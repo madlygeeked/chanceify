@@ -47,7 +47,17 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             // colours, sized to whatever the window is.
             // The very same visualizer, with the very same settings, as
             // everywhere else (Visualizer settings in the right-click menu).
-            let shapes = app.settings.vis_shapes_value();
+            // The mini player has its own look (Off, Bars, Flow or Swirl from
+            // its menu), whatever the big visualizer is set to.
+            let saved_shapes = (app.settings.vis_shapes, app.settings.vis_shapes_set);
+            let shapes = [
+                0,
+                crate::settings::Settings::SHAPE_BARS,
+                crate::settings::Settings::SHAPE_FLOW,
+                crate::settings::Settings::SHAPE_SWIRL,
+            ][app.settings.mini_vis_mode() as usize];
+            app.settings.vis_shapes = shapes;
+            app.settings.vis_shapes_set = true;
             if shapes != 0 {
                 let moving =
                     super::player_bar::lyrics_backdrop(app, ui, area, now.as_ref(), 3);
@@ -62,6 +72,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     ui.ctx().request_repaint_after(std::time::Duration::from_micros(16_667));
                 }
             }
+            (app.settings.vis_shapes, app.settings.vis_shapes_set) = saved_shapes;
             // Right-click anywhere that is not a control for the mini
             // player's options. (Added first, so every control drawn after it
             // keeps its own clicks.)
@@ -116,11 +127,10 @@ fn options_menu(app: &mut App, page: &egui::Response) {
             if widgets::menu_item(ui, &palette, tick(app.settings.mini_volume), "Volume") {
                 app.actions.push(Action::ToggleMiniVolume);
             }
-            if widgets::menu_item(ui, &palette, tick(app.settings.vis_shapes_value() != 0), "Visualizer") {
-                app.actions.push(Action::ToggleVisShapes);
-            }
-            if widgets::menu_item(ui, &palette, Some(Icon::Settings), "Visualizer settings") {
-                app.actions.push(Action::ToggleVisPanel);
+            for (mode, label) in [(0u8, "Nothing moving"), (1, "Bars"), (2, "Flow"), (3, "Swirl")] {
+                if widgets::menu_item(ui, &palette, tick(app.settings.mini_vis_mode() == mode), label) {
+                    app.actions.push(Action::SetMiniVis(mode));
+                }
             }
             widgets::menu_separator(ui, &palette);
             if cfg!(windows)

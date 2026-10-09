@@ -69,8 +69,10 @@ pub(super) fn hero(app: &mut App, ui: &mut egui::Ui, hero: Hero<'_>) {
     ui.add_space(12.0);
     let cover_size = if ui.available_width() > 720.0 {
         212.0
-    } else {
+    } else if ui.available_width() > 520.0 {
         160.0
+    } else {
+        116.0
     };
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 24.0;
@@ -102,7 +104,13 @@ pub(super) fn hero(app: &mut App, ui: &mut egui::Ui, hero: Hero<'_>) {
             ui.spacing_mut().item_spacing.y = 6.0;
             ui.add_space(cover_size * 0.08);
             theme::text(ui, hero.kind.as_ref(), theme::medium(12.5), palette.text);
-            let mut size = if cover_size > 200.0 { 56.0 } else { 40.0 };
+            let mut size = if cover_size > 200.0 {
+                56.0
+            } else if cover_size > 130.0 {
+                40.0
+            } else {
+                30.0
+            };
             loop {
                 let galley = ui.painter().layout_no_wrap(
                     hero.title.to_string(),

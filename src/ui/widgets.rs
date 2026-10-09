@@ -1689,7 +1689,7 @@ pub(crate) fn table_layout(
         // Too many columns for the room. Rather than drop some, every one is
         // squeezed towards a small floor, and the song names give up a bit
         // too. Only if even that is not enough are the last ones dropped.
-        const FLOOR: f32 = 46.0;
+        const FLOOR: f32 = 62.0;
         const TITLE_SQUEEZE: f32 = 110.0;
         let tight = (width - fixed - TITLE_SQUEEZE).max(0.0);
         while !picked.is_empty() && picked.len() as f32 * FLOOR > tight {

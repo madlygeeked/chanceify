@@ -12,13 +12,11 @@ use crate::theme::{self, Icon};
 
 /// Paints the ocean: a soft grid of deep blues and sea greens that drift
 /// into each other over about a minute.
-fn ocean(painter: &egui::Painter, rect: Rect, time: f64) {
+fn ocean(painter: &egui::Painter, rect: Rect, time: f64, tones: [[f32; 3]; 3]) {
     let cols = 36_usize;
     let rows = 22_usize;
     let t = time as f32;
-    let deep = [6.0_f32, 18.0, 34.0];
-    let mid = [20.0_f32, 64.0, 88.0];
-    let glow = [38.0_f32, 104.0, 124.0];
+    let [deep, mid, glow] = tones;
     let mut mesh = egui::Mesh::default();
     for j in 0..=rows {
         for i in 0..=cols {
@@ -51,6 +49,14 @@ fn ocean(painter: &egui::Painter, rect: Rect, time: f64) {
     painter.add(egui::Shape::mesh(mesh));
 }
 
+fn rgb(color: Color32) -> [f32; 3] {
+    [f32::from(color.r()), f32::from(color.g()), f32::from(color.b())]
+}
+
+fn mix(a: [f32; 3], b: [f32; 3], t: f32) -> [f32; 3] {
+    [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+}
+
 pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let ctx = ui.ctx().clone();
     if ctx.input(|input| input.key_pressed(egui::Key::Escape)) {
@@ -62,7 +68,31 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         .frame(Frame::new().fill(Color32::from_rgb(6, 18, 34)))
         .show(ui, |ui| {
             let rect = ui.max_rect();
-            ocean(&ui.painter().with_clip_rect(rect), rect, ctx.input(|input| input.time));
+            let time = ctx.input(|input| input.time);
+            // Colours follow the theme (which follows the album art when
+            // that is on), or the old blue ocean, or a blurred cover.
+            let window = rgb(app.palette.window);
+            let accent = rgb(app.palette.accent);
+            let tones = match app.settings.calm_look {
+                2 => [[6.0, 18.0, 34.0], [20.0, 64.0, 88.0], [38.0, 104.0, 124.0]],
+                _ => [mix(window, [0.0; 3], 0.35), mix(window, accent, 0.35), mix(window, accent, 0.65)],
+            };
+            ocean(&ui.painter().with_clip_rect(rect), rect, time, tones);
+            if app.settings.calm_look == 1
+                && let Some(now) = &now
+            {
+                // The app's own blurred copy of the cover, over the whole window.
+                let url = now.art_url.clone().or_else(|| now.art_small.clone());
+                let art = app.backend.art().clone();
+                if let Some(url) = url
+                    && let Some(handle) = app.softened_covers.texture(&ctx, &art, &url)
+                {
+                    egui::Image::from_texture(egui::load::SizedTexture::from_handle(&handle)).paint_at(ui, rect);
+                    ui.painter().rect_filled(rect, 0.0, Color32::from_black_alpha(130));
+                } else {
+                    ctx.request_repaint_after(std::time::Duration::from_millis(150));
+                }
+            }
             let quiet = Color32::from_gray(185);
             let softer = Color32::from_gray(140);
             let middle = rect.center();
@@ -82,7 +112,30 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         theme::regular(15.0),
                         softer,
                     );
-                    let button = Rect::from_center_size(pos2(middle.x, middle.y + 70.0), vec2(44.0, 44.0));
+                    // The song-length bar above the pause button.
+                    {
+                        let bar = Rect::from_center_size(pos2(middle.x, middle.y + 62.0), vec2(280.0, 6.0));
+                        let hit = bar.expand2(vec2(0.0, 10.0));
+                        let response = ui.interact(hit, egui::Id::new("calm-seek"), egui::Sense::click_and_drag());
+                        let duration = now.duration_ms.max(1);
+                        let mut fraction = (now.position_ms as f32 / duration as f32).clamp(0.0, 1.0);
+                        let preview_id = egui::Id::new("calm-seek-preview");
+                        if let Some(at) = response.interact_pointer_pos().filter(|_| response.dragged() || response.clicked()) {
+                            fraction = ((at.x - bar.left()) / bar.width()).clamp(0.0, 1.0);
+                            ctx.data_mut(|data| data.insert_temp(preview_id, fraction));
+                        }
+                        if response.drag_stopped() || response.clicked() {
+                            app.actions.push(Action::Seek((fraction * duration as f32) as u32));
+                            ctx.data_mut(|data| data.remove::<f32>(preview_id));
+                        }
+                        ui.painter().rect_filled(bar, 3.0, Color32::from_white_alpha(40));
+                        let filled = Rect::from_min_max(bar.min, pos2(bar.left() + bar.width() * fraction, bar.bottom()));
+                        ui.painter().rect_filled(filled, 3.0, Color32::from_gray(200));
+                        let clock = |ms: u32| crate::util::format_duration_ms(ms);
+                        ui.painter().text(pos2(bar.left(), bar.bottom() + 12.0), egui::Align2::LEFT_CENTER, clock((fraction * duration as f32) as u32), theme::regular(11.0), softer);
+                        ui.painter().text(pos2(bar.right(), bar.bottom() + 12.0), egui::Align2::RIGHT_CENTER, clock(now.duration_ms), theme::regular(11.0), softer);
+                    }
+                    let button = Rect::from_center_size(pos2(middle.x, middle.y + 112.0), vec2(44.0, 44.0));
                     let mut child = ui.new_child(
                         egui::UiBuilder::new()
                             .max_rect(button)
@@ -112,6 +165,22 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     );
                 }
             }
+            playlist_picker(app, ui, rect);
+            // How the background looks.
+            {
+                let strip = Rect::from_min_size(pos2(rect.right() - 250.0, rect.bottom() - 40.0), vec2(238.0, 26.0));
+                let mut child = ui.new_child(
+                    egui::UiBuilder::new()
+                        .max_rect(strip)
+                        .layout(egui::Layout::right_to_left(egui::Align::Center)),
+                );
+                for (value, label) in [(2u8, "Ocean"), (1, "Album"), (0, "Theme")] {
+                    if child.selectable_label(app.settings.calm_look == value, label).clicked() {
+                        app.settings.calm_look = value;
+                        app.mark_settings_dirty();
+                    }
+                }
+            }
             ui.painter().text(
                 pos2(middle.x, rect.bottom() - 22.0),
                 egui::Align2::CENTER_CENTER,
@@ -122,4 +191,62 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         });
     // Slow on purpose: a gentle frame rate is all the drift needs.
     ctx.request_repaint_after(std::time::Duration::from_millis(66));
+}
+
+/// A small arrow on the left edge: opens the playlists, and a click plays one.
+fn playlist_picker(app: &mut App, ui: &mut egui::Ui, rect: Rect) {
+    let ctx = ui.ctx().clone();
+    let open_id = egui::Id::new("calm-picker-open");
+    let open: bool = ctx.data(|data| data.get_temp(open_id)).unwrap_or(false);
+    let arrow = Rect::from_center_size(pos2(rect.left() + 22.0, rect.center().y), vec2(34.0, 60.0));
+    let mut child = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(arrow)
+            .layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight)),
+    );
+    let icon = if open { Icon::ChevronLeft } else { Icon::ChevronRight };
+    if theme::icon_button(&mut child, icon, 20.0, Color32::from_gray(140), Color32::from_gray(230), "Play from a playlist").clicked() {
+        ctx.data_mut(|data| data.insert_temp(open_id, !open));
+    }
+    if !open {
+        return;
+    }
+    let playlists: Vec<(String, String)> = app
+        .library
+        .playlists
+        .get()
+        .map(|list| list.iter().map(|p| (p.id.clone(), p.name.clone())).collect())
+        .unwrap_or_default();
+    let mut chosen: Option<String> = None;
+    egui::Area::new(egui::Id::new("calm-picker"))
+        .order(egui::Order::Foreground)
+        .fixed_pos(pos2(rect.left() + 48.0, rect.center().y - 180.0))
+        .show(&ctx, |ui| {
+            Frame::new()
+                .fill(Color32::from_black_alpha(215))
+                .corner_radius(12.0)
+                .inner_margin(10.0)
+                .show(ui, |ui| {
+                    ui.set_width(260.0);
+                    ui.label(egui::RichText::new("Play from").color(Color32::from_gray(150)));
+                    egui::ScrollArea::vertical().max_height(340.0).show(ui, |ui| {
+                        if playlists.is_empty() {
+                            ui.label("No playlists yet.");
+                        }
+                        for (id, name) in &playlists {
+                            if ui.selectable_label(false, name).clicked() {
+                                chosen = Some(id.clone());
+                            }
+                        }
+                    });
+                });
+        });
+    if let Some(id) = chosen {
+        app.actions.push(Action::PlayContext {
+            uri: format!("spotify:playlist:{id}"),
+            offset_uri: None,
+            offset_index: None,
+        });
+        ctx.data_mut(|data| data.insert_temp(open_id, false));
+    }
 }

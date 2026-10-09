@@ -380,10 +380,22 @@ fn central(app: &mut App, ui: &mut egui::Ui) {
                 // it fades out before the song list so nothing in the list
                 // sits on it.
                 if let Some(url) = header_art(app) {
+                    // The app's own softened (blurred) cover first: the egui
+                    // image loader may never be asked for these addresses.
+                    let art = app.backend.art().clone();
                     let image = egui::Image::new(url.as_str()).show_loading_spinner(false);
-                    if let Ok(egui::load::TexturePoll::Ready { texture }) =
-                        image.load_for_size(ui.ctx(), vec2(64.0, 64.0))
-                    {
+                    let soft = app.softened_covers.texture(ui.ctx(), &art, &url);
+                    let loaded = match soft {
+                        Some(handle) => Some(egui::load::SizedTexture::from_handle(&handle)),
+                        None => {
+                            ui.ctx().request_repaint_after(std::time::Duration::from_millis(150));
+                            match image.load_for_size(ui.ctx(), vec2(64.0, 64.0)) {
+                                Ok(egui::load::TexturePoll::Ready { texture }) => Some(texture),
+                                _ => None,
+                            }
+                        }
+                    };
+                    if let Some(texture) = loaded {
                         // The cover keeps its own proportions: only the strip
                         // that fits the header is taken, never stretched.
                         let aspect = (texture.size.x / texture.size.y.max(1.0)).max(0.1);

@@ -425,22 +425,27 @@ fn library_menu_body(app: &mut App, ui: &mut egui::Ui, shelf: Filter, selected: 
     // Three named groups rather than one long list with rules in it: what
     // is shown, how it is ordered, and how it is drawn.
     // What is shown, as one row of buttons: Playlists is the default.
-    ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
-        let palette_for_shelf = app.palette;
-        for (value, label) in &shelves {
-            if shelf_chip(ui, &palette_for_shelf, *value, *value == shelf)
-                .on_hover_text(label.to_string())
-                .clicked()
-            {
-                app.actions.push(Action::SetLibraryShelf(*value));
+    let palette_for_shelf = app.palette;
+    ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+    for pair in shelves.chunks(2) {
+        ui.horizontal(|ui| {
+            ui.add_space(6.0);
+            for (value, label) in pair {
+                if shelf_chip(ui, &palette_for_shelf, *value, *value == shelf)
+                    .on_hover_text(label.to_string())
+                    .clicked()
+                {
+                    app.actions.push(Action::SetLibraryShelf(*value));
+                }
             }
-        }
-    });
+        });
+    }
+    super::widgets::menu_separator(ui, &app.palette);
     // The orders in one row of small buttons, each with a picture.
     let palette_for_sort = app.palette;
-    ui.horizontal_wrapped(|ui| {
+    ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+        ui.add_space(6.0);
         for (sort, label) in &orders {
             if !sort.supports(shelf)
                 || *sort == LibrarySort::Spotify
@@ -465,6 +470,7 @@ fn library_menu_body(app: &mut App, ui: &mut egui::Ui, shelf: Filter, selected: 
             }
         }
     });
+    super::widgets::menu_separator(ui, &app.palette);
     // Three pictures instead of three lines of words: a grid with names, a
     // grid of covers, and a stacked list. Clicking the stacked list again
     // turns its detail line on or off.
@@ -541,7 +547,7 @@ fn sort_chip(
     _label: &str,
     chosen: bool,
 ) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(vec2(38.0, 30.0), Sense::click());
+    let (rect, response) = ui.allocate_exact_size(vec2(44.0, 32.0), Sense::click());
     let fill = if chosen {
         palette.accent.gamma_multiply(0.30)
     } else if response.hovered() {
@@ -687,7 +693,7 @@ fn library_shelves(locale: crate::i18n::Locale) -> [(Filter, std::borrow::Cow<'s
 /// Playlists a list with a note, albums a rounded square with a disc in it,
 /// artists a person, podcasts a microphone.
 fn shelf_chip(ui: &mut egui::Ui, palette: &Palette, shelf: Filter, chosen: bool) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(vec2(38.0, 30.0), Sense::click());
+    let (rect, response) = ui.allocate_exact_size(vec2(44.0, 32.0), Sense::click());
     let fill = if chosen {
         palette.accent.gamma_multiply(0.30)
     } else if response.hovered() {

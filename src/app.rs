@@ -10945,6 +10945,11 @@ impl App {
                 self.show_queue_panel = false;
                 self.show_lyrics_panel = false;
                 self.settings.sidebar_visible = true;
+                // All the playlists at once: the grid, as wide as it can go.
+                self.settings.sidebar_grid = true;
+                self.settings.library_grid_names = true;
+                self.settings.library_shelf = crate::settings::LibraryShelf::Playlists;
+                self.settings.sidebar_width = 5000.0;
                 self.settings_dirty = true;
             }
             Action::ToggleBarSide(bit) => {

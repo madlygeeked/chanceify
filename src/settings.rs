@@ -844,6 +844,8 @@ pub struct Settings {
     pub views_disc: Option<[f32; 2]>,
     /// How much of the Views disc shows when the pointer has been away (0.2 = a fifth).
     pub disc_dim: f32,
+    /// Calm mode's background: 0 the theme's colours, 1 the blurred cover, 2 the blue ocean.
+    pub calm_look: u8,
     /// The pop-out controls: [x, y, width]. None = not shown.
     pub float_controls: Option<[f32; 3]>,
     /// Hovering a theme in the list shows it for the moment.
@@ -1260,6 +1262,7 @@ impl Default for Settings {
             my_view: None,
             views_disc: None,
             disc_dim: 0.2,
+            calm_look: 0,
             float_controls: None,
             theme_point_preview: false,
             discord_playlist: false,
