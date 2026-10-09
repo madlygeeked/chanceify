@@ -1,5 +1,9 @@
 # Terms
 
-chanceify™ is a free personal project, provided as is, with no warranty. It needs a Spotify Premium account and is not affiliated with Spotify or Discord.
+chanceify™ needs a Spotify Premium account.
 
-Don't use it to break things for other people. I can change or stop it at any time.
+chanceify™ is a free personal project, provided as is, with no warranty. 
+
+Don't be malicious towards other people or break things. I can change or stop it at any time.
+
+Love everyone. Or don't. Either way, try and change the world.
