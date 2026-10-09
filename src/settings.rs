@@ -774,6 +774,8 @@ pub struct Settings {
     pub my_view: Option<MyView>,
     /// Where the reader dragged the Views disc to, in points from the window's top left.
     pub views_disc: Option<[f32; 2]>,
+    /// The pop-out controls: [x, y, width]. None = not shown.
+    pub float_controls: Option<[f32; 3]>,
     /// Hovering a theme in the list shows it for the moment.
     #[serde(default = "yes")]
     pub theme_hover_preview: bool,
@@ -868,6 +870,8 @@ pub struct Settings {
     /// queue row anybody actually reads.
     pub queue_show_numbers: bool,
     pub queue_show_time: bool,
+    /// The song length column in the queue and recents (right-click the tabs).
+    pub queue_show_length: bool,
     /// Whether queue rows show the artist under the song name.
     pub queue_show_artist: bool,
     /// Whether queue rows show the playlist icons.
@@ -1175,6 +1179,7 @@ impl Default for Settings {
             discord_swirl: true,
             my_view: None,
             views_disc: None,
+            float_controls: None,
             theme_hover_preview: true,
             discord_playlist: false,
             discord_profile: false,
@@ -1209,6 +1214,7 @@ impl Default for Settings {
             queue_compact: false,
             queue_show_numbers: true,
             queue_show_time: true,
+            queue_show_length: false,
             queue_show_artist: true,
             queue_show_icons: true,
             queue_show_cover: true,
@@ -1591,8 +1597,8 @@ impl Settings {
         "player_bar_vis_flow_depth", "player_bar_vis_flow_offset", "player_bar_vis_flow_sheets",
         "player_bar_vis_flow_speed", "player_bar_vis_gap", "player_bar_vis_hex",
         "player_bar_vis_rise", "player_bar_vis_scale", "queue_compact", "queue_show_artist",
-        "queue_show_cover", "queue_show_icons", "queue_show_numbers", "queue_show_time",
-        "queue_width", "recents_show_artist", "recents_show_cover", "recents_show_icons", "recents_show_numbers", "vis_title_layout", "mini_queue", "mini_volume", "mini_vis", "queue_click", "vis_reverse", "missing_mark_big", "row_order", "seek_anchor", "seek_custom_width", "seek_time_joined", "seek_time_mode",
+        "queue_show_cover", "queue_show_icons", "queue_show_length", "queue_show_numbers", "queue_show_time",
+        "queue_width", "float_controls", "recents_show_artist", "recents_show_cover", "recents_show_icons", "recents_show_numbers", "vis_title_layout", "mini_queue", "mini_volume", "mini_vis", "queue_click", "vis_reverse", "missing_mark_big", "row_order", "seek_anchor", "seek_custom_width", "seek_time_joined", "seek_time_mode",
         "seek_width", "show_shortcut_hints", "sidebar_compact", "sidebar_grid", "sidebar_order",
         "sidebar_width", "swirl_art_scroll", "swirl_art_single", "swirl_art_edge", "swirl_colours_fixed", "swirl_drift", "swirl_peaks",
         "swirl_scale", "swirl_tune", "swirl_warp", "swirl_waves", "theme", "theme_from_cover", "custom_bg", "custom_accent",

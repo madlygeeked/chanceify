@@ -33,3 +33,7 @@ In the shortcuts list (press T) click a key to change it. Shift and Ctrl can go 
 **Play next.** Shift+Ctrl+click (or Shift+Alt+click) a song row puts it at the top of the queue. The "Tap tempo" key is now "Bass jump": press it on the beat and the screen flashes and covers that bounce to the bass jump.
 
 **Rebinding.** Press Ctrl or Shift on its own and the box keeps waiting; only a real key finishes the bind. Under Playback, "Queue the song under the pointer" and "Queue the song under the pointer, to play next" can be put on any key (G, say). Ctrl+click and Shift+Ctrl+click always do the same.
+
+## Views and calm mode (0.76.0)
+- ` (backtick/tilde): back to the default view. Rebindable.
+- Home: calm mode. A slow ocean, the song name and one small play button. Nothing reacts to the music. Home or Esc comes back. Rebindable.

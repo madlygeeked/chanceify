@@ -119,6 +119,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                     if recents {
                         rows.push((4, "Song times", Icon::Clock, settings.queue_show_time));
                     }
+                    rows.push((5, "Song length", Icon::Clock, settings.queue_show_length));
                     for (index, name, icon, shown) in rows.iter() {
                         let index = *index;
                         let label = format!(
@@ -143,6 +144,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                     1 => settings.recents_show_cover = !settings.recents_show_cover,
                     2 => settings.recents_show_artist = !settings.recents_show_artist,
                     3 => settings.recents_show_icons = !settings.recents_show_icons,
+                    5 => settings.queue_show_length = !settings.queue_show_length,
                     _ => settings.queue_show_time = !settings.queue_show_time,
                 }
             } else {
@@ -151,6 +153,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                     1 => settings.queue_show_cover = !settings.queue_show_cover,
                     2 => settings.queue_show_artist = !settings.queue_show_artist,
                     3 => settings.queue_show_icons = !settings.queue_show_icons,
+                    5 => settings.queue_show_length = !settings.queue_show_length,
                     _ => {}
                 }
             }
@@ -360,7 +363,7 @@ fn contents_inner(app: &mut App, ui: &mut egui::Ui, compact: bool) {
                 // row, and its own column set decides which of those two
                 // columns are drawn. The tempo rides with the full row.
                 show_bpm: false,
-                show_time: false,
+                show_time: app.settings.queue_show_length,
                 compact,
                 thin: false,
                 shift: 0.0,
@@ -635,7 +638,7 @@ fn recents_contents_inner(app: &mut App, ui: &mut egui::Ui) {
                 show_added_by: false,
                 // Recents is always the narrow row, so no tempo here.
                 show_bpm: false,
-                show_time: false,
+                show_time: app.settings.queue_show_length,
                 compact: true,
                 thin: false,
                 shift: 0.0,
@@ -703,7 +706,7 @@ fn queue_row(app: &mut App, ui: &mut egui::Ui, index: usize, compact: bool, shif
             added_by: None,
             show_added_by: false,
             show_bpm: false,
-            show_time: false,
+            show_time: app.settings.queue_show_length,
             compact,
             thin: false,
             shift,

@@ -27,6 +27,7 @@ pub mod recap;
 mod views_panel;
 pub mod widgets;
 pub mod winamp;
+pub mod calm;
 
 use egui::{Align2, Color32, Context, CornerRadius, Frame, Id, Margin, Rect, Stroke, vec2};
 
@@ -80,6 +81,13 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     // the thing that moves with the music. Pressing it again brings the
     // window back exactly as it was.
     app.sync_mini_level(ctx);
+    // Calm mode: the whole window is one slow, quiet picture.
+    if app.calm_mode {
+        calm::show(app, ui);
+        keys::handle(app, ctx);
+        toasts(app, ctx, 20.0);
+        return;
+    }
     if app.fullscreen_vis {
         player_bar::show(app, ui);
         lyrics::vis_overlay(app, ui);

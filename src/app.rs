@@ -345,6 +345,8 @@ pub struct App {
     pub recap: Option<crate::ui::recap::Recap>,
     /// The song the pointer is over, set while rows are drawn.
     pub hovered_track: Option<String>,
+    /// Calm mode is showing.
+    pub calm_mode: bool,
     /// A theme shown for a moment while the pointer is over it in Settings.
     pub theme_preview: Option<(Palette, Instant)>,
     theme_previewing: bool,
@@ -1038,6 +1040,7 @@ impl App {
             scroll_top: false,
             recap: None,
             hovered_track: None,
+            calm_mode: false,
             theme_preview: None,
             theme_previewing: false,
             hovered_playable: None,
@@ -10833,6 +10836,19 @@ impl App {
             Action::MoveViewsDisc(place) => {
                 self.settings.views_disc = place;
                 self.mark_settings_dirty();
+            }
+            Action::SetFloatControls(place) => {
+                self.settings.float_controls = place;
+                self.mark_settings_dirty();
+            }
+            Action::ToggleCalm => {
+                self.calm_mode = !self.calm_mode;
+                if self.calm_mode {
+                    self.views_panel = false;
+                    self.vis_panel = false;
+                    self.leave_lyrics_fullscreen(ctx);
+                    self.fullscreen_vis = false;
+                }
             }
             Action::LibraryOnlyView => {
                 self.leave_lyrics_fullscreen(ctx);

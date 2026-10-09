@@ -43,3 +43,10 @@ title: Settings explained
 
 - **Views disc**: a small disc on every screen for mouse-only use. Click it to open Views, drag it anywhere, double-click to put it back. Views also has **Always on top** (any view, not only the mini player), **Save my view** and **My view** (your panels and visualizer, brought back in one press). The theme grid has an All / Dark / Light filter.
 - **Tray**: the tray menu ends with "Quit chanceify completely". Ctrl+W hides to the tray; Ctrl+Q quits.
+
+## 0.76.0
+- Views panel: "Reset the disc" puts the disc back; "Calm mode" preset; "Pop-out controls" switch.
+- Pop-out controls: the buttons and song bar as a panel you drag by its top strip, widen from its right edge, snap onto the library sidebar (right-click the strip), or put away.
+- Queue and Recent tabs: right-click to show or hide "Song length".
+- Track lists: with many columns on, they now squeeze to fit instead of dropping.
+- Recently played times sit in their own column, same spot on every row.

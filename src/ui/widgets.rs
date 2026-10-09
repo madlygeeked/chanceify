@@ -1629,62 +1629,58 @@ pub(crate) fn table_layout(
     let heart = if compact { 0.0 } else { columns.buttons_width() };
     let duration = if compact { 44.0 } else { 56.0 };
     let more = if compact { 0.0 } else { 36.0 };
-    let mut budget = (width - number - cover - heart - duration - more - 8.0 - TITLE_MIN).max(0.0);
-    let mut added = 0.0;
-    let mut added_by = 0.0;
-    let mut bpm = 0.0;
-    let mut release = 0.0;
-    let mut genre = 0.0;
-    let mut playlists = 0.0;
-    let mut album = 0.0;
-    // Tempo before the rest, because it is the narrowest column and the
-    // one a reader most wants left when the window gets tight: three digits
-    // and a label fit in little, whereas an album name does not shrink.
-    if shown.bpm {
-        let wanted = columns.width(crate::model::SortColumn::Bpm);
-        if wanted <= budget {
-            bpm = wanted;
-            budget -= wanted;
+    use crate::model::SortColumn as Sc;
+    let fixed = number + cover + heart + duration + more + 8.0;
+    // In the order they are kept when the room runs short: tempo first,
+    // the album last.
+    let order = [
+        (Sc::Bpm, shown.bpm),
+        (Sc::Added, shown.added),
+        (Sc::Playlists, shown.playlists),
+        (Sc::Release, shown.release),
+        (Sc::Genre, shown.genre),
+        (Sc::AddedBy, shown.added_by),
+        (Sc::Album, shown.album),
+    ];
+    let mut picked: Vec<(Sc, f32)> = order
+        .iter()
+        .filter(|(_, on)| *on)
+        .map(|(column, _)| (*column, columns.width(*column)))
+        .filter(|(_, wanted)| *wanted > 0.0)
+        .collect();
+    let roomy = (width - fixed - TITLE_MIN).max(0.0);
+    let wanted_total: f32 = picked.iter().map(|(_, w)| *w).sum();
+    if wanted_total > roomy {
+        // Too many columns for the room. Rather than drop some, every one is
+        // squeezed towards a small floor, and the song names give up a bit
+        // too. Only if even that is not enough are the last ones dropped.
+        const FLOOR: f32 = 46.0;
+        const TITLE_SQUEEZE: f32 = 110.0;
+        let tight = (width - fixed - TITLE_SQUEEZE).max(0.0);
+        while !picked.is_empty() && picked.len() as f32 * FLOOR > tight {
+            picked.pop();
+        }
+        let extra: f32 = picked.iter().map(|(_, w)| (*w - FLOOR).max(0.0)).sum();
+        let spare = (tight - picked.len() as f32 * FLOOR).max(0.0);
+        let t = if extra > 0.0 { (spare / extra).min(1.0) } else { 0.0 };
+        for (_, w) in picked.iter_mut() {
+            *w = FLOOR + (*w - FLOOR).max(0.0) * t;
         }
     }
-    if shown.added {
-        let wanted = columns.width(crate::model::SortColumn::Added);
-        if wanted <= budget {
-            added = wanted;
-            budget -= wanted;
-        }
-    }
-    if shown.playlists {
-        let wanted = columns.width(crate::model::SortColumn::Playlists);
-        if wanted <= budget {
-            playlists = wanted;
-            budget -= wanted;
-        }
-    }
-    if shown.release {
-        let wanted = columns.width(crate::model::SortColumn::Release);
-        if wanted <= budget {
-            release = wanted;
-            budget -= wanted;
-        }
-    }
-    if shown.genre {
-        let wanted = columns.width(crate::model::SortColumn::Genre);
-        if wanted <= budget {
-            genre = wanted;
-            budget -= wanted;
-        }
-    }
-    if shown.added_by {
-        let wanted = columns.width(crate::model::SortColumn::AddedBy);
-        if wanted <= budget {
-            added_by = wanted;
-            budget -= wanted;
-        }
-    }
-    if shown.album {
-        album = columns.width(crate::model::SortColumn::Album).min(budget);
-    }
+    let get = |column: Sc| {
+        picked
+            .iter()
+            .find(|(c, _)| *c == column)
+            .map(|(_, w)| *w)
+            .unwrap_or(0.0)
+    };
+    let added = get(Sc::Added);
+    let added_by = get(Sc::AddedBy);
+    let bpm = get(Sc::Bpm);
+    let release = get(Sc::Release);
+    let genre = get(Sc::Genre);
+    let playlists = get(Sc::Playlists);
+    let album = get(Sc::Album);
     Columns {
         number,
         cover,
@@ -2007,8 +2003,30 @@ fn track_row_contents(
     }
     let right_fixed =
         cols.heart + if row.show_time { cols.duration } else { 0.0 } + cols.more + 8.0;
+    // "3 min ago" and the like, when there is no date column to hold them:
+    // a column of their own, at the same spot on every row, instead of
+    // trailing after each artist name wherever that happens to end.
+    let ago_label = row
+        .added_at
+        .filter(|added| !added.starts_with("1970-01-01"))
+        .filter(|_| cols.added == 0.0)
+        .map(|added| util::format_relative_date(app.locale, added, jiff::Timestamp::now()));
+    let ago_w = if ago_label.is_some() { 78.0 } else { 0.0 };
     let text_right =
-        rect.right() - right_fixed - cols.added - cols.added_by - cols.album - cols.bpm - cols.release - cols.genre - cols.playlists;
+        rect.right() - right_fixed - cols.added - cols.added_by - cols.album - cols.bpm - cols.release - cols.genre - cols.playlists - ago_w;
+    if let Some(label) = &ago_label {
+        painter.with_clip_rect(Rect::from_min_size(pos2(text_right, rect.top()), vec2(ago_w, row_height)).intersect(painter.clip_rect())).text(
+            pos2(text_right + 6.0, rect.center().y),
+            egui::Align2::LEFT_CENTER,
+            label,
+            theme::regular(12.0),
+            palette.secondary,
+        );
+        if label.ends_with(" ago") {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_secs(1));
+        }
+    }
     // The icons need room of their own, so the title stops short of them.
     // `membership_shown` is the same filter the icons are drawn from, so the
     // reserved space and what is drawn cannot drift apart.
@@ -2108,6 +2126,7 @@ fn track_row_contents(
                 );
                 if let Some(added) = row.added_at.filter(|a| !a.starts_with("1970-01-01"))
                     && cols.added == 0.0
+                    && ago_w == 0.0
                 {
                     let label =
                         util::format_relative_date(app.locale, added, jiff::Timestamp::now());
@@ -2148,6 +2167,7 @@ fn track_row_contents(
                 }
                 if let Some(added) = row.added_at.filter(|a| !a.starts_with("1970-01-01"))
                     && cols.added == 0.0
+                    && ago_w == 0.0
                 {
                     theme::text(
                         &mut child,
@@ -2209,6 +2229,7 @@ fn track_row_contents(
                     );
                     if let Some(added) = row.added_at.filter(|a| !a.starts_with("1970-01-01"))
                         && cols.added == 0.0
+                        && ago_w == 0.0
                     {
                         theme::text(
                             ui,
@@ -2240,6 +2261,7 @@ fn track_row_contents(
                     }
                     if let Some(added) = row.added_at.filter(|a| !a.starts_with("1970-01-01"))
                         && cols.added == 0.0
+                        && ago_w == 0.0
                     {
                         theme::text(
                             ui,
@@ -2338,7 +2360,7 @@ fn track_row_contents(
         {
             let cell = Rect::from_min_size(pos2(x, rect.top()), vec2(cols.added, row_height));
             let label = util::format_relative_date(app.locale, added, jiff::Timestamp::now());
-            painter.text(
+            painter.with_clip_rect(cell.shrink2(vec2(0.0, 0.0)).intersect(painter.clip_rect())).text(
                 pos2(cell.left(), cell.center().y),
                 egui::Align2::LEFT_CENTER,
                 &label,
@@ -2360,7 +2382,8 @@ fn track_row_contents(
         if let PlayableItem::Track(track) = row.item
             && let Some(date) = track.album.as_ref().and_then(|album| album.release_date.as_deref())
         {
-            painter.text(
+            let cell = Rect::from_min_size(pos2(x, rect.top()), vec2((cols.release - 6.0).max(0.0), row_height));
+            painter.with_clip_rect(cell.intersect(painter.clip_rect())).text(
                 pos2(x, rect.center().y),
                 egui::Align2::LEFT_CENTER,
                 date,

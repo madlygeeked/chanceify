@@ -1387,6 +1387,10 @@ pub enum Action {
     LikeHovered,
     /// The library sidebar alone: no queue, no lyrics panel, no full screen.
     LibraryOnlyView,
+    /// Calm mode on or off: a slow ocean, no reaction to the music.
+    ToggleCalm,
+    /// Shows, moves, resizes or puts away the pop-out controls.
+    SetFloatControls(Option<[f32; 3]>),
     SaveMyView,
     ApplyMyView,
     /// The Views disc was dragged to this place (or `None`: back to its own).

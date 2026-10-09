@@ -1360,9 +1360,9 @@ fn controls_box(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f
     }
 }
 
-fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f32, centred: bool) {
+pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f32, centred: bool) -> Option<Rect> {
     let Some(now) = app.now_playing() else {
-        return;
+        return None;
     };
     // The very same buttons and song-length bar as the bottom bar of the
     // normal view, drawn by the same code, on a panel in the theme's colours.
@@ -1400,4 +1400,5 @@ fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, wi
     if now.playing {
         ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
     }
+    Some(outer)
 }
