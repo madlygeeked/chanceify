@@ -43,6 +43,23 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         .frame(Frame::new().fill(palette.window))
         .show(ui, |ui| {
             let area = ui.max_rect();
+            // Something bright moving behind everything, in the cover's
+            // colours, sized to whatever the window is.
+            let vis = app.settings.mini_vis_mode();
+            if vis > 0 {
+                let moving =
+                    super::player_bar::lyrics_backdrop(app, ui, area, now.as_ref(), vis - 1);
+                if vis >= 2 {
+                    // Flow and swirl fill the window: a light veil keeps
+                    // the words readable.
+                    ui.painter()
+                        .with_clip_rect(area)
+                        .rect_filled(area, 0.0, Color32::from_black_alpha(80));
+                }
+                if moving {
+                    ui.ctx().request_repaint_after(std::time::Duration::from_micros(16_667));
+                }
+            }
             // Right-click anywhere that is not a control for the mini
             // player's options. (Added first, so every control drawn after it
             // keeps its own clicks.)
@@ -95,6 +112,12 @@ fn options_menu(app: &mut App, page: &egui::Response) {
             if widgets::menu_item(ui, &palette, tick(app.settings.mini_volume), "Volume") {
                 app.actions.push(Action::ToggleMiniVolume);
             }
+            for (value, label) in [(0u8, "No visualizer"), (1, "Bars"), (2, "Flow"), (3, "Swirl")] {
+                if widgets::menu_item(ui, &palette, tick(app.settings.mini_vis_mode() == value), label) {
+                    app.actions.push(Action::SetMiniVis(value));
+                }
+            }
+            widgets::menu_separator(ui, &palette);
             if widgets::menu_item(ui, &palette, tick(app.settings.mini_on_top), "Float over everything") {
                 app.actions.push(Action::ToggleMiniOnTop);
             }
@@ -148,6 +171,19 @@ fn strip_buttons(app: &mut App, ui: &mut egui::Ui, strip: Rect) {
     .clicked()
     {
         app.actions.push(Action::ToggleMiniQueue);
+    }
+    let volume = app.settings.mini_volume;
+    if theme::icon_button(
+        &mut row,
+        Icon::Volume2,
+        15.0,
+        if volume { palette.accent } else { palette.secondary },
+        if volume { palette.accent_hover } else { palette.text },
+        "Volume",
+    )
+    .clicked()
+    {
+        app.actions.push(Action::ToggleMiniVolume);
     }
     let on_top = app.settings.mini_on_top;
     if theme::icon_button(
@@ -204,7 +240,7 @@ fn portrait(app: &mut App, ui: &mut egui::Ui, body: Rect, now: Option<&NowPlayin
     let words = 52.0 * unit;
     let bars = 30.0 * unit;
     let controls = 46.0 * unit;
-    let volume = if app.settings.mini_volume && body.height() > 300.0 {
+    let volume = if app.settings.mini_volume && body.height() > 200.0 {
         28.0 * unit
     } else {
         0.0
@@ -255,7 +291,7 @@ fn landscape(app: &mut App, ui: &mut egui::Ui, body: Rect, now: Option<&NowPlayi
             .layout(Layout::top_down(Align::Center)),
     );
     // The volume joins the column when there is room for it.
-    let with_volume = app.settings.mini_volume && column.height() >= 150.0 * unit + 30.0;
+    let with_volume = app.settings.mini_volume && column.height() >= 110.0;
     // Centred up and down in the column.
     let content = (52.0 + 30.0 + 46.0 + if with_volume { 28.0 } else { 0.0 }) * unit + 12.0;
     right.add_space(((column.height() - content) / 2.0).max(0.0));

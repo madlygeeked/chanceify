@@ -110,7 +110,7 @@ fn new_releases(app: &mut App, ui: &mut egui::Ui) {
                 &palette,
                 &gettext(
                     app.locale,
-                    "Nothing new in the last 60 days. Press Check now to look at the artists in your playlists.",
+                    "Nothing new in the last 3 months. Press Check now to look at the artists in your playlists.",
                 ),
             );
         }
@@ -118,16 +118,19 @@ fn new_releases(app: &mut App, ui: &mut egui::Ui) {
         return;
     }
     ui.add_space(4.0);
-    let available = ui.available_width();
-    let columns = ((available / 300.0).floor() as usize).clamp(2, 4);
-    let gap = 10.0;
-    let tile_width = (available - gap * (columns as f32 - 1.0)) / columns as f32;
-    let shown: Vec<_> = releases.iter().collect();
-    for row in shown.chunks(columns) {
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = gap;
-            for release in row {
-                let (rect, response) = ui.allocate_exact_size(vec2(tile_width, 60.0), Sense::click());
+    // One numbered list, the newest first, as far back as the check goes
+    // (about three months). It scrolls inside its own box.
+    let mut shown: Vec<_> = releases.iter().collect();
+    shown.sort_by(|a, b| b.date.cmp(&a.date));
+    egui::ScrollArea::vertical()
+        .id_salt("new-releases-list")
+        .max_height(440.0)
+        .auto_shrink([false, true])
+        .show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 6.0;
+            for (index, release) in shown.iter().enumerate() {
+                let (rect, response) =
+                    ui.allocate_exact_size(vec2(ui.available_width(), 60.0), Sense::click());
                 if !ui.is_rect_visible(rect) {
                     continue;
                 }
@@ -137,7 +140,15 @@ fn new_releases(app: &mut App, ui: &mut egui::Ui) {
                     CornerRadius::same(6),
                     if hovered { palette.surface_hover } else { palette.surface },
                 );
-                let cover = Rect::from_min_size(rect.min, Vec2::splat(60.0));
+                let number = Rect::from_min_size(rect.min, vec2(40.0, 60.0));
+                ui.painter().text(
+                    number.center(),
+                    egui::Align2::CENTER_CENTER,
+                    format!("{}", index + 1),
+                    theme::semibold(13.0),
+                    palette.dim,
+                );
+                let cover = Rect::from_min_size(pos2(rect.left() + 40.0, rect.top()), Vec2::splat(60.0));
                 widgets::paint_cover(
                     ui,
                     &palette,
@@ -180,7 +191,6 @@ fn new_releases(app: &mut App, ui: &mut egui::Ui) {
                 }
             }
         });
-    }
     ui.add_space(16.0);
 }
 
@@ -300,30 +310,40 @@ fn ranked_shelf(app: &mut App, ui: &mut egui::Ui, songs: bool, now: i64) {
         ui.add_space(12.0);
         return;
     }
-    crate::autoscroll::show(
-        ui,
-        egui::ScrollArea::horizontal().id_salt(if songs { "stats-songs" } else { "stats-artists" }),
-        egui::Vec2b::new(true, false),
-        |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 10.0;
-                for (index, row) in rows.iter().enumerate() {
-                    stat_tile(app, ui, row, songs, index);
-                }
-            });
-        },
-    );
+    // A grid that fills the page's width, no sideways scrolling.
+    let gap = 10.0;
+    let available = ui.available_width();
+    let columns = ((available / 260.0).floor() as usize).clamp(1, 6);
+    let width = (available - gap * (columns as f32 - 1.0)) / columns as f32;
+    let mut index = 0;
+    for chunk in rows.chunks(columns) {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = gap;
+            for row in chunk {
+                stat_tile(app, ui, row, songs, index, width);
+                index += 1;
+            }
+        });
+    }
     ui.add_space(14.0);
 }
 
 /// One ranked artist or song. Clicking it opens the artist or plays the
 /// song; clicking the artist's name under a song opens that artist.
-fn stat_tile(app: &mut App, ui: &mut egui::Ui, row: &crate::stats::Ranked, song: bool, index: usize) {
+fn stat_tile(
+    app: &mut App,
+    ui: &mut egui::Ui,
+    row: &crate::stats::Ranked,
+    song: bool,
+    index: usize,
+    width: f32,
+) {
     let palette = app.palette;
-    let (rect, response) = ui.allocate_exact_size(vec2(250.0, 60.0), Sense::click());
+    let (rect, response) = ui.allocate_exact_size(vec2(width, 60.0), Sense::click());
     if !ui.is_rect_visible(rect) {
         return;
     }
+    let image = app.stat_picture(&row.uri, &row.artist_id, song);
     let hovered = response.hovered();
     ui.painter().rect_filled(
         rect,
@@ -331,20 +351,25 @@ fn stat_tile(app: &mut App, ui: &mut egui::Ui, row: &crate::stats::Ranked, song:
         if hovered { palette.surface_hover } else { palette.surface },
     );
     let badge = Rect::from_min_size(rect.min, Vec2::splat(60.0));
-    ui.painter().rect_filled(badge, CornerRadius::same(6), palette.surface_hover);
-    theme::paint_icon(
+    widgets::paint_cover(
         ui,
-        if song { Icon::Music } else { Icon::Headphones },
+        &palette,
+        image.as_deref(),
         badge,
-        24.0,
-        palette.secondary,
+        6.0,
+        if song { Icon::Music } else { Icon::Headphones },
+        Some(app.backend.art()),
     );
+    // The rank, on a small dark chip so it reads over any picture.
+    let chip = Rect::from_min_size(badge.min + vec2(3.0, 3.0), vec2(20.0, 16.0));
+    ui.painter()
+        .rect_filled(chip, CornerRadius::same(4), egui::Color32::from_black_alpha(150));
     ui.painter().text(
-        pos2(badge.left() + 5.0, badge.top() + 4.0),
-        egui::Align2::LEFT_TOP,
+        chip.center(),
+        egui::Align2::CENTER_CENTER,
         format!("{}", index + 1),
         theme::semibold(11.0),
-        palette.dim,
+        egui::Color32::WHITE,
     );
     let text = Rect::from_min_max(
         pos2(badge.right() + 10.0, rect.top()),
@@ -1118,25 +1143,8 @@ fn recommendations(app: &mut App, ui: &mut egui::Ui) {
         tracks = Loadable::Loaded(kept);
     }
     let title = gettext(app.locale, "Recommended for you");
-    let choice = app.settings.home.recommended_shown;
-    let limit = match choice {
-        1 => 10,
-        2 => 40,
-        3 => 200,
-        _ => 20,
-    };
-    track_list(app, ui, &title, tracks, limit, None, None);
-    let palette = app.palette;
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 8.0;
-        theme::subtle(ui, &palette, &gettext(app.locale, "How many to show:"));
-        for (label, value) in [("10", 1u8), ("20", 0), ("40", 2), ("All", 3)] {
-            if theme::pill_button(ui, &palette, label, choice == value).clicked() && choice != value {
-                app.settings.home.recommended_shown = value;
-                app.mark_settings_dirty();
-            }
-        }
-    });
+    // Always the whole list.
+    track_list(app, ui, &title, tracks, usize::MAX, None, None);
     ui.add_space(14.0);
 }
 

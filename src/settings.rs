@@ -861,6 +861,10 @@ pub struct Settings {
     pub mini_on_top: bool,
     /// Whether the floating mini player fades while the pointer is away.
     pub mini_fade: bool,
+    /// What moves behind the mini player: 0 nothing, 1 bars, 2 flow, 3
+    /// swirl; never chosen means bars.
+    #[serde(default)]
+    pub mini_vis: Option<u8>,
     /// Folders of music files, besides the songs folder, that the Local
     /// songs page reads.
     pub music_folders: Vec<String>,
@@ -1168,6 +1172,7 @@ impl Default for Settings {
             mini_volume: true,
             mini_on_top: false,
             mini_fade: true,
+            mini_vis: None,
             music_folders: Vec::new(),
             lastfm_api_key: String::new(),
             lastfm_secret: String::new(),
@@ -1405,6 +1410,11 @@ impl Settings {
         if self.bar_stacked { 1 } else { self.bar_layout.min(3) }
     }
 
+    /// What moves behind the mini player (see `mini_vis`).
+    pub fn mini_vis_mode(&self) -> u8 {
+        self.mini_vis.unwrap_or(1).min(3)
+    }
+
     /// How strongly the title sways, 0.2 to 3.
     pub fn vis_sway_strength(&self) -> f32 {
         let value = self.vis_sway_amount;
@@ -1524,7 +1534,7 @@ impl Settings {
         "player_bar_vis_flow_speed", "player_bar_vis_gap", "player_bar_vis_hex",
         "player_bar_vis_rise", "player_bar_vis_scale", "queue_compact", "queue_show_artist",
         "queue_show_cover", "queue_show_icons", "queue_show_numbers", "queue_show_time",
-        "queue_width", "recents_show_artist", "recents_show_cover", "recents_show_icons", "recents_show_numbers", "vis_title_layout", "mini_queue", "mini_volume", "row_order", "seek_anchor", "seek_custom_width", "seek_time_joined", "seek_time_mode",
+        "queue_width", "recents_show_artist", "recents_show_cover", "recents_show_icons", "recents_show_numbers", "vis_title_layout", "mini_queue", "mini_volume", "mini_vis", "row_order", "seek_anchor", "seek_custom_width", "seek_time_joined", "seek_time_mode",
         "seek_width", "show_shortcut_hints", "sidebar_compact", "sidebar_grid", "sidebar_order",
         "sidebar_width", "swirl_art_scroll", "swirl_art_single", "swirl_art_edge", "swirl_colours_fixed", "swirl_drift", "swirl_peaks",
         "swirl_scale", "swirl_tune", "swirl_warp", "swirl_waves", "theme", "theme_from_cover", "custom_bg", "custom_accent",
@@ -1582,6 +1592,8 @@ impl Settings {
     pub const LYRICS_FLOAT_ART: u8 = 8;
     /// The big cover swells with the music's bass.
     pub const LYRICS_BOUNCE_ART: u8 = 16;
+    /// The artist's name is left off the lyrics page; the song's is bigger.
+    pub const LYRICS_HIDE_ARTIST: u8 = 32;
 
     pub fn lyrics_align_value(&self) -> u8 {
         // The old plain Centre (1) became the middle focus mode.

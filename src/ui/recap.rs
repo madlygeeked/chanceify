@@ -156,6 +156,21 @@ fn card(
         CornerRadius { nw: 18, ne: 18, sw: 0, se: 0 },
         palette.accent,
     );
+    // A soft glow of the accent under the stripe, so the top is not flat.
+    super::widgets::paint_vertical_gradient(
+        ui,
+        Rect::from_min_size(rect.min + vec2(1.0, 8.0), vec2(CARD.x - 2.0, 170.0)),
+        palette.accent.gamma_multiply(0.28),
+        egui::Color32::TRANSPARENT,
+    );
+    // The chanceify logo, the vinyl, at the top right.
+    let logo = logo_texture(ui.ctx());
+    painter.image(
+        logo.id(),
+        Rect::from_min_size(pos2(rect.right() - 28.0 - 46.0, rect.top() + 26.0), vec2(46.0, 46.0)),
+        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+        egui::Color32::WHITE,
+    );
     let left = rect.left() + 28.0;
     let mut y = rect.top() + 34.0;
     painter.text(
@@ -177,11 +192,16 @@ fn card(
         (hours, "listened"),
         (streak.to_string(), "day streak"),
     ] {
+        painter.rect_filled(
+            Rect::from_min_size(pos2(x - 10.0, y - 8.0), vec2(128.0, 60.0)),
+            CornerRadius::same(10),
+            palette.surface,
+        );
         painter.text(pos2(x, y), egui::Align2::LEFT_TOP, &big, theme::semibold(24.0), palette.accent);
         painter.text(pos2(x, y + 30.0), egui::Align2::LEFT_TOP, small, theme::regular(12.5), palette.secondary);
         x += 140.0;
     }
-    y += 68.0;
+    y += 72.0;
     for (heading, rows, with_sub) in [("Top artists", artists, false), ("Top songs", songs, true)] {
         painter.text(pos2(left, y), egui::Align2::LEFT_TOP, heading, theme::semibold(15.0), palette.text);
         y += 26.0;
@@ -220,14 +240,35 @@ fn card(
         }
         y += 14.0;
     }
+    painter.image(
+        logo.id(),
+        Rect::from_min_size(pos2(left, rect.bottom() - 36.0), vec2(22.0, 22.0)),
+        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+        egui::Color32::WHITE,
+    );
     painter.text(
-        pos2(left, rect.bottom() - 30.0),
+        pos2(left + 30.0, rect.bottom() - 32.0),
         egui::Align2::LEFT_TOP,
         "chanceify\u{2122}  -  built with love by chance",
         theme::regular(12.0),
         palette.secondary,
     );
     rect
+}
+
+/// The vinyl logo as a texture, made once.
+fn logo_texture(ctx: &egui::Context) -> egui::TextureHandle {
+    let id = egui::Id::new("recap-logo");
+    if let Some(texture) = ctx.data(|data| data.get_temp::<egui::TextureHandle>(id)) {
+        return texture;
+    }
+    let texture = ctx.load_texture(
+        "recap-logo",
+        crate::app_icons::thumbnail(3),
+        egui::TextureOptions::LINEAR,
+    );
+    ctx.data_mut(|data| data.insert_temp(id, texture.clone()));
+    texture
 }
 
 fn shorten(text: &str, max: usize) -> String {

@@ -351,7 +351,8 @@ fn contents_inner(app: &mut App, ui: &mut egui::Ui, compact: bool) {
                 item: current,
                 context: &context,
                 show_cover: app.settings.queue_show_cover,
-                show_album: !compact,
+                // Never the album: open the song to see it.
+                show_album: false,
                 added_at: None,
                 added_by: None,
                 show_added_by: false,

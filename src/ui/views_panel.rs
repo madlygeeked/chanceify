@@ -8,7 +8,6 @@ use egui::{Color32, Context, CornerRadius, Frame, Id, Margin, Stroke};
 
 use crate::app::App;
 use crate::model::Action;
-use crate::settings::PlayerBarVis;
 use crate::theme::{self, Icon, Palette};
 
 use super::widgets;
@@ -66,7 +65,7 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
                 22.0,
                 Color32::from_white_alpha(150),
                 palette.text,
-                "Views and panels (click or right-click)",
+                "Views",
             );
             if button.clicked() || button.secondary_clicked() {
                 app.actions.push(Action::ToggleViewsPanel);
@@ -92,7 +91,7 @@ pub fn show(app: &mut App, ctx: &Context) {
             color: Color32::from_black_alpha(160),
         });
     let mut open = true;
-    egui::Window::new("Views and panels")
+    egui::Window::new("Views")
         .id(Id::new("views-panel"))
         .open(&mut open)
         .order(egui::Order::Foreground)
@@ -105,21 +104,14 @@ pub fn show(app: &mut App, ctx: &Context) {
         .show(ctx, |ui| {
             ui.visuals_mut().override_text_color = Some(palette.text);
             egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui| {
-                theme::text(
-                    ui,
-                    "Switch each one on or off. Drag the title to move this window; drag its edge to resize it.",
-                    theme::regular(12.0),
-                    palette.secondary,
-                );
-                ui.add_space(8.0);
                 let rows: [(&str, bool, Action); 9] = [
-                    ("Library sidebar", app.settings.sidebar_visible, Action::ToggleSidebar),
-                    ("Queue and recently played", app.show_queue_panel, Action::ToggleQueuePanel),
-                    ("Lyrics, small (side panel)", app.show_lyrics_panel, Action::ToggleLyricsPanel),
-                    ("Lyrics, big (full screen)", app.lyrics_fullscreen.is_some(), Action::ToggleLyricsFullscreen),
-                    ("Visualizer, full screen", app.fullscreen_vis, Action::ToggleFullscreenVis),
+                    ("Library", app.settings.sidebar_visible, Action::ToggleSidebar),
+                    ("Queue", app.show_queue_panel, Action::ToggleQueuePanel),
+                    ("Side lyrics", app.show_lyrics_panel, Action::ToggleLyricsPanel),
+                    ("Full screen lyrics", app.lyrics_fullscreen.is_some(), Action::ToggleLyricsFullscreen),
+                    ("Full screen visualizer", app.fullscreen_vis, Action::ToggleFullscreenVis),
                     ("Visualizer settings", app.vis_panel, Action::ToggleVisPanel),
-                    ("Visualizer shapes on", app.settings.vis_shapes_value() != 0, Action::ToggleVisShapes),
+                    ("Visualizer", app.settings.vis_shapes_value() != 0, Action::ToggleVisShapes),
                     ("Big album art", app.settings.art_expanded, Action::ToggleArtExpanded),
                     ("Mini player", app.mini_active, Action::ToggleMiniPlayer),
                 ];
@@ -136,39 +128,17 @@ pub fn show(app: &mut App, ctx: &Context) {
                     ui.add_space(2.0);
                 }
                 ui.add_space(8.0);
-                theme::text(ui, "Visualizer behind the player bar", theme::medium(13.5), palette.text);
-                ui.add_space(2.0);
-                ui.horizontal_wrapped(|ui| {
-                    ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
-                    for (mode, label) in [
-                        (PlayerBarVis::Off, "Off"),
-                        (PlayerBarVis::Spectrum, "Spectrum"),
-                        (PlayerBarVis::Flow, "Flow"),
-                        (PlayerBarVis::Swirl, "Swirl"),
-                        (PlayerBarVis::Waveform, "Waveform"),
-                    ] {
-                        if theme::soft_button(ui, &palette, None, label, app.settings.player_bar_vis == mode)
-                            .clicked()
-                            && app.settings.player_bar_vis != mode
-                        {
-                            app.settings.player_bar_vis = mode;
-                            app.settings.vis_shapes_set = false;
-                            app.actions.push(Action::SettingsChanged);
-                        }
-                    }
-                });
-                ui.add_space(8.0);
                 zoom_row(ui, app, &palette);
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
-                    if theme::soft_button(ui, &palette, None, "Back to normal view", false).clicked() {
+                    if theme::soft_button(ui, &palette, None, "Normal view", false).clicked() {
                         app.actions.push(Action::NormalView);
                     }
-                    if theme::soft_button(ui, &palette, None, "Put the controls and volume back", false).clicked() {
+                    if theme::soft_button(ui, &palette, None, "Default controls", false).clicked() {
                         app.actions.push(Action::ResetBlockNudge);
                     }
-                    if theme::soft_button(ui, &palette, Some(Icon::Info), "Keyboard shortcuts", false).clicked() {
+                    if theme::soft_button(ui, &palette, Some(Icon::Info), "Shortcuts", false).clicked() {
                         app.actions.push(Action::ShowDialog(crate::model::Dialog::Shortcuts));
                     }
                 });

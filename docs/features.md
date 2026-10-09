@@ -9,7 +9,7 @@ title: What it does
 - **Last.fm.** Scrobbling, love, and missing cover art saved for you.
 - **Looks.** 16 themes, your own colours, colours that follow the album cover, and several visualizers.
 - **Keys.** Every key can be changed. Try a ready-made set, export, import, or save as the default.
-- **Views and panels.** Right-click the round disc to open a floating panel that switches every part of the screen on or off.
+- **Views.** Right-click the round disc to open a floating panel that switches every part of the screen on or off.
 - **Your files stay with you.** Everything is saved in the folder beside the app.
 
 [Back](./)

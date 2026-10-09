@@ -28,7 +28,10 @@ pub struct Bindable {
 pub fn fixed_for(group: &str) -> Vec<(&'static str, &'static str)> {
     let ctrl = |ctrl: &'static str, cmd: &'static str| platform_shortcut(ctrl, cmd);
     match group {
-        "Views" => vec![("Esc", "Leave full-screen lyrics")],
+        "Views" => vec![
+            ("Esc", "Leave full screen, go to the top"),
+            (QUIT_SHORTCUT, "Quit"),
+        ],
         "Song lists" => vec![
             ("Delete", "Remove from this playlist"),
             (ctrl("Ctrl+A", "Cmd+A"), "Select all songs"),
@@ -36,9 +39,6 @@ pub fn fixed_for(group: &str) -> Vec<(&'static str, &'static str)> {
             (ctrl("Ctrl+X", "Cmd+X"), "Cut the selected songs"),
             (ctrl("Ctrl+V", "Cmd+V"), "Add the pasted links"),
             ("Shift+↑/↓", "Extend or shrink the selection"),
-        ],
-        "Window" => vec![
-            (QUIT_SHORTCUT, "Quit"),
         ],
         _ => Vec::new(),
     }
@@ -52,65 +52,79 @@ pub fn is_set(app: &App, id: &str) -> bool {
     chord(app, id).is_some()
 }
 
-/// A saved choice: a key, with Shift held or not.
-fn parse_chord(text: &str) -> Option<(Key, bool)> {
-    let (shift, name) = match text.strip_prefix("Shift+") {
-        Some(rest) => (true, rest),
-        None => (false, text),
-    };
+/// A key with the modifiers held with it: Shift, and Ctrl (Cmd on a Mac).
+pub type Chord = (Key, bool, bool);
+
+/// A saved choice: a key, with Shift and/or Ctrl held or not, written like
+/// `K`, `Shift+K`, `Ctrl+Z` or `Ctrl+Shift+ArrowUp`.
+fn parse_chord(text: &str) -> Option<Chord> {
+    let mut name = text;
+    let (mut shift, mut ctrl) = (false, false);
+    loop {
+        if let Some(rest) = name.strip_prefix("Shift+") {
+            shift = true;
+            name = rest;
+        } else if let Some(rest) = name.strip_prefix("Ctrl+") {
+            ctrl = true;
+            name = rest;
+        } else {
+            break;
+        }
+    }
     let key = Key::from_name(name)?;
-    (key != UNSET).then_some((key, shift))
+    (key != UNSET).then_some((key, shift, ctrl))
 }
 
-fn chord_text(key: Key, shift: bool) -> String {
-    if shift {
-        format!("Shift+{}", key.name())
-    } else {
-        key.name().to_string()
-    }
+fn chord_text(key: Key, shift: bool, ctrl: bool) -> String {
+    format!(
+        "{}{}{}",
+        if ctrl { "Ctrl+" } else { "" },
+        if shift { "Shift+" } else { "" },
+        key.name()
+    )
 }
 
 /// The key (and whether Shift goes with it) a shortcut is on now, if any.
-pub fn chord(app: &App, id: &str) -> Option<(Key, bool)> {
+pub fn chord(app: &App, id: &str) -> Option<Chord> {
     match app.settings.key_bindings.get(id) {
         // A saved choice, which may be "no key" (cleared).
         Some(text) => parse_chord(text),
         None => BINDABLE
             .iter()
             .find(|b| b.id == id)
-            .and_then(|b| (b.default != UNSET).then_some((b.default, false))),
+            .and_then(|b| (b.default != UNSET).then_some((b.default, false, false))),
     }
 }
 
 /// How a shortcut's key is written, such as `K` or `Shift+ArrowLeft`.
 pub fn chord_label(app: &App, id: &str) -> Option<String> {
-    chord(app, id).map(|(key, shift)| chord_text(key, shift))
+    chord(app, id).map(|(key, shift, ctrl)| chord_text(key, shift, ctrl))
 }
 
 /// The shortcuts that can be rebound, each one a single key.
 pub const BINDABLE: &[Bindable] = &[
     // Panels and views.
-    Bindable { id: "sidebar", label: "Show or hide the library sidebar", default: UNSET, action: || Action::ToggleSidebar },
-    Bindable { id: "queue", label: "Queue and recently played", default: UNSET, action: || Action::ToggleQueuePanel },
-    Bindable { id: "queuelyrics", label: "Queue and lyrics together (again to close both)", default: Key::X, action: || Action::ToggleQueueAndLyrics },
-    Bindable { id: "lyrics", label: "Lyrics side panel", default: UNSET, action: || Action::ToggleLyricsPanel },
+    Bindable { id: "sidebar", label: "Library", default: UNSET, action: || Action::ToggleSidebar },
+    Bindable { id: "queue", label: "Queue", default: UNSET, action: || Action::ToggleQueuePanel },
+    Bindable { id: "queuelyrics", label: "Queue and lyrics", default: Key::X, action: || Action::ToggleQueueAndLyrics },
+    Bindable { id: "lyrics", label: "Side lyrics", default: UNSET, action: || Action::ToggleLyricsPanel },
     Bindable { id: "visualizer", label: "Visualizer settings", default: Key::B, action: || Action::ToggleVisPanel },
-    Bindable { id: "art", label: "Big or small album art", default: UNSET, action: || Action::ToggleArtExpanded },
-    Bindable { id: "normalview", label: "Normal view (close lyrics, queue, fullscreen)", default: UNSET, action: || Action::NormalView },
-    Bindable { id: "views", label: "Views and panels (all the switches)", default: Key::Z, action: || Action::ToggleViewsPanel },
+    Bindable { id: "art", label: "Big album art", default: UNSET, action: || Action::ToggleArtExpanded },
+    Bindable { id: "normalview", label: "Normal view", default: UNSET, action: || Action::NormalView },
+    Bindable { id: "views", label: "Views", default: Key::Z, action: || Action::ToggleViewsPanel },
     Bindable { id: "mini", label: "Mini player", default: Key::M, action: || Action::ToggleMiniPlayer },
     // Fullscreen.
     Bindable { id: "fullscreen", label: "Full-screen visualizer", default: Key::V, action: || Action::ToggleFullscreenVis },
     Bindable { id: "lyricsfull", label: "Full-screen lyrics", default: Key::C, action: || Action::ToggleLyricsFullscreen },
-    Bindable { id: "visshapes", label: "Visualizer on or off", default: UNSET, action: || Action::ToggleVisShapes },
+    Bindable { id: "visshapes", label: "Visualizer", default: UNSET, action: || Action::ToggleVisShapes },
     // Playback.
-    Bindable { id: "playpause", label: "Play or pause", default: UNSET, action: || Action::TogglePlay },
-    Bindable { id: "shuffle", label: "Toggle shuffle", default: UNSET, action: || Action::ToggleShuffle },
-    Bindable { id: "repeat", label: "Cycle repeat", default: UNSET, action: || Action::CycleRepeat },
-    Bindable { id: "mute", label: "Mute or unmute", default: UNSET, action: || Action::ToggleMute },
+    Bindable { id: "playpause", label: "Play", default: UNSET, action: || Action::TogglePlay },
+    Bindable { id: "shuffle", label: "Shuffle", default: UNSET, action: || Action::ToggleShuffle },
+    Bindable { id: "repeat", label: "Repeat", default: UNSET, action: || Action::CycleRepeat },
+    Bindable { id: "mute", label: "Mute", default: UNSET, action: || Action::ToggleMute },
     Bindable { id: "back10", label: "Seek back 10 seconds", default: UNSET, action: || Action::SeekBy(-10_000) },
     Bindable { id: "forward10", label: "Seek forward 10 seconds", default: UNSET, action: || Action::SeekBy(10_000) },
-    Bindable { id: "seekwidth", label: "Short, medium or full seek bar", default: UNSET, action: || Action::CycleSeekWidth },
+    Bindable { id: "seekwidth", label: "Seek bar length", default: UNSET, action: || Action::CycleSeekWidth },
     Bindable { id: "sharediscord", label: "Copy the song for Discord", default: UNSET, action: || Action::ShareToDiscord },
     Bindable { id: "lastfmlove", label: "Love the song on Last.fm", default: UNSET, action: || Action::LastfmLove },
     Bindable { id: "likehover", label: "Like the song under the pointer", default: UNSET, action: || Action::LikeHovered },
@@ -151,7 +165,7 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "closewindow", label: "Close the window", default: UNSET, action: || Action::CloseWindow },
     Bindable { id: "undo", label: "Undo a removal", default: UNSET, action: || Action::UndoRemoval },
     // Other.
-    Bindable { id: "tutorial", label: "Keyboard shortcuts (this list)", default: Key::T, action: || Action::ShowDialog(Dialog::Shortcuts) },
+    Bindable { id: "tutorial", label: "Shortcuts", default: Key::T, action: || Action::ShowDialog(Dialog::Shortcuts) },
 ];
 
 /// The key binds a new install starts with, baked in from
@@ -193,14 +207,13 @@ pub fn read_keys(text: &str) -> Option<std::collections::BTreeMap<String, String
 /// The groups the shortcuts list is shown in, in order, and which shortcut
 /// belongs in each.
 pub const CATEGORIES: &[(&str, &[&str])] = &[
-    ("Views", &["views", "normalview", "mini", "fullscreen", "lyricsfull", "visshapes", "art"]),
+    ("Views", &["views", "normalview", "mini", "fullscreen", "lyricsfull", "visshapes", "art", "closewindow"]),
     ("Panels", &["sidebar", "queuelyrics", "queue", "lyrics", "visualizer", "scenes"]),
     ("Playback", &["playpause", "playspace", "next", "previous", "shuffle", "repeat", "speed", "tap", "lastfmlove", "sharediscord", "likehover", "likeplaying"]),
     ("Volume", &["mute", "volup", "voldown", "volup5", "voldown5"]),
     ("Jump in the song", &["back10", "forward10", "seekback5", "seekfwd5", "seekwidth", "tenth0", "tenth1", "tenth2", "tenth3", "tenth4", "tenth5", "tenth6", "tenth7", "tenth8", "tenth9"]),
     ("Going places", &["search", "home", "liked", "settings", "pageback", "pageforward", "artistpage", "albumpage", "tutorial"]),
-    ("Song lists", &[]),
-    ("Window", &["closewindow", "undo"]),
+    ("Song lists", &["undo"]),
 ];
 
 /// The id of the shortcut waiting for its new key, if any.
@@ -232,21 +245,23 @@ pub fn capture_rebind(app: &mut App, ctx: &egui::Context) -> bool {
                 repeat: false,
                 modifiers,
                 ..
-            } => Some((*key, modifiers.shift, modifiers.command || modifiers.alt)),
+            } => Some((*key, modifiers.shift, modifiers.command, modifiers.alt)),
             _ => None,
         })
     });
-    if let Some((key, shift, other_modifier)) = pressed {
-        if other_modifier && key != Key::Escape {
-            app.toast("Only a plain key, or Shift with a key, can be used here.");
+    if let Some((key, shift, ctrl, alt)) = pressed {
+        if alt && key != Key::Escape {
+            app.toast("Alt cannot be used here. Use a key, with Shift or Ctrl if you like.");
+        } else if ctrl && key == Key::Q {
+            app.toast("Ctrl+Q always quits. Pick another.");
         } else if is_reserved(key) {
             app.toast("That key is reserved (see Keys that never change). Pick another.");
         } else if key != Key::Escape {
-            let text = chord_text(key, shift);
+            let text = chord_text(key, shift, ctrl);
             // A key already in use is taken from the shortcut that had it.
             let taken: Vec<&'static str> = BINDABLE
                 .iter()
-                .filter(|b| b.id != id && chord(app, b.id) == Some((key, shift)))
+                .filter(|b| b.id != id && chord(app, b.id) == Some((key, shift, ctrl)))
                 .map(|b| b.id)
                 .collect();
             for other in taken {
@@ -351,14 +366,23 @@ pub fn handle(app: &mut App, ctx: &egui::Context) {
         app.settings.keymap_version = 7;
         app.actions.push(Action::SettingsChanged);
     }
+    // 0.71: the mini player no longer fades when the pointer is away unless
+    // it is switched on again. Done once.
+    if app.settings.keymap_version < 8 {
+        app.settings.mini_fade = false;
+        app.settings.keymap_version = 8;
+        app.actions.push(Action::SettingsChanged);
+    }
     // The keys the reader has chosen, read once, before the input is
     // borrowed. Shift versions are read first: egui ignores an extra Shift
     // when it matches, so the plain key would otherwise take them.
-    let mut chords: Vec<(Key, bool, fn() -> Action)> = BINDABLE
+    let mut chords: Vec<(Key, bool, bool, fn() -> Action)> = BINDABLE
         .iter()
-        .filter_map(|b| chord(app, b.id).map(|(key, shift)| (key, shift, b.action)))
+        .filter_map(|b| chord(app, b.id).map(|(key, shift, ctrl)| (key, shift, ctrl, b.action)))
         .collect();
-    chords.sort_by_key(|(_, shift, _)| !*shift);
+    // The ones with more modifiers first, so Ctrl+Shift+K is not taken by
+    // Ctrl+K or K.
+    chords.sort_by_key(|(_, shift, ctrl, _)| std::cmp::Reverse(u8::from(*shift) + u8::from(*ctrl)));
     // A focused song row still takes Ctrl+arrow to change songs; a text
     // field uses those keys to move its caret.
     let editing_text = ctx.text_edit_focused();
@@ -377,8 +401,14 @@ pub fn handle(app: &mut App, ctx: &egui::Context) {
     // A text field keeps its letters; anything else, even a focused song
     // row or button, lets them through.
     if !editing_text {
-        for (assigned, shift, make) in &chords {
-            let modifiers = if *shift { Modifiers::SHIFT } else { Modifiers::NONE };
+        for (assigned, shift, ctrl, make) in &chords {
+            let mut modifiers = Modifiers::NONE;
+            if *shift {
+                modifiers = modifiers | Modifiers::SHIFT;
+            }
+            if *ctrl {
+                modifiers = modifiers | Modifiers::COMMAND;
+            }
             if ctx.input_mut(|input| input.consume_key(modifiers, *assigned)) {
                 actions.push(make());
             }
@@ -729,10 +759,13 @@ mod tests {
     fn every_shortcut_starts_unset_and_a_choice_may_carry_shift() {
         // Only the mini player starts on a key: M.
         assert!(BINDABLE.iter().all(|b| b.default == UNSET || b.id == "mini"));
-        assert_eq!(parse_chord("K"), Some((Key::K, false)));
-        assert_eq!(parse_chord("Shift+ArrowLeft"), Some((Key::ArrowLeft, true)));
+        assert_eq!(parse_chord("K"), Some((Key::K, false, false)));
+        assert_eq!(parse_chord("Shift+ArrowLeft"), Some((Key::ArrowLeft, true, false)));
+        assert_eq!(parse_chord("Ctrl+Z"), Some((Key::Z, false, true)));
+        assert_eq!(parse_chord("Ctrl+Shift+ArrowUp"), Some((Key::ArrowUp, true, true)));
         assert_eq!(parse_chord(UNSET.name()), None);
         assert_eq!(parse_chord("nonsense"), None);
-        assert_eq!(chord_text(Key::K, true), "Shift+K");
+        assert_eq!(chord_text(Key::K, true, false), "Shift+K");
+        assert_eq!(chord_text(Key::Z, false, true), "Ctrl+Z");
     }
 }

@@ -152,7 +152,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     if super::keys::rebinding(ui.ctx()).is_some() {
                         theme::text(
                             ui,
-                            "Press a key (Shift counts too), or right-click it to clear. Escape cancels.",
+                            "Press a key (Shift and Ctrl count too), or right-click it to clear. Escape cancels.",
                             theme::regular(12.5),
                             palette.accent,
                         );
@@ -244,7 +244,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                                                 );
                                                 app.actions.push(Action::SettingsChanged);
                                             }
-                                            ui.allocate_ui(egui::vec2((lane_width - 120.0).max(60.0), 26.0), |ui| {
+                                            ui.allocate_ui_with_layout(egui::vec2((lane_width - 120.0).max(60.0), 26.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
                                                 ui.add(
                                                     egui::Label::new(
                                                         egui::RichText::new(bindable.label)
@@ -260,20 +260,25 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                                     for (keys, what) in super::keys::fixed_for(group_name) {
                                         ui.horizontal(|ui| {
                                             ui.spacing_mut().item_spacing.x = 8.0;
-                                            ui.allocate_ui(egui::vec2(112.0, 26.0), |ui| {
-                                                ui.centered_and_justified(|ui| {
-                                                    ui.add(
-                                                        egui::Label::new(
-                                                            egui::RichText::new(keys)
-                                                                .font(theme::semibold(12.0))
-                                                                .color(palette.dim),
-                                                        )
-                                                        .truncate()
-                                                        .selectable(false),
-                                                    );
-                                                });
-                                            });
-                                            ui.allocate_ui(egui::vec2((lane_width - 120.0).max(60.0), 26.0), |ui| {
+                                            // A key that cannot move: the same pill shape
+                                            // as the others, only not clickable.
+                                            let (key_box, _) = ui.allocate_exact_size(
+                                                egui::vec2(112.0, 26.0),
+                                                egui::Sense::hover(),
+                                            );
+                                            ui.painter().rect_filled(
+                                                key_box,
+                                                egui::CornerRadius::same(13),
+                                                palette.surface,
+                                            );
+                                            ui.painter().text(
+                                                key_box.center(),
+                                                egui::Align2::CENTER_CENTER,
+                                                keys,
+                                                theme::semibold(12.0),
+                                                palette.dim,
+                                            );
+                                            ui.allocate_ui_with_layout(egui::vec2((lane_width - 120.0).max(60.0), 26.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
                                                 ui.add(
                                                     egui::Label::new(
                                                         egui::RichText::new(what)
@@ -315,21 +320,20 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     });
                 }
                 Dialog::Views => {
-                    theme::text(ui, "Views and panels", theme::bold(20.0), palette.text);
+                    theme::text(ui, "Views", theme::bold(20.0), palette.text);
                     ui.add_space(4.0);
-                    theme::subtle(ui, &palette, "Switch each one on or off. This stays open until you press Done or Esc.");
                     ui.add_space(10.0);
                     let rows: [(&str, bool, Action); 10] = [
-                        ("Library sidebar", app.settings.sidebar_visible, Action::ToggleSidebar),
-                        ("Queue and recently played", app.show_queue_panel, Action::ToggleQueuePanel),
-                        ("Lyrics, small (side panel)", app.show_lyrics_panel, Action::ToggleLyricsPanel),
-                        ("Lyrics, big (full screen)", app.lyrics_fullscreen.is_some(), Action::ToggleLyricsFullscreen),
-                        ("Visualizer, full screen", app.fullscreen_vis, Action::ToggleFullscreenVis),
+                        ("Library", app.settings.sidebar_visible, Action::ToggleSidebar),
+                        ("Queue", app.show_queue_panel, Action::ToggleQueuePanel),
+                        ("Side lyrics", app.show_lyrics_panel, Action::ToggleLyricsPanel),
+                        ("Full screen lyrics", app.lyrics_fullscreen.is_some(), Action::ToggleLyricsFullscreen),
+                        ("Full screen visualizer", app.fullscreen_vis, Action::ToggleFullscreenVis),
                         ("Visualizer settings", app.vis_panel, Action::ToggleVisPanel),
-                        ("Visualizer shapes on", app.settings.vis_shapes_value() != 0, Action::ToggleVisShapes),
+                        ("Visualizer", app.settings.vis_shapes_value() != 0, Action::ToggleVisShapes),
                         ("Big album art", app.settings.art_expanded, Action::ToggleArtExpanded),
                         ("Mini player", app.mini_active, Action::ToggleMiniPlayer),
-                        ("Keyboard shortcuts", false, Action::ShowDialog(Dialog::Shortcuts)),
+                        ("Shortcuts", false, Action::ShowDialog(Dialog::Shortcuts)),
                     ];
                     for (label, on, action) in rows {
                         let mut value = on;
@@ -339,7 +343,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     }
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
-                        if theme::pill_button(ui, &palette, "Back to normal view", false).clicked() {
+                        if theme::pill_button(ui, &palette, "Normal view", false).clicked() {
                             app.actions.push(Action::NormalView);
                         }
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {

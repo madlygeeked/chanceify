@@ -573,7 +573,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                             ui,
                             &palette,
                             Some(Icon::Disc),
-                            "Views and panels",
+                            "Views",
                         ) {
                             app.actions.push(Action::ToggleViewsPanel);
                         }

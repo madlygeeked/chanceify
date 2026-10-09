@@ -388,6 +388,7 @@ fn lyrics_menu(app: &mut App, page: &egui::Response, side: bool) {
                 (Settings::LYRICS_BOUNCE_ART, "Art bounces to the music", false),
                 (Settings::LYRICS_HIDE_STAMPS, "Timestamps", true),
                 (Settings::LYRICS_COUNTDOWN, "Countdown", false),
+                (Settings::LYRICS_HIDE_ARTIST, "Artist name", true),
             ];
             for (bit, label, inverted) in flags {
                 let on = app.settings.lyrics_flag(bit) != inverted;
@@ -405,15 +406,13 @@ fn lyrics_menu(app: &mut App, page: &egui::Response, side: bool) {
                 app.actions.push(Action::ToggleLyricsVis);
             }
             if app.settings.lyrics_vis {
-                for (value, label) in [(0u8, "Bars"), (1, "Flow"), (2, "Swirl")] {
-                    if widgets::menu_item(
-                        ui,
-                        &palette,
-                        tick(app.settings.lyrics_vis_mode.min(2) == value),
-                        &gettext(app.locale, label),
-                    ) {
-                        app.actions.push(Action::SetLyricsVisMode(value));
-                    }
+                if widgets::menu_item(
+                    ui,
+                    &palette,
+                    Some(Icon::Settings),
+                    &gettext(app.locale, "Visualizer settings"),
+                ) {
+                    app.actions.push(Action::ToggleVisPanel);
                 }
                 super::player_bar::slider_row(
                     ui,
@@ -732,22 +731,54 @@ fn big_cover(app: &mut App, ui: &mut egui::Ui, column: Rect, align: Align) {
             .layout(Layout::top_down(align)),
     );
     text.spacing_mut().item_spacing.y = 4.0;
-    text.add(
-        egui::Label::new(
-            egui::RichText::new(&now.title)
-                .font(theme::semibold(22.0))
-                .color(Color32::WHITE),
-        )
-        .truncate(),
-    );
-    text.add(
-        egui::Label::new(
-            egui::RichText::new(&now.subtitle)
-                .font(theme::regular(14.0))
-                .color(Color32::from_gray(225)),
-        )
-        .truncate(),
-    );
+    // With the artist hidden the song's name takes the room and is bigger.
+    let show_artist = !app.settings.lyrics_flag(crate::settings::Settings::LYRICS_HIDE_ARTIST);
+    let title_size = if show_artist { 22.0 } else { 30.0 };
+    let saved = app.is_saved(&now.uri).unwrap_or(false);
+    let heart = !now.is_episode && now.uri.starts_with("spotify:track:");
+    text.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 8.0;
+        let room = (words.width() - if heart { 36.0 } else { 0.0 }).max(40.0);
+        ui.allocate_ui_with_layout(
+            vec2(room, title_size + 8.0),
+            Layout::left_to_right(Align::Center),
+            |ui| {
+                ui.add(
+                    egui::Label::new(
+                        egui::RichText::new(&now.title)
+                            .font(theme::semibold(title_size))
+                            .color(Color32::WHITE),
+                    )
+                    .truncate(),
+                );
+            },
+        );
+        if heart {
+            let dark = theme::Palette::dark();
+            if theme::icon_button(
+                ui,
+                if saved { Icon::HeartFilled } else { Icon::Heart },
+                title_size.min(24.0),
+                if saved { dark.accent } else { Color32::from_gray(225) },
+                dark.accent_hover,
+                if saved { "Remove from Liked Songs" } else { "Save to Liked Songs" },
+            )
+            .clicked()
+            {
+                app.actions.push(Action::ToggleSaved(now.uri.clone()));
+            }
+        }
+    });
+    if show_artist {
+        text.add(
+            egui::Label::new(
+                egui::RichText::new(&now.subtitle)
+                    .font(theme::regular(14.0))
+                    .color(Color32::from_gray(225)),
+            )
+            .truncate(),
+        );
+    }
 }
 
 fn fullscreen_content_width(viewport_width: f32) -> f32 {
@@ -780,8 +811,8 @@ fn background(app: &mut App, ui: &mut egui::Ui, rect: Rect) {
         // The spectrum moves over the picture, then a black veil (the
         // reader's "how dark") keeps the words easy to read.
         let now = app.now_playing();
-        let mode = app.settings.lyrics_vis_mode.min(2);
-        let moving = super::player_bar::lyrics_backdrop(app, ui, rect, now.as_ref(), mode);
+        // Shaped by the visualizer settings (Visualizer settings, below).
+        let moving = super::player_bar::lyrics_backdrop(app, ui, rect, now.as_ref(), 3);
         if moving {
             ui.ctx().request_repaint_after(std::time::Duration::from_micros(16_667));
         }
@@ -827,22 +858,26 @@ fn track_heading(app: &App, ui: &mut egui::Ui) {
                 Some(app.backend.art()),
             );
             ui.vertical(|ui| {
+                let show_artist =
+                    !app.settings.lyrics_flag(crate::settings::Settings::LYRICS_HIDE_ARTIST);
                 ui.add(
                     egui::Label::new(
                         egui::RichText::new(&now.title)
-                            .font(theme::semibold(22.0))
+                            .font(theme::semibold(if show_artist { 22.0 } else { 28.0 }))
                             .color(Color32::WHITE),
                     )
                     .truncate(),
                 );
-                ui.add(
-                    egui::Label::new(
-                        egui::RichText::new(&now.subtitle)
-                            .font(theme::regular(13.0))
-                            .color(Color32::from_gray(235)),
-                    )
-                    .truncate(),
-                );
+                if show_artist {
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(&now.subtitle)
+                                .font(theme::regular(13.0))
+                                .color(Color32::from_gray(235)),
+                        )
+                        .truncate(),
+                    );
+                }
             });
         });
     }

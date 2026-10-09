@@ -461,6 +461,10 @@ pub struct App {
     pub radio_pages: HashMap<String, RadioPage>,
     pub track_cache: HashMap<String, Track>,
     track_requests: HashSet<String>,
+    /// Pictures of the artists on the Home page's ranked shelf, by Spotify
+    /// id, and which ids were already asked about.
+    artist_images: HashMap<String, String>,
+    artist_image_asked: HashSet<String>,
     /// Album URIs already resolved or attempted through librespot this session.
     album_types_requested: HashSet<String>,
     /// When each page's last load failed, so a failure is not retried on
@@ -1105,6 +1109,8 @@ impl App {
             radio_pages: HashMap::new(),
             track_cache: HashMap::new(),
             track_requests: HashSet::new(),
+            artist_images: HashMap::new(),
+            artist_image_asked: HashSet::new(),
             album_types_requested: HashSet::new(),
             page_failed_at: HashMap::new(),
             audiobook_shows: HashSet::new(),
@@ -1694,6 +1700,36 @@ impl App {
     }
 
     /// Current item for menus, using cached track details when available.
+    /// The picture for a ranked artist or song on the Home shelf, asking for
+    /// it once when it is not known yet.
+    pub fn stat_picture(&mut self, uri: &str, artist_id: &str, song: bool) -> Option<String> {
+        if song {
+            let id = util::uri_id(uri)?;
+            if let Some(track) = self.track_cache.get(id) {
+                return track
+                    .album
+                    .as_ref()
+                    .and_then(|album| pick_image(&album.images, 120))
+                    .map(str::to_string);
+            }
+            if self.track_requests.insert(id.to_string()) {
+                self.backend.api(ApiRequest::Track { id: id.to_string() });
+            }
+            None
+        } else {
+            if artist_id.is_empty() {
+                return None;
+            }
+            if let Some(url) = self.artist_images.get(artist_id) {
+                return Some(url.clone());
+            }
+            if self.artist_image_asked.insert(artist_id.to_string()) {
+                self.backend.api(ApiRequest::Artist { id: artist_id.to_string() });
+            }
+            None
+        }
+    }
+
     pub fn now_playing_item(&self) -> Option<PlayableItem> {
         let now = self.now_playing()?;
         if now.is_episode {
@@ -7332,9 +7368,16 @@ impl App {
             ApiResponse::Artist { id, result } => {
                 if let Ok(artist) = &result {
                     self.note_artist_image(artist);
+                    if let Some(url) = pick_image(&artist.images, 120) {
+                        self.artist_images.insert(id.clone(), url.to_string());
+                    }
                 }
+                // A picture fetched only for the Home shelf must not tint
+                // the theme.
+                let shelf_only =
+                    self.artist_image_asked.contains(&id) && !self.artist_pages.contains_key(&id);
                 if let Ok(artist) = &result {
-                    if let Some(image) = pick_image(&artist.images, 64) {
+                    if !shelf_only && let Some(image) = pick_image(&artist.images, 64) {
                         self.tint_for(Some(image));
                     }
                     if let Some(page) = self.artist_pages.get_mut(&id)
@@ -10683,7 +10726,8 @@ impl App {
             Action::NormalView => {
                 self.leave_lyrics_fullscreen(ctx);
                 self.fullscreen_vis = false;
-                self.show_queue_panel = false;
+                // The normal view has the queue beside the page.
+                self.show_queue_panel = true;
                 self.show_lyrics_panel = false;
                 self.settings.sidebar_visible = true;
                 self.settings_dirty = true;
@@ -11166,6 +11210,10 @@ impl App {
                         400.0, height,
                     )));
                 }
+                self.mark_settings_dirty();
+            }
+            Action::SetMiniVis(mode) => {
+                self.settings.mini_vis = Some(mode.min(3));
                 self.mark_settings_dirty();
             }
             Action::ToggleMiniVolume => {

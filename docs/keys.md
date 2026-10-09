@@ -20,8 +20,10 @@ Starting keys:
 | V | Full-screen visualizer |
 | B | Visualizer settings |
 | C | Full-screen lyrics |
-| Z | Views and panels |
+| Z | Views |
 | M | Mini player |
 | T | This list |
+
+In the shortcuts list (press T) click a key to change it. Shift and Ctrl can go with any key, for example Ctrl+Up for volume up or Ctrl+Z for undo. Right-click a key to clear it.
 
 [Back](./)

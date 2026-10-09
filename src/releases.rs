@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::models::Album;
 
 /// How far back a release still counts as new.
-pub const NEW_FOR_DAYS: i64 = 60;
+pub const NEW_FOR_DAYS: i64 = 90;
 
 /// The most artists checked for all playlists at once, and for one playlist.
 pub const MAX_ARTISTS_ALL: usize = 150;

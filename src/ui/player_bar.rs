@@ -391,7 +391,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             let order = ROW_ORDERS[(app.settings.row_order as usize).min(5)];
             let gap = 18.0;
             let avail_left = grown.left() + side + 8.0;
-            let avail_right = grown.right();
+            // A strip at the far right is kept clear for the six dots.
+            let avail_right = grown.right() - 16.0;
             let seek_at = order.iter().position(|b| *b == 1).unwrap_or(1);
             // Where each part sits: left, middle or right. Never chosen
             // means by its place in the order, before or after the bar.
@@ -694,6 +695,9 @@ pub(super) fn lyrics_backdrop(
 ) -> bool {
     use crate::settings::PlayerBarVis;
     match mode {
+        // Whatever the visualizer settings say: the same shapes, colours
+        // and sliders as the bar's and the full-screen visualizer's.
+        3 => visualizer(app, ui, rect, now),
         1 => visualizer_shape(app, ui, rect, now, PlayerBarVis::Flow),
         2 => {
             let art = app.swirl_art(ui.ctx());
@@ -1154,7 +1158,8 @@ fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
     let screen_h = ctx
         .input(|input| input.raw.screen_rect)
         .map_or(900.0, |rect| rect.height());
-    let above = if app.fullscreen_vis {
+    let floating = app.fullscreen_vis || app.lyrics_fullscreen.is_some();
+    let above = if floating {
         14.0
     } else {
         ctx.data(|data| data.get_temp::<f32>(egui::Id::new("vis-top")))
@@ -1166,7 +1171,7 @@ fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
     let mut panel = egui::Window::new("visualizer-panel")
         .title_bar(false)
         .collapsible(false);
-    if app.fullscreen_vis {
+    if floating {
         // Full screen: a panel you can drag about, so the picture stays
         // visible while settings change. It is exactly as big as what is in
         // it: it grows and shrinks as sections open and close, never has
@@ -1191,7 +1196,7 @@ fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
             None => panel.anchor(egui::Align2::RIGHT_BOTTOM, vec2(-14.0, -above)),
         };
     }
-    let fullscreen = app.fullscreen_vis;
+    let fullscreen = floating;
     let window = panel.show(ctx, |ui| {
         if fullscreen {
             egui::ScrollArea::vertical()
@@ -4533,7 +4538,7 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
     let mut opened_now = false;
     // Six dots in the gutter at the row's far right: click them for every
     // setting of the row, without hunting for the right spot to right-click.
-    let grip = Rect::from_min_size(pos2(row.right() + 2.0, row.bottom() - 20.0), vec2(12.0, 18.0));
+    let grip = Rect::from_min_size(pos2(row.right() - 14.0, row.bottom() - 20.0), vec2(14.0, 18.0));
     {
         let response = ui.interact(grip, egui::Id::new("row-menu-grip"), Sense::click());
         let colour = if response.hovered() || open.is_some_and(|(kind, _)| kind == 3) {
@@ -4549,7 +4554,7 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
         if response.hovered() {
             ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
         }
-        if response.clicked() {
+        if response.clicked() || response.secondary_clicked() {
             if open.is_some() {
                 ctx.data_mut(|data| data.remove::<(u8, egui::Pos2)>(id));
                 open = None;
@@ -4568,7 +4573,7 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
         // The volume buttons have menus of their own.
         let on_volume_button = zones[2].contains(pos) && pos.x > zones[2].left() + 164.0;
         // The cover and the song's name have their own menus.
-        if !on_volume_button && !name_region.contains(pos) {
+        if !on_volume_button && !name_region.contains(pos) && !grip.contains(pos) {
             let kind = if zones[2].contains(pos) {
                 2
             } else if zones[0].contains(pos) {
@@ -4635,7 +4640,7 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
                                 ui,
                                 &palette,
                                 None,
-                                &gettext(app.locale, "Put the controls and volume back"),
+                                &gettext(app.locale, "Default controls"),
                             ) {
                                 app.actions.push(Action::ResetBlockNudge);
                             }

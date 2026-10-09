@@ -1457,6 +1457,7 @@ pub enum Action {
     ToggleMiniPlayer,
     ToggleMiniQueue,
     ToggleMiniVolume,
+    SetMiniVis(u8),
     ToggleMiniOnTop,
     ToggleMiniFade,
     /// Play song files from the Local songs page: these paths, in this
