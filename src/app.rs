@@ -10898,6 +10898,7 @@ impl App {
                 let s = &mut self.settings;
                 s.bar_free = false;
                 s.bar_free_pos = None;
+                s.bar_free_seek = None;
                 s.bar_stacked = false;
                 s.bar_layout = 3;
                 s.row_order = 0;
@@ -10910,6 +10911,14 @@ impl App {
             }
             Action::SetBarFree(on) => {
                 self.settings.bar_free = on;
+                self.mark_settings_dirty();
+            }
+            Action::SetLyricsCtlOff(off) => {
+                self.settings.lyrics_ctl_off = off;
+                self.mark_settings_dirty();
+            }
+            Action::SetFreeSeek(pos) => {
+                self.settings.bar_free_seek = Some(pos);
                 self.mark_settings_dirty();
             }
             Action::SetFreePos(which, pos) => {
@@ -12568,6 +12577,15 @@ impl App {
         } else {
             None
         };
+        let playlist_url = if self.settings.discord_playlist_button {
+            self.playing_context_uri()
+                .filter(|uri| uri.starts_with("spotify:playlist:"))
+                .and_then(|uri| util::uri_id(&uri).map(str::to_string))
+                .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric()))
+                .map(|id| format!("https://open.spotify.com/playlist/{id}"))
+        } else {
+            None
+        };
         let profile_url = self
             .settings
             .discord_profile
@@ -12583,6 +12601,8 @@ impl App {
             playlist,
             profile_url,
             buttons: self.settings.discord_buttons,
+            playlist_url,
+            song_page: self.settings.discord_song_page,
             links: self.settings.discord_links,
             hide_paused: self.settings.discord_hide_paused,
             files: self.settings.discord_files,

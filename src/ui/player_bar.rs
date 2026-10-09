@@ -603,6 +603,38 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 zone = (cursor, avail_right);
             }
             let (left_cursor, right_cursor) = if stacked { (avail_left, avail_right) } else { zone };
+            // "My own layout": the song bar too sits wherever it was dragged.
+            let (seek_row, left_cursor) = if app.settings.bar_free {
+                let h = 26.0_f32.min(row.height());
+                let [fx, fy] = app.settings.bar_free_seek.unwrap_or([
+                    left_cursor - grown.left(),
+                    seek_row.center().y - h / 2.0 - row.top(),
+                ]);
+                let x = (grown.left() + fx).clamp(avail_left, (avail_right - 120.0).max(avail_left));
+                let y = (row.top() + fy).clamp(row.top(), (row.bottom() - h).max(row.top()));
+                if editing {
+                    let handle = Rect::from_min_size(pos2(x - 2.0, y + h / 2.0 - 6.0), vec2(14.0, 12.0));
+                    let drag = ui.interact(handle, egui::Id::new("seek-handle"), Sense::drag());
+                    let color = if drag.hovered() || drag.dragged() { palette.text } else { palette.dim };
+                    for dx in [3.0, 8.0] {
+                        for dy in [3.0, 6.0, 9.0] {
+                            ui.painter().circle_filled(pos2(x - 2.0 + dx, y + h / 2.0 - 6.0 + dy), 1.2, color);
+                        }
+                    }
+                    if drag.hovered() || drag.dragged() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+                    }
+                    if drag.dragged() {
+                        let delta = drag.drag_delta();
+                        app.actions
+                            .push(Action::SetFreeSeek([x + delta.x - grown.left(), y + delta.y - row.top()]));
+                    }
+                }
+                (Rect::from_min_size(pos2(row.left(), y), vec2(row.width(), h)), x)
+            } else {
+                (seek_row, left_cursor)
+            };
+            let right_cursor = if app.settings.bar_free { avail_right } else { right_cursor };
             let seek_rect = transport(
                 app,
                 ui,
@@ -4894,7 +4926,7 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
                             theme::subtle(
                                 ui,
                                 &palette,
-                                "My own layout: drag the dotted handle on the controls or the volume anywhere in the bar.",
+                                "My own layout: drag the dotted handle on the controls, the song bar or the volume anywhere in the bar.",
                             );
                             super::widgets::menu_separator(ui, &palette);
                             layout_rows(app, ui, &palette);

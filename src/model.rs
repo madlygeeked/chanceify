@@ -1397,6 +1397,8 @@ pub enum Action {
     SpotifyBar,
     SetBarFree(bool),
     SetFreePos(u8, [f32; 2]),
+    SetFreeSeek([f32; 2]),
+    SetLyricsCtlOff([f32; 2]),
     /// Opens the extra visualizer window, or closes it.
     ToggleExtraWindow,
     /// Closes every extra window.

@@ -2049,12 +2049,14 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         }
                     });
                     ui.add_space(4.0);
-                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 10] = [
+                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 12] = [
                         ("Show the album cover", |s| &mut s.discord_cover),
                         ("Show a swirl in the cover's colour on the cover", |s| &mut s.discord_swirl),
                         ("Show the small chanceify badge on the cover", |s| &mut s.discord_badge),
                         ("Say which playlist I'm playing from", |s| &mut s.discord_playlist),
                         ("Add a button to my Spotify profile", |s| &mut s.discord_profile),
+                        ("Add a button to the playlist I'm playing", |s| &mut s.discord_playlist_button),
+                        ("Song button opens the chanceify song page", |s| &mut s.discord_song_page),
                         ("Make the song and artist links to Spotify", |s| &mut s.discord_links),
                         ("Show buttons (Listen on Spotify, Get chanceify)", |s| &mut s.discord_buttons),
                         ("Show songs I play from my own files", |s| &mut s.discord_files),

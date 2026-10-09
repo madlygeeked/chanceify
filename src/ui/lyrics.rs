@@ -1371,17 +1371,40 @@ fn controls_slim(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: 
     let kc = (1.0 + (k - 1.0) * 0.5) * 0.8;
     let controls_w = 218.0 * kc;
     let left = if centred { top_left.x - controls_w / 2.0 } else { top_left.x + (width - controls_w) / 2.0 };
-    let rect = Rect::from_min_size(pos2(left, top_left.y), vec2(controls_w + 20.0, 36.0 * kc));
+    let off = app.settings.lyrics_ctl_off;
+    let base = Rect::from_min_size(pos2(left, top_left.y), vec2(controls_w + 20.0, 36.0 * kc));
+    let rect = base.translate(vec2(off[0], off[1]));
     // Its own foreground layer: above the title and everything else, and
     // never shifted by them.
     let layer = egui::LayerId::new(egui::Order::Foreground, egui::Id::new("fs-lyrics-slim"));
     let mut child = ui.new_child(
         UiBuilder::new()
-            .max_rect(rect)
+            .max_rect(Rect::from_min_max(pos2(rect.left() - 20.0, rect.top() - 18.0), rect.max + vec2(20.0, 0.0)))
             .layer_id(layer),
     );
     child.set_opacity(0.85);
-    super::player_bar::transport_buttons(app, &mut child, Some(&now), rect, left);
+    super::player_bar::transport_buttons(app, &mut child, Some(&now), rect, rect.left() + (left - base.left()));
+    // A row of dots above the buttons: drag to move them, right-click to put back.
+    let grip = Rect::from_center_size(pos2(rect.center().x, rect.top() - 6.0), vec2(40.0, 12.0));
+    let grip_response = child.interact(grip, egui::Id::new("fs-lyrics-grip"), Sense::click_and_drag());
+    let hot = grip_response.hovered() || grip_response.dragged();
+    for dx in [-8.0, 0.0, 8.0] {
+        child.painter().circle_filled(
+            pos2(grip.center().x + dx, grip.center().y),
+            1.6,
+            Color32::from_white_alpha(if hot { 170 } else { 50 }),
+        );
+    }
+    if hot {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+    }
+    if grip_response.dragged() {
+        let d = grip_response.drag_delta();
+        app.actions.push(Action::SetLyricsCtlOff([off[0] + d.x, off[1] + d.y]));
+    }
+    if grip_response.secondary_clicked() {
+        app.actions.push(Action::SetLyricsCtlOff([0.0, 0.0]));
+    }
     if now.playing {
         ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
     }

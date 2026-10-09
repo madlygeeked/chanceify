@@ -114,6 +114,10 @@ pub struct Style {
     /// The reader's Spotify profile address, when they want a button for it.
     pub profile_url: Option<String>,
     pub buttons: bool,
+    /// A button to the playlist the song plays from.
+    pub playlist_url: Option<String>,
+    /// The song button leads to the chanceify song page, not Spotify.
+    pub song_page: bool,
     pub links: bool,
     pub hide_paused: bool,
     pub files: bool,
@@ -186,8 +190,19 @@ pub fn activity_for(
     };
     let mut buttons: Vec<(String, String)> = Vec::new();
     if style.buttons {
-        if let Some(url) = &song_url {
-            buttons.push(("Listen on Spotify".to_string(), url.clone()));
+        let page = if style.song_page && !is_file {
+            song_link(&now.uri, &now.title, &now.subtitle)
+        } else {
+            None
+        };
+        if let Some(url) = page.as_ref().or(song_url.as_ref()) {
+            buttons.push((
+                if page.is_some() { "Open the song" } else { "Listen on Spotify" }.to_string(),
+                url.clone(),
+            ));
+        }
+        if let Some(url) = &style.playlist_url {
+            buttons.push(("Open the playlist".to_string(), url.clone()));
         }
         // Discord shows two at most: the song, then the profile or the app.
         if let Some(url) = &style.profile_url {
@@ -199,6 +214,7 @@ pub fn activity_for(
             buttons.push((format!("Get {}", crate::build_info::DISPLAY_NAME), url.clone()));
         }
     }
+    buttons.truncate(2);
     Some(Activity {
         details: now.title.clone(),
         state: if now.playing || now.subtitle.is_empty() {
@@ -327,7 +343,7 @@ pub const DEFAULT_APPLICATION_ID: &str = "1557925208906661998";
 static LINK: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
 /// The chanceify song page (worker/embed.js). Empty until it is deployed.
-pub const EMBED_URL: &str = "";
+pub const EMBED_URL: &str = "https://chanceify-embed.chance-a10.workers.dev";
 
 /// The link "Copy the song for Discord" gives out for a Spotify track uri.
 pub fn song_link(uri: &str, title: &str, artist: &str) -> Option<String> {
@@ -714,6 +730,8 @@ mod tests {
             swirl: None,
             playlist: None,
             profile_url: None,
+            playlist_url: None,
+            song_page: false,
             buttons: true,
             links: true,
             hide_paused: false,
