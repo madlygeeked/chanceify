@@ -246,6 +246,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                             ("My view", app.settings.my_view.is_some(), Action::ApplyMyView),
                             ("Save my view", false, Action::SaveMyView),
                             ("Calm mode", false, Action::ToggleCalm),
+                            (if app.extra_vis { "Close visualizer window" } else { "New visualizer window" }, app.extra_vis, Action::ToggleExtraWindow),
                         ];
                         for (label, on, action) in presets {
                             if theme::soft_button(ui, &palette, None, label, on).clicked() {

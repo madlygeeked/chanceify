@@ -1389,6 +1389,10 @@ pub enum Action {
     LibraryOnlyView,
     /// Calm mode on or off: a slow ocean, no reaction to the music.
     ToggleCalm,
+    /// Opens the extra visualizer window, or closes it.
+    ToggleExtraWindow,
+    /// Closes every extra window.
+    CloseExtraWindows,
     /// Shows, moves, resizes or puts away the pop-out controls.
     SetFloatControls(Option<[f32; 3]>),
     SaveMyView,

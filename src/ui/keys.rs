@@ -129,6 +129,8 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "lastfmlove", label: "Love the song on Last.fm", default: UNSET, action: || Action::LastfmLove },
     Bindable { id: "defaultview", label: "Back to the default view", default: Key::Backtick, action: || Action::NormalView },
     Bindable { id: "calmmode", label: "Calm mode (slow ocean, nothing reacts to the music)", default: Key::Home, action: || Action::ToggleCalm },
+    Bindable { id: "extrawindow", label: "New visualizer window (second monitor)", default: UNSET, action: || Action::ToggleExtraWindow },
+    Bindable { id: "closeextras", label: "Close the extra visualizer window", default: Key::End, action: || Action::CloseExtraWindows },
     Bindable { id: "queuehover", label: "Queue the song under the pointer", default: UNSET, action: || Action::QueueHovered(false) },
     Bindable { id: "queuehovertop", label: "Queue the song under the pointer, to play next", default: UNSET, action: || Action::QueueHovered(true) },
     Bindable { id: "likehover", label: "Like the song under the pointer", default: UNSET, action: || Action::LikeHovered },
@@ -211,7 +213,7 @@ pub fn read_keys(text: &str) -> Option<std::collections::BTreeMap<String, String
 /// The groups the shortcuts list is shown in, in order, and which shortcut
 /// belongs in each.
 pub const CATEGORIES: &[(&str, &[&str])] = &[
-    ("Views", &["views", "defaultview", "calmmode", "normalview", "mini", "fullscreen", "lyricsfull", "visshapes", "art", "closewindow"]),
+    ("Views", &["views", "defaultview", "calmmode", "extrawindow", "closeextras", "normalview", "mini", "fullscreen", "lyricsfull", "visshapes", "art", "closewindow"]),
     ("Panels", &["sidebar", "queuelyrics", "queue", "lyrics", "visualizer", "scenes"]),
     ("Playback", &["playpause", "playspace", "next", "previous", "shuffle", "repeat", "speed", "tap", "lastfmlove", "sharediscord", "queuehover", "queuehovertop", "likehover", "likeplaying"]),
     ("Volume", &["mute", "volup", "voldown", "volup5", "voldown5"]),

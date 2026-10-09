@@ -28,6 +28,7 @@ mod views_panel;
 pub mod widgets;
 pub mod winamp;
 pub mod calm;
+pub mod extra_window;
 
 use egui::{Align2, Color32, Context, CornerRadius, Frame, Id, Margin, Rect, Stroke, vec2};
 
@@ -81,6 +82,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     // the thing that moves with the music. Pressing it again brings the
     // window back exactly as it was.
     app.sync_mini_level(ctx);
+    // The extra visualizer window, if one is open, in whatever view this is.
+    extra_window::show(app, ctx);
     // Calm mode: the whole window is one slow, quiet picture.
     if app.calm_mode {
         calm::show(app, ui);

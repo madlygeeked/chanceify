@@ -347,6 +347,9 @@ pub struct App {
     pub hovered_track: Option<String>,
     /// Calm mode is showing.
     pub calm_mode: bool,
+    /// The extra visualizer window is open.
+    pub extra_vis: bool,
+    pub extra_vis_since: Option<std::time::Instant>,
     /// A theme shown for a moment while the pointer is over it in Settings.
     pub theme_preview: Option<(Palette, Instant)>,
     theme_previewing: bool,
@@ -1041,6 +1044,8 @@ impl App {
             recap: None,
             hovered_track: None,
             calm_mode: false,
+            extra_vis: false,
+            extra_vis_since: None,
             theme_preview: None,
             theme_previewing: false,
             hovered_playable: None,
@@ -10840,6 +10845,15 @@ impl App {
             Action::SetFloatControls(place) => {
                 self.settings.float_controls = place;
                 self.mark_settings_dirty();
+            }
+            Action::ToggleExtraWindow => {
+                self.extra_vis = !self.extra_vis;
+                if self.extra_vis && self.settings.vis_shapes_value() == 0 {
+                    self.apply(Action::ToggleVisShapes, ctx);
+                }
+            }
+            Action::CloseExtraWindows => {
+                self.extra_vis = false;
             }
             Action::ToggleCalm => {
                 self.calm_mode = !self.calm_mode;
