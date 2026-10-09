@@ -100,6 +100,10 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
             0.0
         };
         let row_height = if beside { 28.0 } else { 22.0 };
+        // Made first, so the close button drawn after it sits on top and
+        // takes its own clicks (it used to be covered, and only a
+        // right-click got through).
+        let page = ui.interact(ui.max_rect(), ui.id().with("lyrics-side-page"), Sense::click());
         let row = egui::vec2(ui.available_width(), row_height);
         ui.allocate_ui_with_layout(row, Layout::right_to_left(Align::Center), |ui| {
             ui.add_space(inset);
@@ -117,9 +121,6 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
             }
         });
         ui.add_space(2.0);
-        // Right-click the empty space for the same options as full screen;
-        // the lines drawn after it keep their own clicks.
-        let page = ui.interact(ui.max_rect(), ui.id().with("lyrics-side-page"), Sense::click());
         lyrics_menu(app, &page, true);
         contents(app, ui);
     });
@@ -484,7 +485,7 @@ fn with_cover(app: &mut App, ui: &mut egui::Ui, rect: Rect, top: f32) {
             vec2(side, side + 90.0),
         );
         big_cover(app, ui, column, Align::Min);
-        controls_box(app, ui, pos2(column.left(), column.bottom() + 8.0), side, false);
+        controls_slim(app, ui, pos2(column.left(), column.bottom() + 8.0), side, false);
         // Lyrics centred in the window when that leaves room beside the
         // cover; otherwise centred in the room that is left. Everything is
         // measured from the window, so it scales with any resolution.
@@ -511,7 +512,7 @@ fn with_cover(app: &mut App, ui: &mut egui::Ui, rect: Rect, top: f32) {
             vec2(side, side + 90.0),
         );
         big_cover(app, ui, column, Align::Center);
-        controls_box(app, ui, pos2(column.center().x, column.bottom() + 8.0), side, true);
+        controls_slim(app, ui, pos2(column.center().x, column.bottom() + 8.0), side, true);
         // Why there are no words, quietly, under the song, or that they
         // are still being fetched.
         let (heading, detail) = match &app.lyrics {
@@ -1357,6 +1358,32 @@ fn controls_box(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f
         ctx.request_repaint_after(std::time::Duration::from_millis(500));
     } else if fade > 0.01 {
         ctx.request_repaint();
+    }
+}
+
+/// Full-screen lyrics: just the five buttons, small, with no panel behind
+/// them, at a fixed spot under the cover. Drawn last so it stays on top.
+fn controls_slim(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f32, centred: bool) {
+    let Some(now) = app.now_playing() else {
+        return;
+    };
+    let k = app.settings.controls_scale_value();
+    let kc = (1.0 + (k - 1.0) * 0.5) * 0.8;
+    let controls_w = 218.0 * kc;
+    let left = if centred { top_left.x - controls_w / 2.0 } else { top_left.x + (width - controls_w) / 2.0 };
+    let rect = Rect::from_min_size(pos2(left, top_left.y), vec2(controls_w + 20.0, 36.0 * kc));
+    // Its own foreground layer: above the title and everything else, and
+    // never shifted by them.
+    let layer = egui::LayerId::new(egui::Order::Foreground, egui::Id::new("fs-lyrics-slim"));
+    let mut child = ui.new_child(
+        UiBuilder::new()
+            .max_rect(rect)
+            .layer_id(layer),
+    );
+    child.set_opacity(0.85);
+    super::player_bar::transport_buttons(app, &mut child, Some(&now), rect, left);
+    if now.playing {
+        ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
     }
 }
 

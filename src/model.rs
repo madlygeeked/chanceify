@@ -1468,6 +1468,9 @@ pub enum Action {
     /// Pick the full-screen title font (index into VIS_FONTS).
     SetVisFont(u8),
     ToggleVisArtist,
+    SaveVisPreset(String),
+    ApplyVisPreset(usize),
+    RemoveVisPreset(usize),
     ToggleVisLyricsBack,
     ToggleLyricsVis,
     SetLyricsVisMode(u8),

@@ -501,6 +501,50 @@ fn proxy_mode_is_system(mode: &ProxyMode) -> bool {
     *mode == ProxyMode::System
 }
 
+/// A visualizer look saved by name: every visualizer setting as it was.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct VisPreset {
+    pub name: String,
+    pub values: serde_json::Map<String, serde_json::Value>,
+}
+
+impl Settings {
+    /// The settings that make up a visualizer look.
+    fn is_vis_key(key: &str) -> bool {
+        key.starts_with("player_bar_vis") || key.starts_with("swirl_") || key.starts_with("vis_") && key != "vis_presets"
+    }
+
+    pub fn save_vis_preset(&mut self, name: &str) {
+        let Ok(serde_json::Value::Object(all)) = serde_json::to_value(&*self) else {
+            return;
+        };
+        let values: serde_json::Map<_, _> = all.into_iter().filter(|(key, _)| Self::is_vis_key(key)).collect();
+        let name = name.trim().to_string();
+        if let Some(old) = self.vis_presets.iter_mut().find(|preset| preset.name == name) {
+            old.values = values;
+        } else {
+            self.vis_presets.push(VisPreset { name, values });
+        }
+    }
+
+    pub fn apply_vis_preset(&mut self, index: usize) {
+        let Some(preset) = self.vis_presets.get(index).cloned() else {
+            return;
+        };
+        let Ok(serde_json::Value::Object(mut all)) = serde_json::to_value(&*self) else {
+            return;
+        };
+        for (key, value) in preset.values {
+            all.insert(key, value);
+        }
+        if let Ok(mut next) = serde_json::from_value::<Settings>(serde_json::Value::Object(all)) {
+            next.proxy_password = std::mem::take(&mut self.proxy_password);
+            next.proxy_password_legacy = self.proxy_password_legacy;
+            *self = next;
+        }
+    }
+}
+
 /// A layout the reader saved with "Save my view".
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct MyView {
@@ -790,6 +834,8 @@ pub struct Settings {
     pub discord_swirl: bool,
     /// The layout saved with "Save my view".
     pub my_view: Option<MyView>,
+    /// Visualizer looks saved by name.
+    pub vis_presets: Vec<VisPreset>,
     /// Where the reader dragged the Views disc to, in points from the window's top left.
     pub views_disc: Option<[f32; 2]>,
     /// The pop-out controls: [x, y, width]. None = not shown.
@@ -905,6 +951,8 @@ pub struct Settings {
     /// How the title sits in the full-screen visualizer: 0 under the cover,
     /// 1 beside it, 2 beside it and big, 3 above it with the artist below.
     pub vis_title_layout: u8,
+    /// How hard the bass jump shakes the window (1.0 = normal).
+    pub jump_shake: f32,
     /// Which app icon the window and taskbar button wear. See `app_icons`.
     pub app_icon: u8,
     /// The compact mini player layout, switched on by the reader. A window
@@ -1243,6 +1291,8 @@ impl Default for Settings {
             recents_show_icons: true,
             recents_show_cover: true,
             vis_title_layout: 0,
+            vis_presets: Vec::new(),
+            jump_shake: 1.0,
             app_icon: 1,
             mini_player: false,
             mini_queue: true,
@@ -1618,7 +1668,7 @@ impl Settings {
         "player_bar_vis_flow_speed", "player_bar_vis_gap", "player_bar_vis_hex",
         "player_bar_vis_rise", "player_bar_vis_scale", "queue_compact", "queue_show_artist",
         "queue_show_cover", "queue_show_icons", "queue_show_length", "queue_show_numbers", "queue_show_time",
-        "queue_width", "float_controls", "recents_show_artist", "recents_show_cover", "recents_show_icons", "recents_show_numbers", "vis_title_layout", "mini_queue", "mini_volume", "mini_vis", "queue_click", "vis_reverse", "missing_mark_big", "row_order", "seek_anchor", "seek_custom_width", "seek_time_joined", "seek_time_mode",
+        "queue_width", "float_controls", "recents_show_artist", "recents_show_cover", "recents_show_icons", "recents_show_numbers", "vis_title_layout", "jump_shake", "mini_queue", "mini_volume", "mini_vis", "queue_click", "vis_reverse", "missing_mark_big", "row_order", "seek_anchor", "seek_custom_width", "seek_time_joined", "seek_time_mode",
         "seek_width", "show_shortcut_hints", "sidebar_compact", "sidebar_grid", "sidebar_order",
         "sidebar_width", "swirl_art_scroll", "swirl_art_single", "swirl_art_edge", "swirl_colours_fixed", "swirl_drift", "swirl_peaks",
         "swirl_scale", "swirl_tune", "swirl_warp", "swirl_waves", "theme", "theme_from_cover", "custom_bg", "custom_accent",

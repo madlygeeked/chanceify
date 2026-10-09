@@ -423,10 +423,14 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 let grab = ui.interact(
                     response.rect,
                     egui::Id::new("global-search-window-drag"),
-                    Sense::drag(),
+                    Sense::click_and_drag(),
                 );
                 if grab.drag_started_by(egui::PointerButton::Primary) {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
+                }
+                // A plain click (no drag) steps into the field.
+                if grab.clicked() {
+                    response.request_focus();
                 }
             }
             if app.search.focus_requested {

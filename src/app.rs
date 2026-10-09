@@ -10488,7 +10488,7 @@ impl App {
                     self.toast("Copied. Paste it in Discord (files have no Spotify link)");
                 }
                 Some(now) => {
-                    let line = match util::open_spotify_url(&now.uri) {
+                    let line = match crate::discord::song_link(&now.uri, &now.title, &now.subtitle).or_else(|| util::open_spotify_url(&now.uri)) {
                         Some(url) => format!("Listening to {} by {} on {} {}", now.title, now.subtitle, crate::build_info::DISPLAY_NAME, url),
                         None => format!("Listening to {} by {} on {}", now.title, now.subtitle, crate::build_info::DISPLAY_NAME),
                     };
@@ -11367,6 +11367,23 @@ impl App {
                 let count = crate::system_fonts::VIS_FONTS.len() as u8;
                 self.settings.vis_text_font = index.min(count.saturating_sub(1));
                 self.mark_settings_dirty();
+            }
+            Action::SaveVisPreset(name) => {
+                if !name.trim().is_empty() {
+                    self.settings.save_vis_preset(&name);
+                    self.mark_settings_dirty();
+                    self.toast("Saved your visualizer look");
+                }
+            }
+            Action::ApplyVisPreset(index) => {
+                self.settings.apply_vis_preset(index);
+                self.mark_settings_dirty();
+            }
+            Action::RemoveVisPreset(index) => {
+                if index < self.settings.vis_presets.len() {
+                    self.settings.vis_presets.remove(index);
+                    self.mark_settings_dirty();
+                }
             }
             Action::ToggleVisArtist => {
                 self.settings.vis_text_no_artist = !self.settings.vis_text_no_artist;
@@ -12695,7 +12712,7 @@ impl App {
         let jump = self.jump_level();
         if jump > 0.0 {
             let t = ctx.input(|input| input.time) as f32;
-            let amp = 7.0 * jump;
+            let amp = 7.0 * jump * self.settings.jump_shake.clamp(0.1, 3.0);
             let shift = egui::vec2((t * 95.0).sin() * amp, (t * 71.0).cos() * amp * 0.7);
             let transform = egui::emath::TSTransform::from_translation(shift);
             let layers: Vec<egui::LayerId> = ctx.memory(|memory| memory.layer_ids().collect());

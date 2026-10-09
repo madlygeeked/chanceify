@@ -2238,8 +2238,38 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             } else {
                 ui.vertical(|ui| shared(ui));
             }
+            vis_presets_row(app, ui);
         }
     }
+}
+
+/// Saved visualizer looks: pick one to apply, x to remove, or save the
+/// current look under a name.
+fn vis_presets_row(app: &mut App, ui: &mut egui::Ui) {
+    let palette = app.palette;
+    ui.add_space(8.0);
+    theme::subtle(ui, &palette, "SAVED LOOKS");
+    let name_id = egui::Id::new("vis-preset-name");
+    let mut name: String = ui.data(|data| data.get_temp(name_id)).unwrap_or_default();
+    ui.horizontal_wrapped(|ui| {
+        for (index, preset) in app.settings.vis_presets.iter().enumerate() {
+            if ui.add(egui::Button::new(preset.name.as_str())).clicked() {
+                app.actions.push(Action::ApplyVisPreset(index));
+            }
+            if theme::icon_button(ui, Icon::X, 12.0, palette.dim, palette.text, "Remove this look").clicked() {
+                app.actions.push(Action::RemoveVisPreset(index));
+            }
+            ui.add_space(6.0);
+        }
+    });
+    ui.horizontal(|ui| {
+        ui.add(egui::TextEdit::singleline(&mut name).hint_text("Name this look").desired_width(160.0));
+        if ui.add_enabled(!name.trim().is_empty(), egui::Button::new("Save this look")).clicked() {
+            app.actions.push(Action::SaveVisPreset(name.clone()));
+            name.clear();
+        }
+    });
+    ui.data_mut(|data| data.insert_temp(name_id, name));
 }
 
 /// A plain text box for a number. While it has focus the text being typed
@@ -4285,6 +4315,30 @@ pub(super) fn transport(
     left: f32,
     zone: (f32, f32),
 ) -> Rect {
+    transport_impl(app, ui, now, row, buttons_row, left, zone, true)
+}
+
+/// Only the five buttons, no song-length bar (full-screen lyrics).
+pub(super) fn transport_buttons(
+    app: &mut App,
+    ui: &mut egui::Ui,
+    now: Option<&NowPlaying>,
+    buttons_row: Rect,
+    left: f32,
+) -> Rect {
+    transport_impl(app, ui, now, buttons_row, buttons_row, left, (left, left), false)
+}
+
+fn transport_impl(
+    app: &mut App,
+    ui: &mut egui::Ui,
+    now: Option<&NowPlaying>,
+    row: Rect,
+    buttons_row: Rect,
+    left: f32,
+    zone: (f32, f32),
+    with_seek: bool,
+) -> Rect {
     let palette = app.palette;
     // Everything here is placed with explicit rects: egui's implicit rows
     // centre each widget in the row height known when it is added, which
@@ -4300,7 +4354,7 @@ pub(super) fn transport(
     let k = app.settings.controls_scale_value();
     // The buttons grow more gently than the bars: at full size they are
     // about half as much bigger as the song-length bar is.
-    let kc = 1.0 + (k - 1.0) * 0.5;
+    let kc = (1.0 + (k - 1.0) * 0.5) * if with_seek { 1.0 } else { 0.8 };
     let cy = buttons_row.center().y;
     let enabled = now.is_some_and(|now| now.can_control) || app.is_connected();
     let playing = now.is_some_and(|now| now.playing);
@@ -4464,6 +4518,9 @@ pub(super) fn transport(
         app.actions.push(Action::CycleRepeat);
     }
 
+    if !with_seek {
+        return buttons_row;
+    }
     // The song-length bar, in the zone the layout left for it.
     let mode = app.settings.seek_time_mode_value();
     let time_size = 12.0 * k.clamp(0.85, 2.0);

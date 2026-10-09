@@ -326,6 +326,26 @@ pub const DEFAULT_APPLICATION_ID: &str = "1557925208906661998";
 /// 1 found, 2 found and the song was sent. For the status line in Settings.
 static LINK: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
+/// The chanceify song page (worker/embed.js). Empty until it is deployed.
+pub const EMBED_URL: &str = "";
+
+/// The link "Copy the song for Discord" gives out for a Spotify track uri.
+pub fn song_link(uri: &str, title: &str, artist: &str) -> Option<String> {
+    let id = uri.strip_prefix("spotify:track:")?;
+    if EMBED_URL.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return None;
+    }
+    let enc = |text: &str| -> String {
+        text.bytes()
+            .map(|b| match b {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
+                _ => format!("%{b:02X}"),
+            })
+            .collect()
+    };
+    Some(format!("{}/t/{id}?t={}&a={}", EMBED_URL.trim_end_matches('/'), enc(title), enc(artist)))
+}
+
 pub fn link_state() -> u8 {
     LINK.load(std::sync::atomic::Ordering::Relaxed)
 }

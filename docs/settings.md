@@ -75,3 +75,9 @@ title: Settings explained
 - Songs: no three dots (right-click instead). No heart or "+" while LIKED is off.
 - Keys: Ctrl+Z undoes a removal (fixed). "Close to the tray". New Play and Pause keys beside Play or pause. The speed-scene key is gone. Bass jump shakes the screen and flashes in the cover's colour.
 - My view also saves the zoom and the window size.
+
+## 0.81.0
+
+- Bass jump shake strength (Keys, under "Bass jump" once it has a key): `jump_shake`, 0.2 to 3.0.
+- Saved visualizer looks (bottom of the visualizer panel): `vis_presets`, each a name plus every visualizer setting.
+- Full-screen lyrics: small transparent button row, always on top, no song-length bar.
