@@ -11520,6 +11520,18 @@ impl App {
                     // Back to the whole window, at the size it had.
                     self.settings.mini_player = false;
                     let [width, height] = self.mini_restore.unwrap_or([1240.0, 800.0]);
+                    // The full window's smallest size comes back, and the
+                    // panel check sends its own minimum again.
+                    if !crate::window::fixed_size() {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(egui::vec2(
+                            crate::window::MAIN_MIN_SIZE[0],
+                            crate::window::MAIN_MIN_SIZE[1],
+                        )));
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
+                    }
+                    ctx.data_mut(|data| {
+                        data.insert_temp(egui::Id::new("main-min-width"), crate::window::MAIN_MIN_SIZE[0]);
+                    });
                     ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
                         width, height,
                     )));
@@ -11532,6 +11544,12 @@ impl App {
                         .filter(|size| size[0] >= 740.0 && size[1] >= 500.0);
                     self.settings.mini_player = true;
                     let height = if self.settings.mini_queue { 680.0 } else { 340.0 };
+                    // The window may shrink to the little player, and stays
+                    // resizable there.
+                    if !crate::window::fixed_size() {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(egui::vec2(300.0, 260.0)));
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
+                    }
                     ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(false));
                     ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
                         400.0, height,
