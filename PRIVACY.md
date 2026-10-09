@@ -7,6 +7,5 @@ This app only uses services you already know:
 (Rich presence provided by [Discord](https://discord.com))
 (Metadata provided by [MusicBrainz](https://musicbrainz.org))
 (Scrobbling provided by [Last.fm](https://www.last.fm))
-(BPM data provided by [GetSongBPM](https://getsongbpm.com))
 
 You should be more concerned about their privacy policies than mine.
