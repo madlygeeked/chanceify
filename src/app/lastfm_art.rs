@@ -98,6 +98,29 @@ impl App {
                 match answer.missing {
                     Some(missing) => {
                         self.art_store.checked.insert(answer.key.clone(), missing);
+                        self.art_store
+                            .at
+                            .insert(answer.key.clone(), lastfm_art::now_secs());
+                        if let Some((kind, file)) = self.art_names.get(&answer.key).cloned() {
+                            let folder = match kind {
+                                Kind::Album => "albums",
+                                Kind::Artist => "artists",
+                            };
+                            let name = format!("{folder}/{file}");
+                            if missing {
+                                // Still missing after the check: it is
+                                // listed again.
+                                self.art_store.removed.remove(&name);
+                            } else {
+                                // Last.fm has a picture now: off the list.
+                                let marker = self
+                                    .art_root()
+                                    .join(format!("{folder}-missing"))
+                                    .join(format!("{file}.jpg"));
+                                std::fs::remove_file(marker).ok();
+                                self.art_store.removed.remove(&name);
+                            }
+                        }
                         for export in &mut self.art_exports {
                             if export.key == answer.key {
                                 export.missing = Some(missing);
@@ -150,7 +173,16 @@ impl App {
         if !self.art_asked.insert(key.clone()) {
             return;
         }
-        let known = self.art_store.checked.get(&key).copied();
+        let mut known = self.art_store.checked.get(&key).copied();
+        // A picture Last.fm lacked is asked about again after a week, so
+        // an upload (or anyone else's) clears it from the list.
+        if known == Some(true) {
+            let asked = self.art_store.at.get(&key).copied().unwrap_or(0);
+            if lastfm_art::now_secs().saturating_sub(asked) > lastfm_art::RECHECK_AFTER {
+                known = None;
+            }
+        }
+        self.art_names.insert(key.clone(), (kind, file.clone()));
         if known.is_none() {
             self.art_checker.check(lastfm_art::Job {
                 kind,
@@ -168,8 +200,10 @@ impl App {
         let missing_copy = root
             .join(format!("{folder}-missing"))
             .join(format!("{file}.jpg"));
-        // Already saved on an earlier run: nothing more to do.
-        if all.exists() && (known != Some(true) || missing_copy.exists()) {
+        // Already saved on an earlier run, or taken off the list by the
+        // reader: nothing more to do.
+        let taken_off = self.art_store.removed.contains(&format!("{folder}/{file}"));
+        if all.exists() && (known != Some(true) || missing_copy.exists() || taken_off) {
             return;
         }
         self.art_exports.push(ArtExport {
@@ -183,6 +217,23 @@ impl App {
             saved_all: all.exists(),
             started: Instant::now(),
         });
+    }
+
+    /// Takes a picture off the "missing" list after the reader added it to
+    /// Last.fm. It stays off until a later check finds it still missing.
+    pub(super) fn remove_missing_art(&mut self, artists: bool, file: &str) {
+        let folder = if artists { "artists" } else { "albums" };
+        // Only a plain file name from the list, never a path.
+        if file.is_empty() || file.contains(['/', '\']) {
+            return;
+        }
+        let marker = self
+            .art_root()
+            .join(format!("{folder}-missing"))
+            .join(format!("{file}.jpg"));
+        std::fs::remove_file(marker).ok();
+        self.art_store.removed.insert(format!("{folder}/{file}"));
+        self.art_store.save(&self.dirs.cache.join("lastfm_art.json"));
     }
 
     /// One step for one picture; false once it is finished or given up.

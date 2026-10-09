@@ -375,6 +375,16 @@ pub fn fancy_theme_name(name: &str) -> String {
     .to_string()
 }
 
+/// A way the full-screen title sways (see `Settings::SWAY_PRESETS`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SwayPreset {
+    pub name: &'static str,
+    pub lean: f32,
+    pub speed: f32,
+    pub bass: f32,
+    pub bob: f32,
+}
+
 impl ThemeChoice {
     pub const ALL: [ThemeChoice; 16] = [
         Self::System,
@@ -412,7 +422,7 @@ impl ThemeChoice {
             Self::Cream => "Vanilla Cream (light)".into(),
             Self::Night => "Night Market".into(),
             Self::Glass => "Frosted Glass (see-through)".into(),
-            Self::PinkMilk => "Pink Milk (light)".into(),
+            Self::PinkMilk => "Kitty Paws (light)".into(),
             Self::Custom => "My own colours".into(),
         }
     }
@@ -635,6 +645,12 @@ pub struct Settings {
     pub nudge_seek: i16,
     /// The song bar on its own row under the controls and volume.
     pub bar_stacked: bool,
+    /// Where the three parts of the bottom row sit: 0 side by side, 1 the
+    /// song bar under the controls and volume, 2 all three on their own
+    /// rows, 3 the song bar above the controls and volume. `bar_stacked`
+    /// (older) means 1 while it is set.
+    #[serde(default)]
+    pub bar_layout: u8,
     /// Ask before removing one unavailable song from its playlist.
     pub unavailable_confirm_one: bool,
     /// Show the time as "1:23 / 3:45" before the bar instead of at both ends.
@@ -702,6 +718,12 @@ pub struct Settings {
     /// The full-screen visualizer's title holds still instead of swaying.
     #[serde(default)]
     pub vis_text_still: bool,
+    /// How the title sways, an index into `SWAY_PRESETS`.
+    #[serde(default)]
+    pub vis_sway: u8,
+    /// How strongly, 0.2 to 3; 0 (never set) means 1.
+    #[serde(default)]
+    pub vis_sway_amount: f32,
     /// ... and has no outline.
     #[serde(default)]
     pub vis_text_no_outline: bool,
@@ -741,7 +763,14 @@ pub struct Settings {
     /// Bars stay on the visualizer instead of rising onto the song-length row.
     #[serde(default)]
     pub vis_bars_stay: bool,
-    /// The spectrum moves behind the full-screen lyrics.
+    /// How solid the window is, 0.3 to 1, so the desktop shows through;
+    /// 0 (never set) means solid (the Frosted Glass theme has its own look).
+    #[serde(default)]
+    pub window_opacity: f32,
+    /// What moves behind the full-screen lyrics: 0 bars, 1 flow, 2 swirl.
+    #[serde(default)]
+    pub lyrics_vis_mode: u8,
+    /// The visualizer moves behind the full-screen lyrics.
     #[serde(default)]
     pub lyrics_vis: bool,
     /// How dark the full-screen lyrics page is over that spectrum, 0.1 to
@@ -1060,6 +1089,7 @@ impl Default for Settings {
             nudge_volume: 0,
             nudge_seek: 0,
             bar_stacked: false,
+            bar_layout: 0,
             unavailable_confirm_one: true,
             anchor_volume: None,
             seek_time_joined: false,
@@ -1082,6 +1112,8 @@ impl Default for Settings {
             vis_no_gradient: false,
             vis_lyrics: false,
             vis_text_still: false,
+            vis_sway: 0,
+            vis_sway_amount: 0.0,
             vis_text_no_outline: false,
             vis_text_back: false,
             vis_text_font: 0,
@@ -1098,6 +1130,8 @@ impl Default for Settings {
             discord_listen_along: false,
             vis_lyrics_no_back: false,
             vis_bars_stay: false,
+            window_opacity: 0.0,
+            lyrics_vis_mode: 0,
             lyrics_vis: false,
             lyrics_vis_dark: 0.0,
             vis_bars_opacity: 0.0,
@@ -1366,6 +1400,46 @@ impl Settings {
         ("Colour overlay: bands", 1.0, 6.0, 1.8),
     ];
 
+    /// The bottom row's layout, 0 to 3 (see `bar_layout`).
+    pub fn bar_layout_value(&self) -> u8 {
+        if self.bar_stacked { 1 } else { self.bar_layout.min(3) }
+    }
+
+    /// How strongly the title sways, 0.2 to 3.
+    pub fn vis_sway_strength(&self) -> f32 {
+        let value = self.vis_sway_amount;
+        if value.is_finite() && value > 0.0 { value.clamp(0.2, 3.0) } else { 1.0 }
+    }
+
+    /// The chosen sway preset.
+    pub fn vis_sway_preset(&self) -> SwayPreset {
+        Self::SWAY_PRESETS[(self.vis_sway as usize).min(Self::SWAY_PRESETS.len() - 1)]
+    }
+
+    /// Ready-made sways for the full-screen title: a name, how far a line
+    /// leans, how fast, how much the bass adds, and how far each letter
+    /// bobs on its own (a fraction of its height).
+    pub const SWAY_PRESETS: [SwayPreset; 7] = [
+        SwayPreset { name: "Grass", lean: 1.0, speed: 1.0, bass: 1.0, bob: 0.0 },
+        SwayPreset { name: "Gentle", lean: 0.5, speed: 0.6, bass: 0.5, bob: 0.0 },
+        SwayPreset { name: "Windy", lean: 1.9, speed: 1.5, bass: 1.0, bob: 0.0 },
+        SwayPreset { name: "Bass pump", lean: 0.5, speed: 1.0, bass: 3.5, bob: 0.0 },
+        SwayPreset { name: "Wave", lean: 0.25, speed: 1.0, bass: 1.0, bob: 0.22 },
+        SwayPreset { name: "Dance", lean: 1.2, speed: 1.6, bass: 2.0, bob: 0.14 },
+        SwayPreset { name: "Drunk", lean: 2.6, speed: 0.7, bass: 1.4, bob: 0.1 },
+    ];
+
+    /// How solid the window is: 1 is opaque, down to 0.3.
+    pub fn window_solidity(&self) -> f32 {
+        let value = self.window_opacity;
+        if value.is_finite() && value > 0.0 { value.clamp(0.3, 1.0) } else { 1.0 }
+    }
+
+    /// Whether the window lets the desktop show through at all.
+    pub fn window_see_through(&self) -> bool {
+        self.theme == ThemeChoice::Glass || self.window_solidity() < 1.0
+    }
+
     /// How dark the full-screen lyrics page is over its visualizer.
     pub fn lyrics_vis_darkness(&self) -> f32 {
         let value = self.lyrics_vis_dark;
@@ -1456,7 +1530,7 @@ impl Settings {
         "swirl_scale", "swirl_tune", "swirl_warp", "swirl_waves", "theme", "theme_from_cover", "custom_bg", "custom_accent",
         "track_columns", "tracklist_compact", "vis", "vis_bar_sides", "vis_shapes",
         "vis_shapes_last", "vis_shapes_set", "volume_presets", "zoom",
-        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_text_no_outline", "vis_text_back", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode",
+        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_sway", "vis_sway_amount", "vis_text_no_outline", "vis_text_back", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "lyrics_vis_mode", "window_opacity", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "bar_layout", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode",
     ];
 
     /// The shareable part of the settings, as the text of a file.
@@ -2170,6 +2244,31 @@ impl ManualProxy {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_bar_layout_follows_the_old_stack_switch_and_stays_in_range() {
+        let mut settings = super::Settings::default();
+        assert_eq!(settings.bar_layout_value(), 0);
+        settings.bar_stacked = true;
+        assert_eq!(settings.bar_layout_value(), 1);
+        settings.bar_stacked = false;
+        settings.bar_layout = 9;
+        assert_eq!(settings.bar_layout_value(), 3);
+    }
+
+    #[test]
+    fn the_sway_and_window_opacity_have_safe_defaults() {
+        let mut settings = super::Settings::default();
+        assert_eq!(settings.vis_sway_preset().name, "Grass");
+        assert!((settings.vis_sway_strength() - 1.0).abs() < 1e-6);
+        settings.vis_sway = 200;
+        assert_eq!(settings.vis_sway_preset().name, "Drunk");
+        assert!((settings.window_solidity() - 1.0).abs() < 1e-6);
+        assert!(!settings.window_see_through());
+        settings.window_opacity = 0.01;
+        assert!((settings.window_solidity() - 0.3).abs() < 1e-6);
+        assert!(settings.window_see_through());
+    }
+
     #[test]
     fn the_lyrics_visualizer_is_off_and_dim_by_default_and_clamped() {
         let mut settings = super::Settings::default();

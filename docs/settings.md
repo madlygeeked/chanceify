@@ -12,6 +12,14 @@ title: Settings explained
 
 **Match the theme to the album cover.** The colours follow the song that is playing.
 
+**See-through window.** Slide it left and the desktop shows through chanceify. Frosted Glass is see-through on its own.
+
+**Controls bar layout.** Right-click the empty space on the bottom bar: all in one row, the song bar under or above the controls and volume, or each of the three on its own row. Right-clicking the controls, the song bar or the volume opens only that one's settings.
+
+**Full-screen lyrics.** Right-click the lyrics page and turn on "Visualizer behind the lyrics". Pick bars, flow or swirl and set how dark it is.
+
+**Last.fm missing pictures.** Settings lists album covers and artist pictures Last.fm lacks, side by side. Press Done once you have uploaded one. Pictures that were missing are checked again after a week.
+
 **Unavailable songs.** Songs Spotify removed from your playlists. You can copy or save the list, or remove them one at a time.
 
 [Back](./)

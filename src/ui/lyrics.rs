@@ -405,6 +405,16 @@ fn lyrics_menu(app: &mut App, page: &egui::Response, side: bool) {
                 app.actions.push(Action::ToggleLyricsVis);
             }
             if app.settings.lyrics_vis {
+                for (value, label) in [(0u8, "Bars"), (1, "Flow"), (2, "Swirl")] {
+                    if widgets::menu_item(
+                        ui,
+                        &palette,
+                        tick(app.settings.lyrics_vis_mode.min(2) == value),
+                        &gettext(app.locale, label),
+                    ) {
+                        app.actions.push(Action::SetLyricsVisMode(value));
+                    }
+                }
                 super::player_bar::slider_row(
                     ui,
                     &palette,
@@ -770,13 +780,8 @@ fn background(app: &mut App, ui: &mut egui::Ui, rect: Rect) {
         // The spectrum moves over the picture, then a black veil (the
         // reader's "how dark") keeps the words easy to read.
         let now = app.now_playing();
-        let moving = super::player_bar::visualizer_shape(
-            app,
-            ui,
-            rect,
-            now.as_ref(),
-            crate::settings::PlayerBarVis::Spectrum,
-        );
+        let mode = app.settings.lyrics_vis_mode.min(2);
+        let moving = super::player_bar::lyrics_backdrop(app, ui, rect, now.as_ref(), mode);
         if moving {
             ui.ctx().request_repaint_after(std::time::Duration::from_micros(16_667));
         }

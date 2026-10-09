@@ -1422,6 +1422,8 @@ pub enum Action {
     ResetBlockNudge,
     /// Puts the song bar on its own row under the controls and volume, or back.
     ToggleBarStack,
+    RemoveMissingArt { artists: bool, file: String },
+    SetBarLayout(u8),
     ToggleLyricsFlag(u8),
     /// The small lyrics panel's own option bits and line size.
     ToggleSideLyricsFlag(u8),
@@ -1435,6 +1437,8 @@ pub enum Action {
     ToggleVisGradient,
     ToggleVisLyrics,
     ToggleVisTextSway,
+    SetVisSway(u8),
+    SetVisSwayAmount(f32),
     ToggleVisTextOutline,
     ToggleVisTextBack,
     /// Pick the full-screen title font (index into VIS_FONTS).
@@ -1442,6 +1446,7 @@ pub enum Action {
     ToggleVisArtist,
     ToggleVisLyricsBack,
     ToggleLyricsVis,
+    SetLyricsVisMode(u8),
     SetLyricsVisDark(f32),
     /// Where the full-screen title sits: 0 under the cover, 1 beside it,
     /// 2 beside it and big, 3 above it with the artist below.

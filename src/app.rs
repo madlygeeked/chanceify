@@ -433,6 +433,8 @@ pub struct App {
     art_store: crate::lastfm_art::Store,
     art_checker: crate::lastfm_art::Checker,
     art_asked: std::collections::HashSet<String>,
+    /// The folder and file name each checked key is saved under.
+    art_names: std::collections::HashMap<String, (crate::lastfm_art::Kind, String)>,
     art_exports: Vec<lastfm_art::ArtExport>,
     art_seen_for: Option<String>,
     pub art_missing_now: bool,
@@ -1079,6 +1081,7 @@ impl App {
             art_store: crate::lastfm_art::Store::load(&art_store_path),
             art_checker: crate::lastfm_art::Checker::default(),
             art_asked: std::collections::HashSet::new(),
+            art_names: std::collections::HashMap::new(),
             art_exports: Vec::new(),
             art_seen_for: None,
             art_missing_now: false,
@@ -4426,6 +4429,7 @@ impl App {
         } else {
             palette
         };
+        let palette = palette.fade(self.settings.window_solidity());
         if self.applied_dark != Some(dark) || self.palette != palette {
             // The first colours need no reveal, and the mini player's window
             // is drawn by its skin. A cover-driven change happens every song
@@ -10823,6 +10827,14 @@ impl App {
                 }
                 self.mark_settings_dirty();
             }
+            Action::RemoveMissingArt { artists, file } => {
+                self.remove_missing_art(artists, &file);
+            }
+            Action::SetBarLayout(layout) => {
+                self.settings.bar_stacked = false;
+                self.settings.bar_layout = layout.min(3);
+                self.mark_settings_dirty();
+            }
             Action::ToggleBarStack => {
                 self.settings.bar_stacked = !self.settings.bar_stacked;
                 self.mark_settings_dirty();
@@ -11063,6 +11075,18 @@ impl App {
                 self.settings.vis_no_gradient = !self.settings.vis_no_gradient;
                 self.mark_settings_dirty();
             }
+            Action::SetVisSway(index) => {
+                self.settings.vis_sway = index.min(crate::settings::Settings::SWAY_PRESETS.len() as u8 - 1);
+                // Choosing a style means wanting it to move.
+                self.settings.vis_text_still = false;
+                self.mark_settings_dirty();
+            }
+            Action::SetVisSwayAmount(value) => {
+                if value.is_finite() {
+                    self.settings.vis_sway_amount = value.clamp(0.2, 3.0);
+                    self.mark_settings_dirty();
+                }
+            }
             Action::ToggleVisTextSway => {
                 self.settings.vis_text_still = !self.settings.vis_text_still;
                 self.mark_settings_dirty();
@@ -11090,6 +11114,10 @@ impl App {
             }
             Action::ToggleLyricsVis => {
                 self.settings.lyrics_vis = !self.settings.lyrics_vis;
+                self.mark_settings_dirty();
+            }
+            Action::SetLyricsVisMode(mode) => {
+                self.settings.lyrics_vis_mode = mode.min(2);
                 self.mark_settings_dirty();
             }
             Action::SetLyricsVisDark(value) => {

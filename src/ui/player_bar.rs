@@ -217,8 +217,14 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     // buttons, then the song-length bar, then the volume. The row grows with
     // the controls' size setting, so nothing is drawn over the picture.
     let controls_k = app.settings.controls_scale_value();
-    let stacked = app.settings.bar_stacked;
-    let strip_h = (46.0 * controls_k).clamp(46.0, 84.0) * if stacked { 1.6 } else { 1.0 };
+    let layout = app.settings.bar_layout_value();
+    let stacked = layout != 0;
+    let strip_h = (46.0 * controls_k).clamp(46.0, 84.0)
+        * match layout {
+            0 => 1.0,
+            2 => 2.2,
+            _ => 1.6,
+        };
     let height = bar_h + foot + rise + theme::PLAYER_BAR_HEIGHT * (scale - 1.0) + strip_h;
     egui::Panel::bottom("player-bar")
         .exact_size(height.max(bar_h + foot + strip_h))
@@ -362,16 +368,24 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             let volume_w = VOLUME_BLOCK + (volume_slider - 100.0) + 44.0 * presets.len() as f32;
             // Stacked, the controls and volume take the upper band of the
             // row and the song bar the lower one.
-            let band = if stacked {
-                Rect::from_min_max(row.min, pos2(row.right(), row.top() + row.height() / 1.6))
-            } else {
-                row
+            let slice = |from: f32, to: f32| {
+                Rect::from_min_max(
+                    pos2(row.left(), row.top() + row.height() * from),
+                    pos2(row.right(), row.top() + row.height() * to),
+                )
             };
-            let seek_row = if stacked {
-                Rect::from_min_max(pos2(row.left(), band.bottom()), row.max)
-            } else {
-                row
+            // `band` is where the controls sit, `band_volume` where the
+            // volume does, `seek_row` the song bar's.
+            let (band, band_volume, seek_row) = match layout {
+                // The song bar under the controls and volume.
+                1 => (slice(0.0, 1.0 / 1.6), slice(0.0, 1.0 / 1.6), slice(1.0 / 1.6, 1.0)),
+                // Three rows: controls, volume, song bar.
+                2 => (slice(0.0, 1.0 / 3.0), slice(1.0 / 3.0, 2.0 / 3.0), slice(2.0 / 3.0, 1.0)),
+                // The song bar above the controls and volume.
+                3 => (slice(0.6 / 1.6, 1.0), slice(0.6 / 1.6, 1.0), slice(0.0, 0.6 / 1.6)),
+                _ => (row, row, row),
             };
+            let band_of = |block: u8| if block == 2 { band_volume } else { band };
             let editing_row = row;
             let block_w = [controls_w, 0.0, volume_w];
             let order = ROW_ORDERS[(app.settings.row_order as usize).min(5)];
@@ -398,6 +412,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             for block in order.iter().filter(|b| **b != 1) {
                 if anchors[*block as usize] == 0 {
                     let w = block_w[*block as usize];
+                    let band = band_of(*block);
                     blocks[*block as usize] = Rect::from_min_max(
                         pos2(left_cursor, band.top()),
                         pos2(left_cursor + w, band.bottom()),
@@ -410,6 +425,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 if anchors[*block as usize] == 2 {
                     let w = block_w[*block as usize];
                     right_cursor -= w;
+                    let band = band_of(*block);
                     blocks[*block as usize] = Rect::from_min_max(
                         pos2(right_cursor, band.top()),
                         pos2(right_cursor + w, band.bottom()),
@@ -431,6 +447,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     .max(left_cursor);
                 for block in middle {
                     let w = block_w[block as usize];
+                    let band = band_of(block);
                     blocks[block as usize] = Rect::from_min_max(
                         pos2(x, band.top()),
                         pos2(x + w, band.bottom()),
@@ -439,12 +456,28 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     x += w + gap;
                 }
             }
+            if layout == 2 {
+                // Each on its own row: nothing shares a row, so each sits
+                // where its own Left, Middle or Right says.
+                for b in [0u8, 2u8] {
+                    let w = block_w[b as usize];
+                    let x = match anchors[b as usize] {
+                        0 => avail_left,
+                        1 => ((avail_left + avail_right) / 2.0 - w / 2.0).max(avail_left),
+                        _ => (avail_right - w).max(avail_left),
+                    };
+                    let band = band_of(b);
+                    blocks[b as usize] =
+                        Rect::from_min_max(pos2(x, band.top()), pos2(x + w, band.bottom()));
+                }
+            }
             // The reader may have dragged the controls or the volume aside,
             // in steps of a grid; they stay inside the row and never overlap.
             let grid = 12.0_f32;
             let editing = ui.rect_contains_pointer(editing_row);
             for (b, steps) in [(0usize, app.settings.nudge_controls), (2usize, app.settings.nudge_volume)] {
                 let w = block_w[b];
+                let band = band_of(b as u8);
                 let base = blocks[b].left();
                 let x = (base + f32::from(steps) * grid).clamp(avail_left, (avail_right - w).max(avail_left));
                 blocks[b] = Rect::from_min_max(pos2(x, band.top()), pos2(x + w, band.bottom()));
@@ -479,11 +512,14 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     }
                 }
             }
-            if blocks[0].left() < blocks[2].right() && blocks[2].left() < blocks[0].right() {
+            if layout != 2
+                && blocks[0].left() < blocks[2].right()
+                && blocks[2].left() < blocks[0].right()
+            {
                 // They touch: the volume steps aside, or else the controls.
                 let right = (blocks[0].right() + gap).min(avail_right - block_w[2]);
                 if right >= blocks[0].right() {
-                    blocks[2] = Rect::from_min_max(pos2(right, band.top()), pos2(right + block_w[2], band.bottom()));
+                    blocks[2] = Rect::from_min_max(pos2(right, band_volume.top()), pos2(right + block_w[2], band_volume.bottom()));
                 } else {
                     let left = (blocks[2].left() - gap - block_w[0]).max(avail_left);
                     blocks[0] = Rect::from_min_max(pos2(left, band.top()), pos2(left + block_w[0], band.bottom()));
@@ -645,6 +681,50 @@ fn visualizer(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying>
     }
     crate::crash::stage("visualizer: end");
     moving
+}
+
+/// What moves behind the full-screen lyrics: the bars (0), the flow (1) or
+/// the swirl (2), over the whole page. Returns whether it is still moving.
+pub(super) fn lyrics_backdrop(
+    app: &mut App,
+    ui: &egui::Ui,
+    rect: Rect,
+    now: Option<&NowPlaying>,
+    mode: u8,
+) -> bool {
+    use crate::settings::PlayerBarVis;
+    match mode {
+        1 => visualizer_shape(app, ui, rect, now, PlayerBarVis::Flow),
+        2 => {
+            let art = app.swirl_art(ui.ctx());
+            let previous = app.swirl_previous(ui.ctx());
+            let dark = ui.visuals().dark_mode;
+            let painter = ui.painter().with_clip_rect(rect);
+            let strength = if dark { 1.0 } else { LIGHT_STRENGTH };
+            let phase = swirl_phase(app, ui, now);
+            let run = SwirlRun {
+                bright: app.settings.swirl_tune_value(10) / 100.0,
+                wash: app.settings.swirl_tune_value(11) / 100.0,
+                bands: app.settings.swirl_tune_value(12),
+                art: app.settings.swirl_art_scroll,
+                mirror: !app.settings.swirl_art_single,
+            };
+            swirl(
+                &painter,
+                rect,
+                &[],
+                strength,
+                phase,
+                false,
+                art.as_ref(),
+                previous,
+                run,
+                swirl_wash(app, ui.input(|input| input.time)),
+            );
+            true
+        }
+        _ => visualizer_shape(app, ui, rect, now, PlayerBarVis::Spectrum),
+    }
 }
 
 /// The fullscreen bars: ragged bars hanging from whichever edges are on,
@@ -1525,7 +1605,10 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             // them, one under another when it is not, so the panel never
             // reaches past the window whatever its size.
             let screen_w = ui.ctx().content_rect().width();
-            let columns_fit = screen_w >= 1000.0;
+            // Two columns from a modest width when the swirl's column is
+            // not open, so the panel is shorter and fits one screen.
+            let columns_fit = screen_w >= 1000.0
+                || (screen_w >= 700.0 && shapes & crate::settings::Settings::SHAPE_SWIRL == 0);
             let col_w = if columns_fit {
                 300.0
             } else {
@@ -1778,6 +1861,30 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             .clicked()
             {
                 app.actions.push(Action::ToggleVisTextSway);
+            }
+            {
+                let presets = crate::settings::Settings::SWAY_PRESETS;
+                let names: Vec<&str> = presets.iter().map(|preset| preset.name).collect();
+                let current = (app.settings.vis_sway as usize).min(names.len() - 1);
+                if let Some(index) = inline_choice(
+                    ui,
+                    &palette,
+                    "vis-sway-style",
+                    "SWAY STYLE",
+                    names[current],
+                    &names,
+                    Some(current),
+                ) {
+                    app.actions.push(Action::SetVisSway(index as u8));
+                }
+                slider_row(
+                    ui,
+                    &palette,
+                    &gettext(app.locale, "Sway strength"),
+                    20.0..=300.0,
+                    app.settings.vis_sway_strength() * 100.0,
+                    |value| app.actions.push(Action::SetVisSwayAmount(value / 100.0)),
+                );
             }
             if chip(
                 ui,
@@ -2971,6 +3078,8 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
         .ctx()
         .animate_value_with_time(egui::Id::new("title-bass"), bass, 0.07);
     let still = app.settings.vis_text_still;
+    let sway = app.settings.vis_sway_preset();
+    let strength = app.settings.vis_sway_strength();
     let contrast = if ink == Color32::WHITE { Color32::BLACK } else { Color32::WHITE };
     let outline = !app.settings.vis_text_no_outline;
     let show_artist = !app.settings.vis_text_no_artist && !now.subtitle.is_empty();
@@ -3057,13 +3166,16 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
         } else {
             let phase = row as f32;
             let damp = (420.0 / whole_width.max(1.0)).clamp(0.3, 1.0);
-            ((0.05 * (time * 0.9 - phase * 0.6).sin()
-                + 0.03 * (time * 1.7 - phase * 0.9 + 1.0).sin())
-                * (1.0 + 2.0 * bass)
-                + 0.04 * bass * (time * 4.1 - phase * 0.7).sin())
+            let t = time * sway.speed;
+            let bass_lean = 1.0 + 2.0 * bass * sway.bass;
+            ((0.05 * (t * 0.9 - phase * 0.6).sin() + 0.03 * (t * 1.7 - phase * 0.9 + 1.0).sin())
+                * bass_lean
+                + 0.04 * bass * sway.bass * (t * 4.1 - phase * 0.7).sin())
                 * damp
+                * sway.lean
+                * strength
         };
-        if angle != 0.0 {
+        if !still && (angle != 0.0 || sway.bob > 0.0) {
             moving = true;
         }
         let (sin, cos) = angle.sin_cos();
@@ -3075,7 +3187,13 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
             let glyph = &glyphs[i];
             let w = glyph.size().x;
             let h = glyph.size().y;
-            let origin = pos2(x, line_top + (line_h - h));
+            // Each letter bobbing on its own, for the wave-like sways.
+            let bob = if still || sway.bob <= 0.0 {
+                0.0
+            } else {
+                (time * 3.0 * sway.speed - i as f32 * 0.55).sin() * sway.bob * h * strength
+            };
+            let origin = pos2(x, line_top + (line_h - h) + bob);
             if outline {
                 let reach = (h * 0.04).clamp(1.5, 4.0);
                 for step in 0..8 {
@@ -4454,13 +4572,35 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
                 (|ui: &mut egui::Ui| match kind {
                         1 => bar_rows(app, ui, &palette),
                         2 => audio_menu_body(app, ui),
-                        // The controls and the empty space between the
-                        // groups share one menu: where each group sits, and
-                        // how the song bar and its time look. The row is
-                        // resized by dragging its empty space.
+                        // The play controls: only their own size and place.
+                        0 => {
+                            let size = app.settings.controls_scale_value();
+                            slider_row(
+                                ui,
+                                &palette,
+                                &gettext(app.locale, "Size"),
+                                70.0..=180.0,
+                                size * 100.0,
+                                |value| app.actions.push(Action::SetControlsScale(value / 100.0)),
+                            );
+                            anchor_rows(app, ui, &palette, Some(0));
+                            if super::widgets::menu_item(
+                                ui,
+                                &palette,
+                                None,
+                                &gettext(app.locale, "Put the controls back"),
+                            ) {
+                                app.actions.push(Action::SetBlockNudge(0, 0));
+                            }
+                        }
+                        // The empty space between the groups: everything
+                        // about the row at once, the layout first. The
+                        // row is resized by dragging its empty space.
                         _ => {
+                            layout_rows(app, ui, &palette);
+                            super::widgets::menu_separator(ui, &palette);
                             arrange_strip(app, ui, &palette);
-                            anchor_rows(app, ui, &palette);
+                            anchor_rows(app, ui, &palette, None);
                             if super::widgets::menu_item(
                                 ui,
                                 &palette,
@@ -4468,14 +4608,6 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
                                 &gettext(app.locale, "Put the controls and volume back"),
                             ) {
                                 app.actions.push(Action::ResetBlockNudge);
-                            }
-                            let stack_label = if app.settings.bar_stacked {
-                                "Song bar beside the controls"
-                            } else {
-                                "Song bar under the controls (stacked)"
-                            };
-                            if super::widgets::menu_item(ui, &palette, None, &gettext(app.locale, stack_label)) {
-                                app.actions.push(Action::ToggleBarStack);
                             }
                             super::widgets::menu_separator(ui, &palette);
                             bar_rows(app, ui, &palette);
@@ -4499,10 +4631,18 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
 /// row. Drag a tile along the strip to move that group.
 /// Left, middle or right for the play controls and for the volume, each on
 /// its own (the song-length bar has its own row of the same chips).
-fn anchor_rows(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette) {
+fn anchor_rows(
+    app: &mut App,
+    ui: &mut egui::Ui,
+    palette: &crate::theme::Palette,
+    only: Option<u8>,
+) {
     let order = ROW_ORDERS[(app.settings.row_order as usize).min(5)];
     let seek_at = order.iter().position(|b| *b == 1).unwrap_or(1);
     for (label, block) in [("Controls", 0u8), ("Volume", 2u8)] {
+        if only.is_some_and(|only| only != block) {
+            continue;
+        }
         let place = order.iter().position(|b| *b == block).unwrap_or(0);
         let chosen = match block {
             0 => app.settings.anchor_controls,
@@ -4518,6 +4658,27 @@ fn anchor_rows(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette
                 }
             }
         });
+    }
+}
+
+/// How the three parts of the bottom row are stacked: side by side, the
+/// song bar under or above the other two, or each on its own row.
+fn layout_rows(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette) {
+    let current = app.settings.bar_layout_value();
+    for (value, label) in [
+        (0u8, "All in one row"),
+        (1, "Song bar under the controls and volume"),
+        (3, "Song bar above the controls and volume"),
+        (2, "Controls, volume and song bar, each on its own row"),
+    ] {
+        if super::widgets::menu_item(
+            ui,
+            palette,
+            if current == value { Some(Icon::Check) } else { None },
+            &gettext(app.locale, label),
+        ) {
+            app.actions.push(Action::SetBarLayout(value));
+        }
     }
 }
 

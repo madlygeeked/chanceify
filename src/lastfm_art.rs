@@ -47,6 +47,24 @@ pub struct Store {
     /// For each album or artist key: true when Last.fm has no picture.
     #[serde(default)]
     pub checked: HashMap<String, bool>,
+    /// When each was last asked about, in seconds since 1970. A picture
+    /// Last.fm lacks is asked about again after a week.
+    #[serde(default)]
+    pub at: HashMap<String, u64>,
+    /// Pictures the reader took off the list after uploading them
+    /// ("albums/Artist - Album"); they come back only if a later check
+    /// finds Last.fm still lacks them.
+    #[serde(default)]
+    pub removed: std::collections::HashSet<String>,
+}
+
+/// A week, in seconds.
+pub const RECHECK_AFTER: u64 = 7 * 24 * 3600;
+
+pub fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
 }
 
 impl Store {

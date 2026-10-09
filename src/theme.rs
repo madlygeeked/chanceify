@@ -86,6 +86,19 @@ impl Palette {
         Some(palette)
     }
 
+    /// The window, panels and rows see-through by `level` (1 is solid), so
+    /// the desktop shows behind them. Pop-up menus stay as they are.
+    pub fn fade(mut self, level: f32) -> Self {
+        let level = level.clamp(0.3, 1.0);
+        if level >= 1.0 {
+            return self;
+        }
+        self.window = self.window.gamma_multiply(level);
+        self.panel = self.panel.gamma_multiply(level);
+        self.surface = self.surface.gamma_multiply(level.max(0.5));
+        self
+    }
+
     /// A palette from two picked colours: the window and the accent. The other
     /// surfaces are the window colour moved a little towards white (on a dark
     /// window) or black (on a light one).
@@ -408,6 +421,9 @@ pub fn apply_local(ui: &mut egui::Ui, palette: &Palette) {
 }
 
 fn apply_to_style(style: &mut egui::Style, palette: &Palette) {
+    // Drop-down lists open as tall as the screen allows, so a list of
+    // fifteen shows all fifteen instead of a short scrolling box.
+    style.spacing.combo_height = 1000.0;
     let visuals = &mut style.visuals;
     *visuals = if palette.dark {
         egui::Visuals::dark()

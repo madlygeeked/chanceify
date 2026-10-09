@@ -883,6 +883,10 @@ fn native_options(
                 // the top edge and the traffic lights float over it, the way
                 // every other music player on the platform looks; the interface
                 // leaves room for them with `theme::titlebar_inset`.
+                // The window can show the desktop through it (Frosted
+                // Glass, or the window opacity slider); it is made
+                // see-through at creation and paints itself solid otherwise.
+                .with_transparent(true)
                 .with_fullsize_content_view(true)
                 .with_titlebar_shown(false)
                 .with_title_shown(false)
@@ -1456,12 +1460,12 @@ impl eframe::App for Shell {
     /// The mini player's window is see-through where the skin leaves it
     /// out; the big window paints itself over eframe's own ground.
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        if self.app.settings.winamp_window
-            || self.app.settings.theme == chanceify::settings::ThemeChoice::Glass
-        {
+        if self.app.settings.winamp_window || self.app.settings.window_see_through() {
             [0.0; 4]
         } else {
-            egui::Color32::from_rgba_unmultiplied(12, 12, 12, 180).to_normalized_gamma_f32()
+            // Solid: the window is created see-through, so the ground
+            // must be opaque or the desktop would show through everything.
+            egui::Color32::from_rgb(12, 12, 12).to_normalized_gamma_f32()
         }
     }
 

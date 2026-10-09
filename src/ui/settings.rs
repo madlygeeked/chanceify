@@ -875,20 +875,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             ),
         ),
         RowText::new(
-            gettext(locale, "Interface zoom"),
-            super::keys::platform_shortcut(
-                &gettext(
-                    locale,
-                    "Ctrl+Plus and Ctrl+Minus work anywhere; Ctrl+0 resets.",
-                ),
-                &gettext(
-                    locale,
-                    "Cmd+Plus and Cmd+Minus work anywhere; Cmd+0 resets.",
-                ),
-            )
-            .to_owned(),
-        ),
-        RowText::new(
             middle_click.clone(),
             gettext(
                 locale,
@@ -1013,6 +999,23 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                                 app.actions.push(Action::SettingsChanged);
                             }
                         });
+                        let mut solid = app.settings.window_solidity() * 100.0;
+                        ui.horizontal(|ui| {
+                            theme::text(ui, "See-through window", theme::regular(13.0), palette.secondary);
+                            if setting_slider(
+                                ui,
+                                &palette,
+                                &mut solid,
+                                30.0..=100.0,
+                                |slider| slider,
+                                |value| value.suffix("%").fixed_decimals(0),
+                            )
+                            .changed()
+                            {
+                                app.settings.window_opacity = (solid / 100.0).clamp(0.3, 1.0);
+                                app.actions.push(Action::SettingsChanged);
+                            }
+                        });
                         // The guide to writing a theme sits beside the folder
                         // it goes in, and above it when both do not fit.
                         let (guide, folder) = (&theme_guide, &themes_folder);
@@ -1058,43 +1061,13 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 &appearance_rows[1],
                 |ui| language_picker(app, ui),
             );
-            filtered_row(
-                ui,
-                &palette,
-                &needle,
-                &appearance,
-                &appearance_rows[2],
-                |ui| {
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x = 6.0;
-                        let mut zoom = app.settings.zoom;
-                        if theme::soft_button(ui, &palette, None, "+", false).clicked() {
-                            zoom = (zoom + 0.1).min(2.5);
-                        }
-                        theme::text(
-                            ui,
-                            format!("{:.0}%", zoom * 100.0),
-                            theme::medium(13.5),
-                            palette.text,
-                        );
-                        if theme::soft_button(ui, &palette, None, "-", false).clicked() {
-                            zoom = (zoom - 0.1).max(0.5);
-                        }
-                        if (zoom - app.settings.zoom).abs() > 0.001 {
-                            app.settings.zoom = zoom;
-                            ui.ctx().set_zoom_factor(zoom);
-                            app.mark_settings_dirty();
-                        }
-                    });
-                },
-            );
             if cfg!(target_os = "linux") {
                 filtered_row(
                     ui,
                     &palette,
                     &needle,
                     &appearance,
-                    &appearance_rows[3],
+                    &appearance_rows[2],
                     |ui| {
                         if widgets::switch(
                             ui,
@@ -2475,8 +2448,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         app.actions.push(Action::OpenUrl("https://www.last.fm/music".into()));
                     }
                 });
-                missing_list(ui, app, &palette, false);
-                missing_list(ui, app, &palette, true);
+                missing_lists(ui, app, &palette);
             }
         });
     }
@@ -2880,62 +2852,67 @@ fn last_fm_part(text: &str) -> String {
     out
 }
 
-/// The album covers or artist pictures Last.fm lacks, as a list that opens
-/// each one's Last.fm page, where "Upload image" adds it. The names come
-/// from the files in the `-missing` folders.
-fn missing_list(ui: &mut egui::Ui, app: &mut App, palette: &Palette, artists: bool) {
-    let folder = app
-        .dirs
-        .index_dir()
-        .join("lastfm-art")
-        .join(if artists { "artists-missing" } else { "albums-missing" });
-    let cache_id = egui::Id::new(("missing-list", artists));
+/// What Last.fm lacks, two lists side by side: album covers and artist
+/// pictures. Each row opens its Last.fm page, and "Done" takes it off the
+/// list once the picture is uploaded (it is checked again in a week).
+fn missing_lists(ui: &mut egui::Ui, app: &mut App, palette: &Palette) {
+    let root = app.dirs.index_dir().join("lastfm-art");
     let now = ui.input(|input| input.time);
-    let cached = ui.data(|data| data.get_temp::<(f64, std::sync::Arc<Vec<String>>)>(cache_id));
-    let names = match cached {
-        Some((at, names)) if now - at < 5.0 => names,
-        _ => {
-            let mut names: Vec<String> = std::fs::read_dir(&folder)
-                .map(|entries| {
-                    entries
-                        .filter_map(Result::ok)
-                        .filter_map(|entry| {
-                            let name = entry.file_name().to_string_lossy().to_string();
-                            name.strip_suffix(".jpg").map(str::to_string)
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-            names.sort_by_key(|name| name.to_lowercase());
-            let names = std::sync::Arc::new(names);
-            ui.data_mut(|data| data.insert_temp(cache_id, (now, names.clone())));
-            names
-        }
-    };
-    let title = if artists {
-        format!("Missing artist pictures ({})", names.len())
-    } else {
-        format!("Missing album covers ({})", names.len())
-    };
-    egui::CollapsingHeader::new(egui::RichText::new(title).color(palette.text))
-        .id_salt(("missing-header", artists))
-        .show(ui, |ui| {
+    let mut lists: Vec<std::sync::Arc<Vec<String>>> = Vec::new();
+    for artists in [false, true] {
+        let folder = root.join(if artists { "artists-missing" } else { "albums-missing" });
+        let cache_id = egui::Id::new(("missing-list", artists));
+        let cached = ui.data(|data| data.get_temp::<(f64, std::sync::Arc<Vec<String>>)>(cache_id));
+        let names = match cached {
+            Some((at, names)) if now - at < 5.0 => names,
+            _ => {
+                let mut names: Vec<String> = std::fs::read_dir(&folder)
+                    .map(|entries| {
+                        entries
+                            .filter_map(Result::ok)
+                            .filter_map(|entry| {
+                                let name = entry.file_name().to_string_lossy().to_string();
+                                name.strip_suffix(".jpg").map(str::to_string)
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                names.sort_by_key(|name| name.to_lowercase());
+                let names = std::sync::Arc::new(names);
+                ui.data_mut(|data| data.insert_temp(cache_id, (now, names.clone())));
+                names
+            }
+        };
+        lists.push(names);
+    }
+    theme::subtle(
+        ui,
+        palette,
+        "Open its Last.fm page, press Upload image, and pick the picture from the folder. Press Done to take it off this list (it is checked again in a week).",
+    );
+    ui.add_space(4.0);
+    ui.columns(2, |columns| {
+        for (index, ui) in columns.iter_mut().enumerate() {
+            let artists = index == 1;
+            let names = lists[index].clone();
+            let title = if artists {
+                format!("Missing artist pictures ({})", names.len())
+            } else {
+                format!("Missing album covers ({})", names.len())
+            };
+            theme::text(ui, title, theme::semibold(13.5), palette.text);
+            ui.add_space(2.0);
             if names.is_empty() {
                 theme::subtle(ui, palette, "None yet. They are added as you listen.");
-                return;
+                continue;
             }
-            theme::subtle(
-                ui,
-                palette,
-                "Open its Last.fm page, press Upload image, and pick the picture from the folder.",
-            );
             egui::ScrollArea::vertical()
                 .id_salt(("missing-scroll", artists))
-                .max_height(260.0)
+                .max_height((ui.ctx().content_rect().height() * 0.5).max(260.0))
+                .auto_shrink([false, true])
                 .show(ui, |ui| {
                     for name in names.iter() {
                         ui.horizontal(|ui| {
-                            theme::text(ui, name.as_str(), theme::regular(13.0), palette.text);
                             let url = if artists {
                                 format!("https://www.last.fm/music/{}", last_fm_part(name))
                             } else if let Some((artist, album)) = name.split_once(" - ") {
@@ -2947,13 +2924,38 @@ fn missing_list(ui: &mut egui::Ui, app: &mut App, palette: &Palette, artists: bo
                             } else {
                                 format!("https://www.last.fm/search?q={}", last_fm_part(name))
                             };
-                            if theme::soft_button(ui, palette, Some(Icon::ExternalLink), "Open on Last.fm", false)
+                            if theme::soft_button(ui, palette, None, "Done", false)
+                                .on_hover_text("Added it to Last.fm? Take it off the list.")
+                                .clicked()
+                            {
+                                app.actions.push(Action::RemoveMissingArt {
+                                    artists,
+                                    file: name.clone(),
+                                });
+                                ui.data_mut(|data| {
+                                    data.remove::<(f64, std::sync::Arc<Vec<String>>)>(egui::Id::new((
+                                        "missing-list",
+                                        artists,
+                                    )))
+                                });
+                            }
+                            if theme::soft_button(ui, palette, Some(Icon::ExternalLink), "Open", false)
+                                .on_hover_text("Open it on Last.fm")
                                 .clicked()
                             {
                                 app.actions.push(Action::OpenUrl(url));
                             }
+                            ui.add(
+                                egui::Label::new(
+                                    egui::RichText::new(name.as_str())
+                                        .font(theme::regular(13.0))
+                                        .color(palette.text),
+                                )
+                                .truncate(),
+                            );
                         });
                     }
                 });
-        });
+        }
+    });
 }
