@@ -495,6 +495,16 @@ fn proxy_mode_is_system(mode: &ProxyMode) -> bool {
     *mode == ProxyMode::System
 }
 
+/// A layout the reader saved with "Save my view".
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct MyView {
+    pub sidebar: bool,
+    pub queue: bool,
+    pub lyrics_panel: bool,
+    pub shapes: u8,
+    pub art_expanded: bool,
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -760,6 +770,10 @@ pub struct Settings {
     /// Show a swirl in the colour of the cover as the small picture on the cover.
     #[serde(default = "yes")]
     pub discord_swirl: bool,
+    /// The layout saved with "Save my view".
+    pub my_view: Option<MyView>,
+    /// Where the reader dragged the Views disc to, in points from the window's top left.
+    pub views_disc: Option<[f32; 2]>,
     /// Hovering a theme in the list shows it for the moment.
     #[serde(default = "yes")]
     pub theme_hover_preview: bool,
@@ -1159,6 +1173,8 @@ impl Default for Settings {
             discord_cover: true,
             discord_badge: true,
             discord_swirl: true,
+            my_view: None,
+            views_disc: None,
             theme_hover_preview: true,
             discord_playlist: false,
             discord_profile: false,

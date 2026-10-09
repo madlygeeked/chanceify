@@ -41,38 +41,69 @@ pub fn zoom_row(ui: &mut egui::Ui, app: &mut App, palette: &Palette) {
     });
 }
 
-/// A small disc in the corner of the full-screen views, so the panel can be
-/// reached from there too.
+/// The Views disc: a small disc the mouse can drag anywhere and click to open
+/// the Views panel, on every screen. Until it has been moved, it stays out of
+/// the way where the sidebar has its own disc.
 pub fn corner_disc(app: &mut App, ctx: &Context) {
     let full = app.fullscreen_vis || app.lyrics_fullscreen.is_some();
-    // With the sidebar hidden its disc is hidden too, so one sits by the
-    // player bar instead.
-    if !full && !app.mini_active && app.settings.sidebar_visible {
+    let moved = app.settings.views_disc;
+    if moved.is_none() && !full && !app.mini_active && app.settings.sidebar_visible {
         return;
     }
     let palette = dark_palette(app);
+    let screen = ctx.content_rect();
+    let size = if app.mini_active { 16.0 } else { 22.0 };
+    let home = if app.mini_active {
+        egui::pos2(4.0, 4.0)
+    } else if full {
+        egui::pos2(14.0, 14.0 + theme::titlebar_inset(ctx))
+    } else {
+        egui::pos2(12.0, screen.bottom() - theme::PLAYER_BAR_HEIGHT - 40.0)
+    };
+    let at = moved.map_or(home, |[x, y]| egui::pos2(x, y));
+    let at = egui::pos2(
+        at.x.clamp(screen.left(), (screen.right() - size - 12.0).max(screen.left())),
+        at.y.clamp(screen.top(), (screen.bottom() - size - 12.0).max(screen.top())),
+    );
+    let mut drop_at: Option<egui::Pos2> = None;
+    let mut reset = false;
     egui::Area::new(Id::new("views-corner-disc"))
         .order(egui::Order::Foreground)
-        .fixed_pos(if app.mini_active {
-            egui::pos2(4.0, 4.0)
-        } else if full {
-            egui::pos2(14.0, 14.0 + theme::titlebar_inset(ctx))
-        } else {
-            egui::pos2(12.0, ctx.content_rect().bottom() - theme::PLAYER_BAR_HEIGHT - 40.0)
-        })
+        .fixed_pos(at)
         .show(ctx, |ui| {
-            let button = theme::icon_button(
+            let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(size + 12.0), egui::Sense::click_and_drag());
+            let hot = response.hovered() || response.dragged();
+            theme::paint_icon(
                 ui,
                 Icon::Disc,
-                if app.mini_active { 16.0 } else { 22.0 },
-                Color32::from_white_alpha(if app.mini_active { 110 } else { 150 }),
-                palette.text,
-                "Views",
+                rect,
+                size,
+                if hot { palette.text } else { Color32::from_white_alpha(if app.mini_active { 110 } else { 150 }) },
             );
-            if button.clicked() || button.secondary_clicked() {
+            response
+                .clone()
+                .on_hover_text("Views. Click to open, drag to move, double-click to put it back.");
+            if hot {
+                ui.ctx().set_cursor_icon(if response.dragged() {
+                    egui::CursorIcon::Grabbing
+                } else {
+                    egui::CursorIcon::PointingHand
+                });
+            }
+            if response.dragged() {
+                drop_at = Some(at + response.drag_delta());
+            }
+            if response.double_clicked() {
+                reset = true;
+            } else if response.clicked() || response.secondary_clicked() {
                 app.actions.push(Action::ToggleViewsPanel);
             }
         });
+    if reset {
+        app.actions.push(Action::MoveViewsDisc(None));
+    } else if let Some(place) = drop_at {
+        app.actions.push(Action::MoveViewsDisc(Some([place.x, place.y])));
+    }
 }
 
 pub fn show(app: &mut App, ctx: &Context) {
@@ -120,6 +151,8 @@ pub fn show(app: &mut App, ctx: &Context) {
                             ("Full screen visualizer", app.fullscreen_vis, Action::ToggleFullscreenVis),
                             ("Library only", false, Action::LibraryOnlyView),
                             ("Default view", false, Action::NormalView),
+                            ("My view", app.settings.my_view.is_some(), Action::ApplyMyView),
+                            ("Save my view", false, Action::SaveMyView),
                         ];
                         for (label, on, action) in presets {
                             if theme::soft_button(ui, &palette, None, label, on).clicked() {
@@ -129,7 +162,8 @@ pub fn show(app: &mut App, ctx: &Context) {
                     });
                 });
                 ui.add_space(8.0);
-                let rows: [(&str, bool, Action); 9] = [
+                let rows: [(&str, bool, Action); 10] = [
+                    ("Always on top", app.settings.mini_on_top, Action::ToggleMiniOnTop),
                     ("Library", app.settings.sidebar_visible, Action::ToggleSidebar),
                     ("Queue", app.show_queue_panel, Action::ToggleQueuePanel),
                     ("Side lyrics", app.show_lyrics_panel, Action::ToggleLyricsPanel),

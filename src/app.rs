@@ -907,7 +907,7 @@ fn tray_config() -> fastframe_tray::Config {
             MenuItem::action(TRAY_NEXT, "Next"),
             MenuItem::action(TRAY_PREVIOUS, "Previous"),
             MenuItem::Separator,
-            MenuItem::action(TRAY_QUIT, "Quit"),
+            MenuItem::action(TRAY_QUIT, "Quit chanceify completely"),
         ],
     }
 }
@@ -3914,7 +3914,7 @@ impl App {
     /// Keeps the always-on-top level in step with the mini player: on while
     /// it is showing with the option set, back to normal otherwise.
     pub(crate) fn sync_mini_level(&mut self, ctx: &egui::Context) {
-        let want = self.mini_active && self.settings.mini_on_top;
+        let want = self.settings.mini_on_top;
         if want != self.mini_top_sent {
             self.mini_top_sent = want;
             if self.window_level_supported {
@@ -10800,6 +10800,39 @@ impl App {
                     self.apply(Action::ToggleVisShapes, ctx);
                 }
                 self.settings_dirty = true;
+            }
+            Action::SaveMyView => {
+                self.settings.my_view = Some(crate::settings::MyView {
+                    sidebar: self.settings.sidebar_visible,
+                    queue: self.show_queue_panel,
+                    lyrics_panel: self.show_lyrics_panel,
+                    shapes: self.settings.vis_shapes_value(),
+                    art_expanded: self.settings.art_expanded,
+                });
+                self.mark_settings_dirty();
+                self.toast("Saved your view");
+            }
+            Action::ApplyMyView => match self.settings.my_view.clone() {
+                Some(view) => {
+                    self.leave_lyrics_fullscreen(ctx);
+                    self.fullscreen_vis = false;
+                    self.settings.sidebar_visible = view.sidebar;
+                    self.show_queue_panel = view.queue;
+                    self.show_lyrics_panel = view.lyrics_panel;
+                    self.settings.art_expanded = view.art_expanded;
+                    let flip = self.settings.vis_shapes_value() ^ view.shapes;
+                    for bit in [1u8, 2, 4] {
+                        if flip & bit != 0 {
+                            self.apply(Action::ToggleVisShape(bit), ctx);
+                        }
+                    }
+                    self.mark_settings_dirty();
+                }
+                None => self.toast("Set the panels how you like, then press Save my view."),
+            },
+            Action::MoveViewsDisc(place) => {
+                self.settings.views_disc = place;
+                self.mark_settings_dirty();
             }
             Action::LibraryOnlyView => {
                 self.leave_lyrics_fullscreen(ctx);

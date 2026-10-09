@@ -40,3 +40,6 @@ title: Settings explained
 - **Themes** are a grid of small pictures. Point at one to see it on the whole window; the "Preview a theme when I point at it" switch turns that off.
 - **Proxy** (was Network proxy) has just Off, System, HTTP and SOCKS5 and their boxes.
 - **Views** (the disc): a bare disc with buttons for the mini player, visualizer, full screen visualizer, library only and the default view (library, queue and the visualizer along the bottom). The disc also sits in the mini player. The mini player has the same visualizer and the same Visualizer settings as everywhere else, and shows the volume number.
+
+- **Views disc**: a small disc on every screen for mouse-only use. Click it to open Views, drag it anywhere, double-click to put it back. Views also has **Always on top** (any view, not only the mini player), **Save my view** and **My view** (your panels and visualizer, brought back in one press). The theme grid has an All / Dark / Light filter.
+- **Tray**: the tray menu ends with "Quit chanceify completely". Ctrl+W hides to the tray; Ctrl+Q quits.

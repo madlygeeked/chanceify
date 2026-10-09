@@ -1387,6 +1387,10 @@ pub enum Action {
     LikeHovered,
     /// The library sidebar alone: no queue, no lyrics panel, no full screen.
     LibraryOnlyView,
+    SaveMyView,
+    ApplyMyView,
+    /// The Views disc was dragged to this place (or `None`: back to its own).
+    MoveViewsDisc(Option<[f32; 2]>),
     /// Queues the song under the pointer; `true` puts it at the top of the queue.
     QueueHovered(bool),
     /// Likes or unlikes the playing song.

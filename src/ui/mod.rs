@@ -79,6 +79,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     // sidebar, no panels, no player bar — so the one thing on screen is
     // the thing that moves with the music. Pressing it again brings the
     // window back exactly as it was.
+    app.sync_mini_level(ctx);
     if app.fullscreen_vis {
         player_bar::show(app, ui);
         lyrics::vis_overlay(app, ui);

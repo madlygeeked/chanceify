@@ -123,9 +123,6 @@ fn options_menu(app: &mut App, page: &egui::Response) {
                 app.actions.push(Action::ToggleVisPanel);
             }
             widgets::menu_separator(ui, &palette);
-            if widgets::menu_item(ui, &palette, tick(app.settings.mini_on_top), "Float over everything") {
-                app.actions.push(Action::ToggleMiniOnTop);
-            }
             if cfg!(windows)
                 && widgets::menu_item(
                     ui,
@@ -189,19 +186,6 @@ fn strip_buttons(app: &mut App, ui: &mut egui::Ui, strip: Rect) {
     .clicked()
     {
         app.actions.push(Action::ToggleMiniVolume);
-    }
-    let on_top = app.settings.mini_on_top;
-    if theme::icon_button(
-        &mut row,
-        if on_top { Icon::PinOff } else { Icon::Pin },
-        15.0,
-        if on_top { palette.accent } else { palette.secondary },
-        if on_top { palette.accent_hover } else { palette.text },
-        if on_top { "Stop keeping it on top" } else { "Keep it on top" },
-    )
-    .clicked()
-    {
-        app.actions.push(Action::ToggleMiniOnTop);
     }
 }
 

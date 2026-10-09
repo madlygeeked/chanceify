@@ -2987,6 +2987,23 @@ fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette)
             current,
         ));
     }
+    // All, only the dark ones, or only the light ones.
+    let filter_id = egui::Id::new("theme-grid-filter");
+    let mut filter: u8 = ui.data(|data| data.get_temp(filter_id)).unwrap_or(0);
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        for (value, label) in [(0u8, "All"), (1, "Dark"), (2, "Light")] {
+            if theme::soft_button(ui, palette, None, label, filter == value).clicked() {
+                filter = value;
+            }
+        }
+    });
+    ui.data_mut(|data| data.insert_temp(filter_id, filter));
+    tiles.retain(|(_, picture, _, _, current)| match filter {
+        1 => picture.dark || *current,
+        2 => !picture.dark || *current,
+        _ => true,
+    });
     let tile = vec2(132.0, 92.0);
     let mut previewing: Option<Palette> = None;
     ui.horizontal_wrapped(|ui| {
