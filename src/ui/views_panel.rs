@@ -71,8 +71,24 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
         .interactable(true)
         .fixed_pos(at)
         .show(ctx, |ui| {
+            // Dims a few seconds after the pointer leaves it, and comes back
+            // the moment the pointer is over it (or the panel is open).
+            let seen_id = Id::new("views-disc-seen");
+            let now_t = ui.ctx().input(|input| input.time);
+            let last_seen: f64 = ui.data(|data| data.get_temp(seen_id)).unwrap_or(now_t);
+            let calm = !app.views_panel && now_t - last_seen > 3.0;
+            let dim = ui.ctx().animate_value_with_time(seen_id.with("dim"), if calm { 0.4 } else { 1.0 }, 0.5);
+            ui.set_opacity(dim);
             let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(size + 12.0), egui::Sense::click_and_drag());
             let hot = response.hovered() || response.dragged();
+            if hot {
+                ui.data_mut(|data| data.insert_temp(seen_id, now_t));
+            } else {
+                ui.data_mut(|data| data.insert_temp(seen_id, last_seen));
+                if !calm {
+                    ui.ctx().request_repaint_after(std::time::Duration::from_millis(500));
+                }
+            }
             // A round dark back, so the disc reads over any picture.
             ui.painter().circle_filled(
                 rect.center(),
