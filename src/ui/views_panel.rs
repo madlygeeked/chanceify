@@ -107,7 +107,7 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
 }
 
 /// Where the pop-out controls first appear: bottom centre, above the bar.
-fn default_float(ctx: &Context) -> [f32; 3] {
+pub(super) fn default_float(ctx: &Context) -> [f32; 3] {
     let screen = ctx.content_rect();
     let width = 380.0;
     [

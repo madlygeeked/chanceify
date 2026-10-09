@@ -153,7 +153,8 @@ impl TrackColumns {
             crate::model::SortColumn::Bpm => self.bpm,
             crate::model::SortColumn::Release => self.release,
             crate::model::SortColumn::Playlists => self.playlists,
-            crate::model::SortColumn::Genre => self.genre,
+            // Genres are gone: the column can never be shown.
+            crate::model::SortColumn::Genre => 0.0,
             _ => 0.0,
         };
         if raw.is_finite() {
@@ -374,12 +375,12 @@ pub fn parse_hex(text: &str) -> Option<[u8; 3]> {
 pub fn fancy_theme_name(name: &str) -> String {
     match name.to_ascii_lowercase().replace(['-', '_'], " ").as_str() {
         "catppuccin" => "Cat Cafe",
-        "catppuccin latte" => "Cat Cafe Latte (light)",
-        "nord" => "Arctic Dawn",
-        "ristretto" => "Espresso Shot",
-        "rose pine" => "Pine Rose Garden",
-        "rose pine dawn" => "Rosewood Dawn (light)",
-        "rose pine moon" => "Moonlit Rose",
+        "catppuccin latte" => "Latte",
+        "nord" => "Arctic",
+        "ristretto" => "Espresso",
+        "rose pine" => "Pine Rose",
+        "rose pine dawn" => "Rosewood",
+        "rose pine moon" => "Moonlit",
         "tokyo night" => "Neon Tokyo",
         _ => return name.to_string(),
     }
@@ -423,18 +424,18 @@ impl ThemeChoice {
             Self::Light => pgettext(locale, "theme", "Light"),
             Self::System => gettext(locale, "Follow system"),
             Self::Midnight => "Deep Space".into(),
-            Self::Ocean => "Ocean Drive".into(),
-            Self::Sunset => "Sunset Strip".into(),
-            Self::Forest => "Emerald Forest".into(),
-            Self::Rose => "Rosé All Day".into(),
-            Self::Grape => "Grape Soda".into(),
+            Self::Ocean => "Ocean".into(),
+            Self::Sunset => "Sunset".into(),
+            Self::Forest => "Forest".into(),
+            Self::Rose => "Rosé".into(),
+            Self::Grape => "Grape".into(),
             Self::Amoled => "Pure Black".into(),
-            Self::Mocha => "Mocha Mornings".into(),
-            Self::Cream => "Vanilla Cream (light)".into(),
+            Self::Mocha => "Mocha".into(),
+            Self::Cream => "Vanilla".into(),
             Self::Night => "Night Market".into(),
-            Self::Glass => "Frosted Glass (see-through)".into(),
-            Self::PinkMilk => "Kitty Paws (light)".into(),
-            Self::Custom => "My own colours".into(),
+            Self::Glass => "Frosted Glass".into(),
+            Self::PinkMilk => "Kitty Paws".into(),
+            Self::Custom => "My colours".into(),
         }
     }
 }
@@ -777,8 +778,8 @@ pub struct Settings {
     /// The pop-out controls: [x, y, width]. None = not shown.
     pub float_controls: Option<[f32; 3]>,
     /// Hovering a theme in the list shows it for the moment.
-    #[serde(default = "yes")]
-    pub theme_hover_preview: bool,
+    #[serde(default)]
+    pub theme_point_preview: bool,
     /// Say which playlist the song is playing from.
     pub discord_playlist: bool,
     /// A button that opens the reader's Spotify profile.
@@ -1180,7 +1181,7 @@ impl Default for Settings {
             my_view: None,
             views_disc: None,
             float_controls: None,
-            theme_hover_preview: true,
+            theme_point_preview: false,
             discord_playlist: false,
             discord_profile: false,
             discord_buttons: true,

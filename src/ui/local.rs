@@ -44,7 +44,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         app.local_sync.forget_genres();
     }
     app.refresh_local_genres();
-    app.request_local_genres();
     app.request_local_saved();
     let scan = app.local_scan.view();
     if scan.running {
@@ -428,7 +427,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 // heart-coloured when it is in Liked Songs).
                 if line.spotify.is_some() {
                     let centre = pos2(rect.left() + 4.0, rect.center().y);
-                    painter.circle_filled(centre, 2.5, Color32::from_rgb(0x1d, 0xb9, 0x54));
+                    painter.circle_filled(centre, 2.5, palette.accent);
                     if line.liked {
                         painter.circle_stroke(
                             centre,

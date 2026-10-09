@@ -2810,7 +2810,7 @@ pub struct HeaderAction {
 
 /// The columns a track list can sort by, in the order the menu lists them:
 /// what the song is, then where it came from, then when and how long.
-pub(crate) const SORTABLE: [(crate::model::SortColumn, &str); 7] = [
+pub(crate) const SORTABLE: [(crate::model::SortColumn, &str); 6] = [
     (crate::model::SortColumn::Title, "column heading|TITLE"),
     (crate::model::SortColumn::Album, "column heading|ALBUM"),
     (
@@ -2818,16 +2818,14 @@ pub(crate) const SORTABLE: [(crate::model::SortColumn, &str); 7] = [
         "column heading|PLAYLISTS",
     ),
     (crate::model::SortColumn::Added, "column heading|DATE ADDED"),
-    (crate::model::SortColumn::Genre, "column heading|GENRE"),
     (crate::model::SortColumn::Bpm, "column heading|BPM"),
     (crate::model::SortColumn::Duration, "column heading|LENGTH"),
 ];
 
 /// The columns a reader can show, hide and drag, and the heading each is
 /// known by.
-pub(crate) const RESIZABLE: [(crate::model::SortColumn, &str); 5] = [
+pub(crate) const RESIZABLE: [(crate::model::SortColumn, &str); 4] = [
     (crate::model::SortColumn::Playlists, "column heading|PLAYLISTS"),
-    (crate::model::SortColumn::Genre, "column heading|GENRE"),
     (crate::model::SortColumn::Album, "column heading|ALBUM"),
     (crate::model::SortColumn::Added, "column heading|DATE ADDED"),
     (crate::model::SortColumn::Bpm, "column heading|BPM"),
@@ -2865,11 +2863,11 @@ fn checkbox_row_ex(
         }
         let boxed = Rect::from_center_size(pos2(rect.left() + 18.0, rect.center().y), Vec2::splat(16.0));
         if checked {
-            let green = Color32::from_rgb(0x1e, 0xd7, 0x60);
+            let green = palette.accent;
             let green = if enabled { green } else { green.gamma_multiply(0.45) };
             ui.painter().rect_filled(boxed, CornerRadius::same(3), green);
             Icon::Check
-                .image(Color32::BLACK, 12.0)
+                .image(palette.on_accent, 12.0)
                 .paint_at(ui, Rect::from_center_size(boxed.center(), Vec2::splat(12.0)));
         } else {
             ui.painter().rect_stroke(
@@ -3171,15 +3169,26 @@ pub fn table_header(
     // saw the click and the menu only opened on empty space.
     let mut anchors: Vec<egui::Response> = Vec::new();
     let mut heading =
-        |ui: &mut Ui, x: f32, text: &str, column: SortColumn, anchors: &mut Vec<egui::Response>| {
+        |ui: &mut Ui, x: f32, text: &str, column: SortColumn, room: f32, anchors: &mut Vec<egui::Response>| {
             let active = sort.and_then(|sort| sort.direction(column));
-            let galley = ui.painter().layout_no_wrap(
+            let arrow_room = if active.is_some() { 13.0 } else { 0.0 };
+            let mut galley = ui.painter().layout_no_wrap(
                 text.to_string(),
                 font.clone(),
                 egui::Color32::PLACEHOLDER,
             );
+            // In a squeezed column the heading shrinks to fit instead of
+            // running into the next one.
+            let avail = (room - 12.0 - arrow_room).max(20.0);
+            if galley.size().x > avail {
+                let scaled = (font.size * avail / galley.size().x).max(8.5);
+                galley = ui.painter().layout_no_wrap(
+                    text.to_string(),
+                    egui::FontId::new(scaled, font.family.clone()),
+                    egui::Color32::PLACEHOLDER,
+                );
+            }
             let size = galley.size();
-            let arrow_room = if active.is_some() { 13.0 } else { 0.0 };
             let top_left = pos2(x, rect.center().y - size.y / 2.0);
             let head =
                 Rect::from_min_size(top_left, size + vec2(arrow_room, 0.0)).expand2(vec2(4.0, 8.0));
@@ -3289,6 +3298,7 @@ pub fn table_header(
         x,
         &pgettext(locale, "column heading", "TITLE"),
         SortColumn::Title,
+        f32::INFINITY,
         &mut anchors,
     );
     // The columns are laid out from the right inwards, so the song names
@@ -3329,6 +3339,7 @@ pub fn table_header(
             cx,
             &pgettext(locale, "column heading", "PLAYLISTS"),
             SortColumn::Playlists,
+            laid.playlists,
             &mut anchors,
         );
         edges.push((cx, SortColumn::Playlists));
@@ -3340,6 +3351,7 @@ pub fn table_header(
             cx,
             &pgettext(locale, "column heading", "ALBUM"),
             SortColumn::Album,
+            laid.album,
             &mut anchors,
         );
         edges.push((cx, SortColumn::Album));
@@ -3351,6 +3363,7 @@ pub fn table_header(
             cx,
             &pgettext(locale, "column heading", "DATE ADDED"),
             SortColumn::Added,
+            laid.added,
             &mut anchors,
         );
         edges.push((cx, SortColumn::Added));
@@ -3364,6 +3377,7 @@ pub fn table_header(
             cx,
             &pgettext(locale, "column heading", "RELEASE DATE"),
             SortColumn::Release,
+            laid.release,
             &mut anchors,
         );
         edges.push((cx, SortColumn::Release));
@@ -3375,6 +3389,7 @@ pub fn table_header(
             cx,
             &pgettext(locale, "column heading", "GENRE"),
             SortColumn::Genre,
+            laid.genre,
             &mut anchors,
         );
         edges.push((cx, SortColumn::Genre));
@@ -3386,6 +3401,7 @@ pub fn table_header(
             cx,
             &pgettext(locale, "column heading", "BPM"),
             SortColumn::Bpm,
+            laid.bpm,
             &mut anchors,
         );
         edges.push((cx, SortColumn::Bpm));
@@ -3571,11 +3587,8 @@ pub fn table_header(
                     ) {
                         widths.hide_duration = !widths.hide_duration;
                     }
-                    if checkbox_row(ui, palette, &gettext(locale, "LIKED HEART"), !widths.hide_heart) {
+                    if checkbox_row(ui, palette, &gettext(locale, "LIKED"), !widths.hide_heart) {
                         widths.hide_heart = !widths.hide_heart;
-                    }
-                    if checkbox_row(ui, palette, &gettext(locale, "ADD TO PLAYLIST +"), !widths.hide_plus) {
-                        widths.hide_plus = !widths.hide_plus;
                     }
                     menu_separator(ui, palette);
                     if menu_item(ui, palette, None, &gettext(locale, "RESET COLUMN WIDTHS")) {

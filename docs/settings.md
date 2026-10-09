@@ -50,3 +50,13 @@ title: Settings explained
 - Queue and Recent tabs: right-click to show or hide "Song length".
 - Track lists: with many columns on, they now squeeze to fit instead of dropping.
 - Recently played times sit in their own column, same spot on every row.
+
+## 0.78.0
+- The sidebar disc is now the Views button (click or right-click). Local songs has a laptop icon.
+- Right-click the player bar's buttons to pop the controls out; right-click them there... use the panel's strip menu to put them away.
+- Themes: shorter names; Follow system, chanceify, dark themes, then light ones. "Preview a theme when I point at it" sits beside All/Dark/Light and is off by default.
+- See-through window works with every theme (Settings > Appearance).
+- Tick boxes and the live dot follow the theme's accent colour.
+- Genres are gone: no Genre column, no MusicBrainz look-ups.
+- Column menu: "LIKED" replaces "LIKED HEART"; the "ADD TO PLAYLIST +" row is gone. Headings shrink to fit.
+- Settings > Discord shows whether the Discord app was found.

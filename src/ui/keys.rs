@@ -369,9 +369,6 @@ pub fn handle(app: &mut App, ctx: &egui::Context) {
     // 0.63: the Genre column starts switched on, once, so songs get their
     // genres from MusicBrainz without hunting for the setting.
     if app.settings.keymap_version < 6 {
-        if !app.settings.track_columns.shown(crate::model::SortColumn::Genre) {
-            app.settings.track_columns.toggle(crate::model::SortColumn::Genre);
-        }
         app.settings.keymap_version = 6;
         app.actions.push(Action::SettingsChanged);
     }

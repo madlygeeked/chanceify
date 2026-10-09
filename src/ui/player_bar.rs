@@ -579,6 +579,26 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 (left_cursor, right_cursor),
             );
             blocks[1] = seek_rect;
+            // Right-click the buttons: the controls pop out into a panel you
+            // can move, like the disc. Right-click them there to put away.
+            {
+                let buttons = Rect::from_min_max(
+                    pos2(blocks[0].left(), band.top()),
+                    pos2(blocks[0].left() + block_w[0], band.bottom()),
+                );
+                let pressed = ui.input(|input| {
+                    input.pointer.secondary_clicked()
+                        && input.pointer.interact_pos().is_some_and(|at| buttons.contains(at))
+                });
+                if pressed {
+                    let place = if app.settings.float_controls.is_some() {
+                        None
+                    } else {
+                        Some(super::views_panel::default_float(ui.ctx()))
+                    };
+                    app.actions.push(Action::SetFloatControls(place));
+                }
+            }
             let mut right_ui = ui.new_child(
                 UiBuilder::new()
                     .max_rect(blocks[2])
@@ -1600,7 +1620,7 @@ fn audio_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     vec2(72.0, (row.height() - 2.0).max(18.0)),
                 );
                 let response = ui.interact(pill, egui::Id::new("eq-live-pill"), Sense::click());
-                let colour = if live { Color32::from_rgb(0x1e, 0xd7, 0x60) } else { palette.dim };
+                let colour = if live { palette.accent } else { palette.dim };
                 ui.painter().rect_filled(
                     pill,
                     egui::CornerRadius::same(9),

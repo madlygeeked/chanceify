@@ -322,6 +322,14 @@ fn subscribe(pipe: &mut dyn Pipe) -> std::io::Result<()> {
 /// put their own in Settings.
 pub const DEFAULT_APPLICATION_ID: &str = "1557925208906661998";
 
+/// How the link to the Discord app stands: 0 not found (or not tried yet),
+/// 1 found, 2 found and the song was sent. For the status line in Settings.
+static LINK: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+pub fn link_state() -> u8 {
+    LINK.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 enum Message {
     Set(String, Option<Activity>),
 }
@@ -405,6 +413,7 @@ fn run(rx: mpsc::Receiver<Message>) {
         if connection.is_none() || connected_as != id {
             connection = connect(&id);
             connected_as = id.clone();
+            LINK.store(u8::from(connection.is_some()), std::sync::atomic::Ordering::Relaxed);
             if listening && let Some(pipe) = connection.as_mut() {
                 if let Err(error) = subscribe(pipe.as_mut()) {
                     log::debug!("discord listen-along: {error}");
@@ -414,6 +423,7 @@ fn run(rx: mpsc::Receiver<Message>) {
         }
         let Some(pipe) = connection.as_mut() else {
             // Discord is not open; the next timeout tries again.
+            LINK.store(0, std::sync::atomic::Ordering::Relaxed);
             continue;
         };
         let sent = match set_activity(pipe.as_mut(), activity.as_ref(), false) {
@@ -423,10 +433,14 @@ fn run(rx: mpsc::Receiver<Message>) {
             other => other,
         };
         match sent {
-            Ok(_) => pending = None,
+            Ok(_) => {
+                pending = None;
+                LINK.store(2, std::sync::atomic::Ordering::Relaxed);
+            }
             Err(error) => {
                 log::debug!("discord presence: {error}");
                 connection = None;
+                LINK.store(0, std::sync::atomic::Ordering::Relaxed);
             }
         }
     }

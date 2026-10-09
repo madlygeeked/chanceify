@@ -955,7 +955,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         });
                         let mut solid = app.settings.window_solidity() * 100.0;
                         ui.horizontal(|ui| {
-                            theme::text(ui, "See-through window", theme::regular(13.0), palette.secondary);
+                            theme::text(ui, "See-through window (works with every theme: 100% solid, 50% like frosted glass)", theme::regular(13.0), palette.secondary);
                             if setting_slider(
                                 ui,
                                 &palette,
@@ -2069,6 +2069,19 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         }
                     }
                     ui.add_space(6.0);
+                    {
+                        let (text, colour) = match crate::discord::link_state() {
+                            2 => ("Discord: connected, and the song was sent.", palette.accent),
+                            1 => ("Discord: found. Waiting for a song to send.", palette.secondary),
+                            _ => (
+                                "Discord: not found yet. Open the Discord desktop app (not the website), and turn on Settings > Activity Privacy > Share my activity in Discord.",
+                                palette.secondary,
+                            ),
+                        };
+                        theme::text(ui, text, theme::regular(12.5), colour);
+                        ui.ctx().request_repaint_after(std::time::Duration::from_secs(2));
+                    }
+                    ui.add_space(6.0);
                     // A live preview: exactly what is being sent to Discord for the song now playing.
                     {
                         let style = app.discord_style();
@@ -2955,7 +2968,7 @@ fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette)
     use crate::theme::Palette;
     use egui::{Rect, pos2, vec2};
     // (name, picture, the theme to show while hovering, the action on click)
-    let mut tiles: Vec<(String, Palette, Option<Palette>, Action, bool)> = Vec::new();
+    let mut tiles: Vec<(u8, String, Palette, Option<Palette>, Action, bool)> = Vec::new();
     for choice in ThemeChoice::ALL {
         let shown = match choice {
             ThemeChoice::Dark => Some(Palette::dark()),
@@ -2969,7 +2982,10 @@ fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette)
         };
         let picture = shown.unwrap_or_else(Palette::dark);
         let current = app.settings.custom_theme.is_none() && app.settings.theme == choice;
+        // Follow system first, then every dark theme, then every light one.
+        let rank = if choice == ThemeChoice::System { 0 } else if picture.dark { 2 } else { 3 };
         tiles.push((
+            rank,
             choice.label(app.locale).to_string(),
             picture,
             shown,
@@ -2979,8 +2995,12 @@ fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette)
     }
     for theme in app.custom_themes.picker_themes() {
         let current = app.settings.custom_theme.as_deref() == Some(theme.filename.as_str());
+        let name = crate::settings::fancy_theme_name(&fastframe_theme::display_name(&theme.filename)).to_string();
+        // chanceify's own theme comes second.
+        let rank = if name.eq_ignore_ascii_case("chanceify") { 1 } else if theme.palette.dark { 2 } else { 3 };
         tiles.push((
-            crate::settings::fancy_theme_name(&fastframe_theme::display_name(&theme.filename)).to_string(),
+            rank,
+            name,
             theme.palette,
             Some(theme.palette),
             Action::SetCustomTheme(theme.filename.clone()),
@@ -2997,9 +3017,16 @@ fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette)
                 filter = value;
             }
         }
+        ui.add_space(10.0);
+        let mut point = app.settings.theme_point_preview;
+        if widgets::switch_labeled(ui, palette, "Preview a theme when I point at it", &mut point).changed() {
+            app.settings.theme_point_preview = point;
+            app.mark_settings_dirty();
+        }
     });
     ui.data_mut(|data| data.insert_temp(filter_id, filter));
-    tiles.retain(|(_, picture, _, _, current)| match filter {
+    tiles.sort_by_key(|tile| tile.0);
+    tiles.retain(|(_, _, picture, _, _, current)| match filter {
         1 => picture.dark || *current,
         2 => !picture.dark || *current,
         _ => true,
@@ -3008,7 +3035,7 @@ fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette)
     let mut previewing: Option<Palette> = None;
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
-        for (name, picture, preview, action, current) in tiles {
+        for (_, name, picture, preview, action, current) in tiles {
             let (rect, response) = ui.allocate_exact_size(tile, egui::Sense::click());
             let painter = ui.painter();
             let art = Rect::from_min_size(rect.min, vec2(tile.x, 62.0));
@@ -3044,13 +3071,13 @@ fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette)
             painter.text(
                 pos2(rect.left() + 2.0, rect.bottom() - 14.0),
                 egui::Align2::LEFT_CENTER,
-                name,
+                name.replace(" (light)", "").replace(" (see-through)", ""),
                 theme::regular(12.0),
                 if current { palette.accent } else { palette.text },
             );
             if response.hovered() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                if app.settings.theme_hover_preview && !current {
+                if app.settings.theme_point_preview && !current {
                     previewing = preview;
                 }
             }
@@ -3059,12 +3086,6 @@ fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette)
             }
         }
     });
-    ui.add_space(4.0);
-    let mut hover = app.settings.theme_hover_preview;
-    if widgets::switch_labeled(ui, palette, "Preview a theme when I point at it", &mut hover).changed() {
-        app.settings.theme_hover_preview = hover;
-        app.mark_settings_dirty();
-    }
     if let Some(shown) = previewing {
         app.theme_preview = Some((shown, std::time::Instant::now()));
         ui.ctx().request_repaint_after(std::time::Duration::from_millis(120));

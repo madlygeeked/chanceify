@@ -96,6 +96,8 @@ impl Palette {
         self.window = self.window.gamma_multiply(level);
         self.panel = self.panel.gamma_multiply(level);
         self.surface = self.surface.gamma_multiply(level.max(0.5));
+        self.surface_hover = self.surface_hover.gamma_multiply(level.max(0.65));
+        self.surface_active = self.surface_active.gamma_multiply(level.max(0.75));
         self
     }
 

@@ -1243,18 +1243,27 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
         ui.add_space(2.0);
         let local_button = theme::icon_button(
             ui,
-            Icon::Disc,
+            Icon::Laptop,
             22.0,
             if page == Page::Local { palette.text } else { palette.secondary },
             palette.text,
             "Local songs",
         );
-        // Right-click the disc: the Views and panels window opens at once.
-        if local_button.secondary_clicked() {
-            app.actions.push(Action::ToggleViewsPanel);
-        }
         if local_button.clicked() {
             app.actions.push(Action::Open(Page::Local));
+        }
+        ui.add_space(2.0);
+        // The disc is the Views button: click or right-click opens the panel.
+        let views_button = theme::icon_button(
+            ui,
+            Icon::Disc,
+            22.0,
+            if app.views_panel { palette.accent } else { palette.secondary },
+            palette.text,
+            "Views",
+        );
+        if views_button.clicked() || views_button.secondary_clicked() {
+            app.actions.push(Action::ToggleViewsPanel);
         }
         ui.add_space(6.0);
         let can_back = app.can_go_back();
