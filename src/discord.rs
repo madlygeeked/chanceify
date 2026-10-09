@@ -118,6 +118,8 @@ pub struct Style {
     pub playlist_url: Option<String>,
     /// The song button leads to the chanceify song page, not Spotify.
     pub song_page: bool,
+    /// 0 album big, swirl small; 1 swirl big, album small; 2 badge only.
+    pub look: u8,
     pub links: bool,
     pub hide_paused: bool,
     pub files: bool,
@@ -178,15 +180,19 @@ pub fn activity_for(
     } else {
         None
     };
-    let (large_image, small_image) = match cover {
-        Some(url) => (
+    let (large_image, small_image) = match (cover, style.look) {
+        // The swirl big, the album in the corner.
+        (Some(url), 1) if style.swirl.is_some() => (style.swirl.clone(), Some(url)),
+        // Only the chanceify badge.
+        (_, 2) => (Some(BADGE_KEY.to_string()), None),
+        (Some(url), _) => (
             Some(url),
             style
                 .swirl
                 .clone()
                 .or_else(|| style.badge.then(|| BADGE_KEY.to_string())),
         ),
-        None => (style.badge.then(|| BADGE_KEY.to_string()), None),
+        (None, _) => (style.badge.then(|| BADGE_KEY.to_string()), None),
     };
     let mut buttons: Vec<(String, String)> = Vec::new();
     if style.buttons {
@@ -732,6 +738,7 @@ mod tests {
             profile_url: None,
             playlist_url: None,
             song_page: false,
+            look: 0,
             buttons: true,
             links: true,
             hide_paused: false,

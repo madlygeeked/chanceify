@@ -854,6 +854,8 @@ pub struct Settings {
     /// A button that opens the reader's Spotify profile.
     pub discord_profile: bool,
     pub discord_playlist_button: bool,
+    /// 0 album big, swirl small; 1 swirl big, album small; 2 chanceify badge only.
+    pub discord_look: u8,
     pub discord_song_page: bool,
     /// Show the "Listen on Spotify" and "Get chanceify" buttons.
     pub discord_buttons: bool,
@@ -1263,6 +1265,7 @@ impl Default for Settings {
             discord_playlist: false,
             discord_profile: false,
             discord_playlist_button: false,
+            discord_look: 0,
             discord_song_page: false,
             discord_buttons: true,
             discord_links: true,

@@ -11143,6 +11143,10 @@ impl App {
             Action::ImportSettings => self.import_settings_file("chanceify-settings.json"),
             Action::LoadDefaultSettings => self.import_settings_file("defaults.json"),
             Action::ToggleViewsPanel => self.views_panel = !self.views_panel,
+            Action::RegisterLinks => match crate::link::register_links() {
+                Ok(()) => self.toast("chanceify:// links now open chanceify"),
+                Err(error) => self.toast_error(format!("Could not set that up: {error}")),
+            },
             Action::OpenRecap => self.recap = Some(crate::ui::recap::Recap::new()),
             Action::OpenRecapFolder => {
                 let folder = self.dirs.index_dir().join("recaps");
@@ -12603,6 +12607,7 @@ impl App {
             buttons: self.settings.discord_buttons,
             playlist_url,
             song_page: self.settings.discord_song_page,
+            look: self.settings.discord_look,
             links: self.settings.discord_links,
             hide_paused: self.settings.discord_hide_paused,
             files: self.settings.discord_files,

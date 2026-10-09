@@ -34,6 +34,10 @@ pub fn canonical_context_uri(uri: &str) -> String {
 /// without a locale segment (`/intl-de/`), a query string, or the old
 /// `/user/NAME/playlist/ID` shape.
 pub fn parse(text: &str) -> Option<String> {
+    // chanceify://track/ID is the same link, handed to this app.
+    if let Some(rest) = text.trim().strip_prefix("chanceify://") {
+        return parse(&format!("spotify://{rest}"));
+    }
     if let Some(query) = search_query(text) {
         return Some(format!(
             "spotify:search:{}",
@@ -283,5 +287,32 @@ mod tests {
         ] {
             assert_eq!(parse(invalid), None, "{invalid}");
         }
+    }
+}
+
+/// Tells Windows that `chanceify://` links open this program (the reader asked
+/// for it; it is the only thing written outside the chanceify folder, and only
+/// under the current user).
+pub fn register_links() -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let exe = std::env::current_exe().map_err(|error| error.to_string())?;
+        let command = format!("\"{}\" \"%1\"", exe.display());
+        let run = |args: &[&str]| -> Result<(), String> {
+            let status = std::process::Command::new("reg")
+                .args(args)
+                .creation_flags(0x0800_0000)
+                .status()
+                .map_err(|error| error.to_string())?;
+            status.success().then_some(()).ok_or_else(|| "Windows refused".to_string())
+        };
+        run(&["add", r"HKCU\Software\Classes\chanceify", "/ve", "/d", "URL:chanceify", "/f"])?;
+        run(&["add", r"HKCU\Software\Classes\chanceify", "/v", "URL Protocol", "/d", "", "/f"])?;
+        run(&["add", r"HKCU\Software\Classes\chanceify\shell\open\command", "/ve", "/d", &command, "/f"])
+    }
+    #[cfg(not(windows))]
+    {
+        Err("Only on Windows".to_string())
     }
 }

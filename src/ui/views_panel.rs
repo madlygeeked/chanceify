@@ -339,6 +339,34 @@ pub fn show(app: &mut App, ctx: &Context) {
                     ui.add_space(2.0);
                 }
                 ui.add_space(8.0);
+                // Every key's job as a button, for those who use the mouse only.
+                egui::CollapsingHeader::new(
+                    egui::RichText::new("Everything the keys do").color(palette.text).font(theme::semibold(13.5)),
+                )
+                .id_salt("views-all-actions")
+                .default_open(false)
+                .show(ui, |ui| {
+                    for (group, ids) in super::keys::CATEGORIES {
+                        theme::subtle(ui, &palette, &group.to_uppercase());
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+                            for id in *ids {
+                                if let Some(bindable) = super::keys::BINDABLE.iter().find(|b| b.id == *id) {
+                                    let hint = super::keys::chord_label(app, bindable.id);
+                                    let mut button = theme::soft_button(ui, &palette, None, bindable.label, false);
+                                    if let Some(hint) = hint {
+                                        button = button.on_hover_text(format!("Key: {hint}"));
+                                    }
+                                    if button.clicked() {
+                                        app.actions.push((bindable.action)());
+                                    }
+                                }
+                            }
+                        });
+                        ui.add_space(6.0);
+                    }
+                });
+                ui.add_space(8.0);
                 zoom_row(ui, app, &palette);
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {

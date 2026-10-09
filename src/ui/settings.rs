@@ -2048,6 +2048,21 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                             }
                         }
                     });
+                    ui.horizontal_wrapped(|ui| {
+                        theme::text(ui, "Card look", theme::regular(12.5), palette.secondary);
+                        for (value, label) in [(0u8, "Album big, swirl small"), (1, "Swirl big, album small"), (2, "chanceify badge only")] {
+                            if theme::soft_button(ui, &palette, None, label, app.settings.discord_look == value).clicked() {
+                                app.settings.discord_look = value;
+                                app.mark_settings_dirty();
+                            }
+                        }
+                    });
+                    if theme::soft_button(ui, &palette, None, "Let chanceify:// links open chanceify (Windows)", false)
+                        .on_hover_text("Adds one entry for your Windows user, so the song page's Open in chanceify button works.")
+                        .clicked()
+                    {
+                        app.actions.push(Action::RegisterLinks);
+                    }
                     ui.add_space(4.0);
                     let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 12] = [
                         ("Show the album cover", |s| &mut s.discord_cover),

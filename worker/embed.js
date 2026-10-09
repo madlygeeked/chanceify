@@ -53,7 +53,10 @@ function page({ title, artist, id, image }) {
 <meta property="og:description" content="${esc(desc)}">
 ${image ? `<meta property="og:image" content="${esc(image)}">` : ""}
 <meta property="og:url" content="${esc(spotify)}">
-<meta name="twitter:card" content="summary">
+<meta name="twitter:card" content="summary_large_image">
+${image ? `<meta name="twitter:image" content="${esc(image)}">
+<meta property="og:image:width" content="640">
+<meta property="og:image:height" content="640">` : ""}
 <style>
 :root{color-scheme:dark}
 *{box-sizing:border-box}
@@ -65,6 +68,9 @@ h1{font-size:26px;margin:22px 0 4px;line-height:1.2}
 p{margin:0;color:#c4b5fd;font-size:16px}
 .btn{display:inline-block;margin-top:26px;padding:13px 28px;border-radius:999px;background:linear-gradient(90deg,#6366f1,#8b5cf6);color:#fff;font-weight:600;text-decoration:none}
 .btn:hover{filter:brightness(1.12)}
+.row{margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.ghost{padding:9px 16px;border-radius:999px;border:1px solid #a78bfa55;color:#ddd6fe;text-decoration:none;font-size:14px}
+.ghost:hover{background:#a78bfa22}
 .foot{margin-top:28px;font-size:13px;color:#a78bfa99}
 .foot a{color:inherit}
 </style></head><body>
@@ -72,7 +78,8 @@ p{margin:0;color:#c4b5fd;font-size:16px}
 <div class="cover"${image ? ` style="background-image:url('${esc(image)}')"` : ""}></div>
 <h1>${esc(title)}</h1>
 <p>${esc(line)}</p>
-${id ? `<a class="btn" href="${esc(spotify)}">Listen on Spotify</a>` : ""}
+${id ? `<a class="btn" href="${esc(spotify)}">Listen on Spotify</a>
+<div class="row"><a class="ghost" href="spotify:track:${esc(id)}">Open in the Spotify app</a><a class="ghost" href="chanceify://track/${esc(id)}">Open in chanceify</a></div>` : ""}
 <div class="foot">Built with love by <a href="https://github.com/madlygeeked">chance</a></div>
 </main></body></html>`;
 }

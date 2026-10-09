@@ -1382,6 +1382,7 @@ pub enum Action {
     /// Opens the recap picture window.
     OpenRecap,
     OpenRecapFolder,
+    RegisterLinks,
     /// Writes the key binds to a file in the settings folder.
     ExportKeys,
     ImportKeys,
