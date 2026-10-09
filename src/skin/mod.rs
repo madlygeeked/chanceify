@@ -28,7 +28,7 @@ pub enum SkinError {
     NotAnArchive,
     #[error("{0}")]
     Archive(zip::ZipError),
-    #[error("this is a modern Winamp skin, which Chanceify cannot draw; it needs a classic one")]
+    #[error("this is a modern Winamp skin, which chanceify cannot draw; it needs a classic one")]
     ModernSkin,
     #[error("no skin bitmaps were found inside")]
     Empty,
@@ -279,7 +279,7 @@ fn wanted(file_name: &str) -> bool {
 const BUILTIN_ARCHIVE: &[u8] = include_bytes!("../../assets/skins/chanceify.wsz");
 
 static BUILTIN: LazyLock<Arc<Skin>> = LazyLock::new(|| {
-    Arc::new(Skin::from_archive("Chanceify", BUILTIN_ARCHIVE).expect("the built-in skin reads"))
+    Arc::new(Skin::from_archive("chanceify", BUILTIN_ARCHIVE).expect("the built-in skin reads"))
 });
 
 #[cfg(test)]
@@ -326,7 +326,7 @@ mod tests {
             );
         }
         assert!(skin.has_extended_digits());
-        assert_eq!(skin.name, "Chanceify");
+        assert_eq!(skin.name, "chanceify");
     }
 
     #[test]

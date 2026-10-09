@@ -1585,7 +1585,7 @@ mod tests {
         );
         assert_eq!(
             marquee_text(Locale::English, None, None, None, None, None),
-            "Chanceify"
+            "chanceify"
         );
         let untitled = now("Episode 12", "", 0);
         assert_eq!(

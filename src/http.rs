@@ -125,7 +125,7 @@ fn apply_blocking_proxy(
 }
 
 fn user_agent() -> &'static str {
-    concat!("Chanceify/", env!("CARGO_PKG_VERSION"))
+    concat!("chanceify/", env!("CARGO_PKG_VERSION"))
 }
 
 #[cfg(test)]

@@ -560,7 +560,7 @@ pub fn populate(app: &mut App) {
     app.devices = vec![
         Device {
             id: Some("local-demo".into()),
-            name: "Chanceify".into(),
+            name: "chanceify".into(),
             is_active: false,
             is_restricted: false,
             volume_percent: Some(70),

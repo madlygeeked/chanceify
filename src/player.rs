@@ -1581,7 +1581,7 @@ mod tests {
     fn an_inactive_connect_device_keeps_its_engine_session() {
         let mut state = LocalState {
             connected: true,
-            active_client: "Chanceify".into(),
+            active_client: "chanceify".into(),
             ..LocalState::default()
         };
 
@@ -1629,7 +1629,7 @@ mod tests {
             tap: AudioTap::new(),
             eq: crate::eq::shared(),
             speed: crate::speed::shared(),
-            device_name: "Chanceify".into(),
+            device_name: "chanceify".into(),
             bitrate_kbps: 320,
             normalisation: false,
             autoplay: true,

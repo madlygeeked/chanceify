@@ -25050,7 +25050,7 @@ mod tests {
                 "unknown",
                 // Local playback is this computer, which Spotify has not
                 // named because it is not a remote device.
-                "Chanceify",
+                "chanceify",
             ]
         );
         // No devices seen yet is an empty array, not an empty string, so a

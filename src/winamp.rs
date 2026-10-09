@@ -434,7 +434,7 @@ mod tests {
             crate::speed::shared(),
         );
         let start = Instant::now();
-        assert_eq!(state.marquee("Chanceify", start).0, "Chanceify");
+        assert_eq!(state.marquee("chanceify", start).0, "chanceify");
         assert!(!state.marquee_scrolling());
 
         let long = "Radiohead - Everything In Its Right Place (4:11)";

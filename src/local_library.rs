@@ -271,7 +271,7 @@ fn decode(path: &Path) -> Result<Decoded, String> {
             &FormatOptions::default(),
             &MetadataOptions::default(),
         )
-        .map_err(|e| format!("not a song Chanceify can read ({e})"))?;
+        .map_err(|e| format!("not a song chanceify can read ({e})"))?;
     let mut tags = Tags::default();
     if let Some(metadata) = probed.metadata.get() {
         if let Some(revision) = metadata.current() {

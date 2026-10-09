@@ -635,6 +635,8 @@ pub struct Settings {
     pub nudge_seek: i16,
     /// The song bar on its own row under the controls and volume.
     pub bar_stacked: bool,
+    /// Ask before removing one unavailable song from its playlist.
+    pub unavailable_confirm_one: bool,
     /// Show the time as "1:23 / 3:45" before the bar instead of at both ends.
     #[serde(default)]
     pub seek_time_joined: bool,
@@ -1051,6 +1053,7 @@ impl Default for Settings {
             nudge_volume: 0,
             nudge_seek: 0,
             bar_stacked: false,
+            unavailable_confirm_one: true,
             anchor_volume: None,
             seek_time_joined: false,
             seek_time_mode: 0,

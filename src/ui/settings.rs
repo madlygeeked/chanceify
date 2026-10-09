@@ -1793,14 +1793,14 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
 
     if needle.is_empty() || "unavailable songs removed deleted missing lost cleanup duplicate duplicates overlap playlists".contains(needle.as_str()) {
         any_visible = true;
-        section(ui, &palette, "Unavailable songs and cleanup", |ui| {
+        section(ui, &palette, "Unavailable songs", |ui| {
             let user = app.user.as_ref().map(|user| user.id.clone()).unwrap_or_default();
             let entries: Vec<crate::unavailable::Entry> =
                 app.unavailable.entries_for(&user).to_vec();
             ui.add(
                 egui::Label::new(
                     egui::RichText::new(
-                        "Songs in your playlists that Spotify has removed or that are not available where you are. Find them elsewhere before you remove them, so they are not lost.",
+                        "Songs in your playlists that Spotify has removed or that are not available where you are.\nFind them elsewhere before you remove them, so they are not lost.",
                     )
                     .font(theme::regular(13.0))
                     .color(palette.secondary),
@@ -1940,6 +1940,20 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 }
             });
             ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                theme::text(
+                    ui,
+                    "Ask me before removing one song",
+                    theme::regular(13.0),
+                    palette.secondary,
+                );
+                let mut ask = app.settings.unavailable_confirm_one;
+                if widgets::switch(ui, &palette, "Ask me before removing one song", &mut ask).changed() {
+                    app.settings.unavailable_confirm_one = ask;
+                    app.actions.push(Action::SettingsChanged);
+                }
+            });
+            ui.add_space(4.0);
             egui::ScrollArea::vertical()
                 .id_salt("unavailable-songs")
                 .max_height((ui.ctx().content_rect().height() * 0.62).max(320.0))
@@ -1977,13 +1991,28 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                                     app.actions.push(Action::OpenUrl(entry.soundcloud_url()));
                                 }
                             }
-                            if !entry.uri.is_empty()
-                                && theme::soft_button(ui, &palette, Some(Icon::Trash), "Remove this one", false).clicked()
-                            {
-                                app.actions.push(Action::RemoveUnavailableOne {
+                            if !entry.uri.is_empty() {
+                                let ask_id = egui::Id::new(("unavailable-ask", &entry.playlist_id, &entry.uri));
+                                let asking = ui.data(|data| data.get_temp::<bool>(ask_id)).unwrap_or(false);
+                                let remove = Action::RemoveUnavailableOne {
                                     playlist_id: entry.playlist_id.clone(),
                                     uri: entry.uri.clone(),
-                                });
+                                };
+                                if asking {
+                                    theme::text(ui, "Remove it?", theme::regular(12.0), palette.warning);
+                                    if theme::soft_button(ui, &palette, Some(Icon::Trash), "Yes", true).clicked() {
+                                        app.actions.push(remove);
+                                        ui.data_mut(|data| data.insert_temp(ask_id, false));
+                                    } else if theme::soft_button(ui, &palette, None, "No", false).clicked() {
+                                        ui.data_mut(|data| data.insert_temp(ask_id, false));
+                                    }
+                                } else if theme::soft_button(ui, &palette, Some(Icon::Trash), "Remove this one", false).clicked() {
+                                    if app.settings.unavailable_confirm_one {
+                                        ui.data_mut(|data| data.insert_temp(ask_id, true));
+                                    } else {
+                                        app.actions.push(remove);
+                                    }
+                                }
                             }
                         });
                         ui.add_space(6.0);
@@ -1993,8 +2022,31 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             if removable > 0 {
                 ui.add_space(8.0);
                 let confirm_id = egui::Id::new("unavailable-confirm");
-                let confirming = ui.data(|data| data.get_temp::<bool>(confirm_id)).unwrap_or(false);
-                if confirming {
+                // 0 nothing asked, 1 first question, 2 second and last question.
+                let stage = ui.data(|data| data.get_temp::<u8>(confirm_id)).unwrap_or(0);
+                if stage == 2 {
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(format!(
+                                "Last check: remove all {removable} songs now? This cannot be undone."
+                            ))
+                            .font(theme::semibold(13.0))
+                            .color(palette.warning),
+                        )
+                        .wrap(),
+                    );
+                    ui.horizontal(|ui| {
+                        if theme::soft_button(ui, &palette, Some(Icon::Trash), "Yes, remove all of them", true)
+                            .clicked()
+                        {
+                            app.actions.push(Action::RemoveUnavailable);
+                            ui.data_mut(|data| data.insert_temp(confirm_id, 0u8));
+                        }
+                        if theme::soft_button(ui, &palette, None, "Cancel", false).clicked() {
+                            ui.data_mut(|data| data.insert_temp(confirm_id, 0u8));
+                        }
+                    });
+                } else if stage == 1 {
                     ui.add(
                         egui::Label::new(
                             egui::RichText::new(format!(
@@ -2006,14 +2058,13 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         .wrap(),
                     );
                     ui.horizontal(|ui| {
-                        if theme::soft_button(ui, &palette, Some(Icon::Trash), "Yes, remove them", true)
+                        if theme::soft_button(ui, &palette, Some(Icon::Trash), "Yes, continue", true)
                             .clicked()
                         {
-                            app.actions.push(Action::RemoveUnavailable);
-                            ui.data_mut(|data| data.insert_temp(confirm_id, false));
+                            ui.data_mut(|data| data.insert_temp(confirm_id, 2u8));
                         }
                         if theme::soft_button(ui, &palette, None, "Cancel", false).clicked() {
-                            ui.data_mut(|data| data.insert_temp(confirm_id, false));
+                            ui.data_mut(|data| data.insert_temp(confirm_id, 0u8));
                         }
                     });
                 } else if theme::soft_button(
@@ -2025,7 +2076,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 )
                 .clicked()
                 {
-                    ui.data_mut(|data| data.insert_temp(confirm_id, true));
+                    ui.data_mut(|data| data.insert_temp(confirm_id, 1u8));
                 }
             }
         });
@@ -2152,7 +2203,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 if theme::soft_button(ui, &palette, None, "Import settings", false).clicked() {
                     app.actions.push(Action::ImportSettings);
                 }
-                if theme::soft_button(ui, &palette, None, "Load Chance's defaults", false).clicked() {
+                if theme::soft_button(ui, &palette, None, "Load chance's defaults", false).clicked() {
                     app.actions.push(Action::LoadDefaultSettings);
                 }
                 if theme::soft_button(ui, &palette, Some(Icon::ExternalLink), "Open index folder", false)
@@ -2408,6 +2459,14 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         .clicked()
                     {
                         app.actions.push(Action::OpenMissingArtFolder);
+                    }
+                    if theme::soft_button(ui, &palette, None, "?", false)
+                        .on_hover_text(
+                            "Covers and artist pictures that Last.fm does not have are copied into this folder as you listen. To add one to Last.fm: open that album or artist on last.fm, press \"Upload image\" (you need a free Last.fm account) and choose the file. Click the ? to open Last.fm.",
+                        )
+                        .clicked()
+                    {
+                        app.actions.push(Action::OpenUrl("https://www.last.fm/music".into()));
                     }
                 });
             }

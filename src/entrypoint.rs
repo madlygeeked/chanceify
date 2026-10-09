@@ -231,7 +231,7 @@ fn run_control(control: Control) -> i32 {
             }
         }
         Err(error) => {
-            eprintln!("Chanceify is not running or does not support remote control: {error}");
+            eprintln!("chanceify is not running or does not support remote control: {error}");
             return 1;
         }
     };
@@ -268,7 +268,7 @@ fn run_control(control: Control) -> i32 {
     match result {
         Ok(()) => 0,
         Err(error) => {
-            eprintln!("Chanceify is not running or does not support remote control: {error}");
+            eprintln!("chanceify is not running or does not support remote control: {error}");
             1
         }
     }
@@ -276,7 +276,7 @@ fn run_control(control: Control) -> i32 {
 
 #[cfg(target_os = "linux")]
 const PULSEAUDIO_PROPERTIES: [(&str, &str); 2] = [
-    ("PULSE_PROP_application.name", "Chanceify"),
+    ("PULSE_PROP_application.name", "chanceify"),
     ("PULSE_PROP_stream.description", "Spotify playback"),
 ];
 
@@ -437,7 +437,7 @@ pub(crate) fn run() -> eframe::Result<()> {
         match single_instance::acquire(&waker, link.as_deref()) {
             single_instance::Outcome::Only(guard) => Some(guard),
             single_instance::Outcome::Surfaced => {
-                log::info!("Chanceify is already running; asked it to show its window");
+                log::info!("chanceify is already running; asked it to show its window");
                 return Ok(());
             }
         }
@@ -653,7 +653,7 @@ pub(crate) fn run() -> eframe::Result<()> {
             #[cfg(target_os = "linux")]
             let hide_from_taskbar = options.viewport.taskbar == Some(false);
             eframe::run_native(
-                "Chanceify",
+                "chanceify",
                 options,
                 Box::new(move |cc| {
                     if let Some(gl) = &cc.gl {

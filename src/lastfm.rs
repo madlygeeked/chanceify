@@ -20,7 +20,7 @@ const API_URL: &str = "https://ws.audioscrobbler.com/2.0/";
 /// Chance's small Cloudflare Worker (see `worker/lastfm-proxy.js`). It holds
 /// the Last.fm key and secret, so they are never inside this program or on
 /// GitHub. Empty means no proxy: Settings then asks for a key of your own.
-pub const PROXY_URL: &str = "";
+pub const PROXY_URL: &str = "https://chanceify-lastfm.chance-a10.workers.dev/";
 
 /// Stands in for the key and secret while the proxy does the signing.
 pub const VIA_PROXY: &str = "via-proxy";
