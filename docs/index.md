@@ -19,7 +19,10 @@ You need a Spotify **Premium** account.
 
 ## Make it yours
 
+- [What it does](features)
 - [Connect your own Spotify app and Last.fm](setup)
+- [Settings explained](settings)
+- [Questions](faq)
 - [Where your files live](files)
 - [Keyboard shortcuts](keys)
 
@@ -29,4 +32,4 @@ You need a Spotify **Premium** account.
 - [Terms](https://github.com/madlygeeked/chanceify/blob/main/TERMS.md)
 
 Built with love by [chance](https://github.com/madlygeeked).
-Inspired by Spotify, Spotifast and Spicetify.
+Inspired by [Spotify](https://www.spotify.com), [Spotifast](https://github.com/crmne/spotifast) and [Spicetify](https://spicetify.app).
