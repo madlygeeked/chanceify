@@ -11088,6 +11088,16 @@ impl App {
                 self.settings.vis_lyrics = !self.settings.vis_lyrics;
                 self.mark_settings_dirty();
             }
+            Action::ToggleLyricsVis => {
+                self.settings.lyrics_vis = !self.settings.lyrics_vis;
+                self.mark_settings_dirty();
+            }
+            Action::SetLyricsVisDark(value) => {
+                if value.is_finite() {
+                    self.settings.lyrics_vis_dark = value.clamp(0.1, 0.95);
+                    self.mark_settings_dirty();
+                }
+            }
             Action::ToggleVisLyricsBack => {
                 self.settings.vis_lyrics_no_back = !self.settings.vis_lyrics_no_back;
                 self.mark_settings_dirty();

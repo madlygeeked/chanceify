@@ -396,6 +396,25 @@ fn lyrics_menu(app: &mut App, page: &egui::Response, side: bool) {
                 }
             }
             widgets::menu_separator(ui, &palette);
+            if widgets::menu_item(
+                ui,
+                &palette,
+                tick(app.settings.lyrics_vis),
+                &gettext(app.locale, "Visualizer behind the lyrics"),
+            ) {
+                app.actions.push(Action::ToggleLyricsVis);
+            }
+            if app.settings.lyrics_vis {
+                super::player_bar::slider_row(
+                    ui,
+                    &palette,
+                    &gettext(app.locale, "How dark"),
+                    10.0..=95.0,
+                    app.settings.lyrics_vis_darkness() * 100.0,
+                    |value| app.actions.push(Action::SetLyricsVisDark(value / 100.0)),
+                );
+            }
+            widgets::menu_separator(ui, &palette);
             let current = app.settings.lyrics_align_value();
             for (value, label) in [
                 (0u8, "Left"),
@@ -747,7 +766,25 @@ fn background(app: &mut App, ui: &mut egui::Ui, rect: Rect) {
             Color32::from_gray(180),
         );
     }
-    painter.rect_filled(rect, 0.0, Color32::from_black_alpha(120));
+    if app.settings.lyrics_vis {
+        // The spectrum moves over the picture, then a black veil (the
+        // reader's "how dark") keeps the words easy to read.
+        let now = app.now_playing();
+        let moving = super::player_bar::visualizer_shape(
+            app,
+            ui,
+            rect,
+            now.as_ref(),
+            crate::settings::PlayerBarVis::Spectrum,
+        );
+        if moving {
+            ui.ctx().request_repaint_after(std::time::Duration::from_micros(16_667));
+        }
+        let veil = (app.settings.lyrics_vis_darkness() * 255.0) as u8;
+        painter.rect_filled(rect, 0.0, Color32::from_black_alpha(veil));
+    } else {
+        painter.rect_filled(rect, 0.0, Color32::from_black_alpha(120));
+    }
     widgets::paint_vertical_gradient(
         ui,
         rect,

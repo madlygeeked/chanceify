@@ -917,7 +917,7 @@ fn vis_gradient(
     (low, high)
 }
 
-fn visualizer_shape(
+pub(super) fn visualizer_shape(
     app: &mut App,
     ui: &egui::Ui,
     rect: Rect,
@@ -2389,7 +2389,7 @@ fn chip_sensing(
 /// Enter or click away. It only submits on one of those two, never as you
 /// type — setting the bar count to 1 as the first digit of 128 is worse
 /// than not setting it at all.
-fn slider_row(
+pub(super) fn slider_row(
     ui: &mut egui::Ui,
     palette: &crate::theme::Palette,
     label: &str,

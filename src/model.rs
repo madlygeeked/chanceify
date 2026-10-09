@@ -1441,6 +1441,8 @@ pub enum Action {
     SetVisFont(u8),
     ToggleVisArtist,
     ToggleVisLyricsBack,
+    ToggleLyricsVis,
+    SetLyricsVisDark(f32),
     /// Where the full-screen title sits: 0 under the cover, 1 beside it,
     /// 2 beside it and big, 3 above it with the artist below.
     SetVisTitleLayout(u8),

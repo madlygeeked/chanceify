@@ -741,6 +741,13 @@ pub struct Settings {
     /// Bars stay on the visualizer instead of rising onto the song-length row.
     #[serde(default)]
     pub vis_bars_stay: bool,
+    /// The spectrum moves behind the full-screen lyrics.
+    #[serde(default)]
+    pub lyrics_vis: bool,
+    /// How dark the full-screen lyrics page is over that spectrum, 0.1 to
+    /// 0.95; 0 (never set) means 0.6.
+    #[serde(default)]
+    pub lyrics_vis_dark: f32,
     /// How solid the bars and the flow are, 0.1 to 1; 0 (never set) means 1.
     #[serde(default)]
     pub vis_bars_opacity: f32,
@@ -1091,6 +1098,8 @@ impl Default for Settings {
             discord_listen_along: false,
             vis_lyrics_no_back: false,
             vis_bars_stay: false,
+            lyrics_vis: false,
+            lyrics_vis_dark: 0.0,
             vis_bars_opacity: 0.0,
             swirl_react_mode: 0,
             vis_flow_opacity: 0.0,
@@ -1357,6 +1366,12 @@ impl Settings {
         ("Colour overlay: bands", 1.0, 6.0, 1.8),
     ];
 
+    /// How dark the full-screen lyrics page is over its visualizer.
+    pub fn lyrics_vis_darkness(&self) -> f32 {
+        let value = self.lyrics_vis_dark;
+        if value.is_finite() && value > 0.0 { value.clamp(0.1, 0.95) } else { 0.6 }
+    }
+
     /// How solid the bars (true) or the flow (false) are, 0.1 to 1.
     pub fn vis_opacity(&self, bars: bool) -> f32 {
         let value = if bars { self.vis_bars_opacity } else { self.vis_flow_opacity };
@@ -1441,7 +1456,7 @@ impl Settings {
         "swirl_scale", "swirl_tune", "swirl_warp", "swirl_waves", "theme", "theme_from_cover", "custom_bg", "custom_accent",
         "track_columns", "tracklist_compact", "vis", "vis_bar_sides", "vis_shapes",
         "vis_shapes_last", "vis_shapes_set", "volume_presets", "zoom",
-        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_text_no_outline", "vis_text_back", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode",
+        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_text_no_outline", "vis_text_back", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode",
     ];
 
     /// The shareable part of the settings, as the text of a file.
@@ -2155,6 +2170,19 @@ impl ManualProxy {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_lyrics_visualizer_is_off_and_dim_by_default_and_clamped() {
+        let mut settings = super::Settings::default();
+        assert!(!settings.lyrics_vis);
+        assert!((settings.lyrics_vis_darkness() - 0.6).abs() < 1e-6);
+        settings.lyrics_vis_dark = 5.0;
+        assert!((settings.lyrics_vis_darkness() - 0.95).abs() < 1e-6);
+        settings.lyrics_vis_dark = 0.01;
+        assert!((settings.lyrics_vis_darkness() - 0.1).abs() < 1e-6);
+        let old: super::Settings = serde_json::from_str("{}").unwrap();
+        assert!(!old.lyrics_vis);
+    }
+
     #[test]
     fn trial_launch_writes_keys_the_previous_release_can_still_read() {
         let settings = super::Settings {
