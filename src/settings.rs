@@ -760,6 +760,10 @@ pub struct Settings {
     /// Show a swirl in the colour of the cover as the small picture on the cover.
     #[serde(default = "yes")]
     pub discord_swirl: bool,
+    /// Say which playlist the song is playing from.
+    pub discord_playlist: bool,
+    /// A button that opens the reader's Spotify profile.
+    pub discord_profile: bool,
     /// Show the "Listen on Spotify" and "Get chanceify" buttons.
     pub discord_buttons: bool,
     /// Make the song and the artist links to Spotify.
@@ -1152,6 +1156,8 @@ impl Default for Settings {
             discord_cover: true,
             discord_badge: true,
             discord_swirl: true,
+            discord_playlist: false,
+            discord_profile: false,
             discord_buttons: true,
             discord_links: true,
             discord_hide_paused: false,

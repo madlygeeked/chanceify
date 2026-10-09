@@ -34,3 +34,5 @@ title: Settings explained
 - **Lyrics site busy**: chanceify asks LRCLIB again by itself up to five times.
 
 - **Discord swirl**: the small picture on the cover is a swirl in the cover's colour (Settings > Discord). The pictures are in `docs/swirl` and are served from the chanceify GitHub page, so they show once that page is switched on.
+
+- **Discord playlist and profile**: "Say which playlist I'm playing from" adds the playlist name to the hover text, and "Add a button to my Spotify profile" adds a button (Discord shows two buttons at most, so it replaces "Get chanceify"). Both are off until you turn them on. Settings > Discord also shows a live preview of what is being sent.

@@ -12355,6 +12355,58 @@ impl App {
         }
     }
 
+    /// How the Discord profile is to look, from the settings and what plays.
+    pub fn discord_style(&mut self) -> crate::discord::Style {
+        // The swirl takes the colour the app has already worked out for the cover.
+        let swirl = if self.settings.discord_swirl && self.settings.discord_cover {
+            let cover = self
+                .now_playing()
+                .and_then(|now| now.art_url.clone().or_else(|| now.art_small.clone()));
+            self.tint_for(cover.as_deref())
+                .map(|color| crate::discord::swirl_url(color.r(), color.g(), color.b()))
+        } else {
+            None
+        };
+        let playlist = if self.settings.discord_playlist {
+            self.playing_context_uri()
+                .filter(|uri| uri.starts_with("spotify:playlist:"))
+                .and_then(|uri| util::uri_id(&uri).map(str::to_string))
+                .and_then(|id| {
+                    self.library_entry(&id)
+                        .or_else(|| self.playlist_pages.get(&id)?.playlist.get())
+                        .map(|playlist| playlist.name.clone())
+                })
+                .filter(|name| !name.trim().is_empty())
+        } else {
+            None
+        };
+        let profile_url = self
+            .settings
+            .discord_profile
+            .then(|| self.user_id().map(str::to_string))
+            .flatten()
+            .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)))
+            .map(|id| format!("https://open.spotify.com/user/{id}"));
+        let style = crate::discord::Style {
+            status_line: self.settings.discord_status_line,
+            cover: self.settings.discord_cover,
+            badge: self.settings.discord_badge,
+            swirl,
+            playlist,
+            profile_url,
+            buttons: self.settings.discord_buttons,
+            links: self.settings.discord_links,
+            hide_paused: self.settings.discord_hide_paused,
+            files: self.settings.discord_files,
+            listen_along: self.settings.discord_listen_along,
+            // Only once there is a real GitHub page to send people to.
+            app_url: (crate::build_info::GITHUB_URL.trim_end_matches('/').len()
+                > "https://github.com".len())
+            .then(|| crate::build_info::GITHUB_URL.to_string()),
+        };
+        style
+    }
+
     /// Keeps the Discord profile showing what is playing, when asked to.
     fn sync_discord(&mut self) {
         let mut id = self.settings.discord_client_id.trim().to_string();
@@ -12369,30 +12421,7 @@ impl App {
         crate::discord::set_listen(self.settings.discord_listen_along);
         self.poll_discord_join();
         // The swirl takes the colour the app has already worked out for the cover.
-        let swirl = if self.settings.discord_swirl && self.settings.discord_cover {
-            let cover = self
-                .now_playing()
-                .and_then(|now| now.art_url.clone().or_else(|| now.art_small.clone()));
-            self.tint_for(cover.as_deref())
-                .map(|color| crate::discord::swirl_url(color.r(), color.g(), color.b()))
-        } else {
-            None
-        };
-        let style = crate::discord::Style {
-            status_line: self.settings.discord_status_line,
-            cover: self.settings.discord_cover,
-            badge: self.settings.discord_badge,
-            swirl,
-            buttons: self.settings.discord_buttons,
-            links: self.settings.discord_links,
-            hide_paused: self.settings.discord_hide_paused,
-            files: self.settings.discord_files,
-            listen_along: self.settings.discord_listen_along,
-            // Only once there is a real GitHub page to send people to.
-            app_url: (crate::build_info::GITHUB_URL.trim_end_matches('/').len()
-                > "https://github.com".len())
-            .then(|| crate::build_info::GITHUB_URL.to_string()),
-        };
+        let style = self.discord_style();
         let seconds = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |elapsed| elapsed.as_secs() as i64);

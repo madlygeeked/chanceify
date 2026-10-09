@@ -109,6 +109,10 @@ pub struct Style {
     pub badge: bool,
     /// A swirl picture (web address) in the cover's colour, shown small on the cover.
     pub swirl: Option<String>,
+    /// The playlist the song plays from, when the reader wants it said.
+    pub playlist: Option<String>,
+    /// The reader's Spotify profile address, when they want a button for it.
+    pub profile_url: Option<String>,
     pub buttons: bool,
     pub links: bool,
     pub hide_paused: bool,
@@ -185,7 +189,13 @@ pub fn activity_for(
         if let Some(url) = &song_url {
             buttons.push(("Listen on Spotify".to_string(), url.clone()));
         }
-        if let Some(url) = &style.app_url {
+        // Discord shows two at most: the song, then the profile or the app.
+        if let Some(url) = &style.profile_url {
+            buttons.push(("My Spotify profile".to_string(), url.clone()));
+        }
+        if buttons.len() < 2
+            && let Some(url) = &style.app_url
+        {
             buttons.push((format!("Get {}", crate::build_info::DISPLAY_NAME), url.clone()));
         }
     }
@@ -204,13 +214,22 @@ pub fn activity_for(
             _ => 2,
         },
         large_image,
-        large_text: if now.album_name.is_empty() {
-            crate::build_info::DISPLAY_NAME.to_string()
-        } else {
-            now.album_name.clone()
+        large_text: {
+            let album = if now.album_name.is_empty() {
+                crate::build_info::DISPLAY_NAME.to_string()
+            } else {
+                now.album_name.clone()
+            };
+            match &style.playlist {
+                Some(playlist) => format!("{album} - from {playlist}"),
+                None => album,
+            }
         },
         small_image,
-        small_text: crate::build_info::DISPLAY_NAME.to_string(),
+        small_text: match &style.playlist {
+            Some(playlist) => format!("Playing from {playlist}"),
+            None => crate::build_info::DISPLAY_NAME.to_string(),
+        },
         buttons,
         start: timed.then_some(start),
         end: timed.then_some(start + i64::from(now.duration_ms / 1000)),
@@ -659,6 +678,8 @@ mod tests {
             cover: true,
             badge: true,
             swirl: None,
+            playlist: None,
+            profile_url: None,
             buttons: true,
             links: true,
             hide_paused: false,
@@ -666,6 +687,18 @@ mod tests {
             listen_along: false,
             app_url: Some("https://github.com/someone/chanceify".into()),
         }
+    }
+
+    #[test]
+    fn playlist_and_profile_show_when_asked() {
+        let mut chosen = style();
+        chosen.playlist = Some("Road trip".into());
+        chosen.profile_url = Some("https://open.spotify.com/user/abc".into());
+        let activity = activity_for(&playing(), &chosen, 0).unwrap();
+        assert!(activity.large_text.ends_with("from Road trip"));
+        assert_eq!(activity.small_text, "Playing from Road trip");
+        assert_eq!(activity.buttons.len(), 2);
+        assert_eq!(activity.buttons[1].0, "My Spotify profile");
     }
 
     #[test]

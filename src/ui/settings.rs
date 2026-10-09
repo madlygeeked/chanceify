@@ -2123,10 +2123,12 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         }
                     });
                     ui.add_space(4.0);
-                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 8] = [
+                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 10] = [
                         ("Show the album cover", |s| &mut s.discord_cover),
                         ("Show a swirl in the cover's colour on the cover", |s| &mut s.discord_swirl),
                         ("Show the small chanceify badge on the cover", |s| &mut s.discord_badge),
+                        ("Say which playlist I'm playing from", |s| &mut s.discord_playlist),
+                        ("Add a button to my Spotify profile", |s| &mut s.discord_profile),
                         ("Make the song and artist links to Spotify", |s| &mut s.discord_links),
                         ("Show buttons (Listen on Spotify, Get chanceify)", |s| &mut s.discord_buttons),
                         ("Show songs I play from my own files", |s| &mut s.discord_files),
@@ -2139,6 +2141,54 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                             *field(&mut app.settings) = value;
                             app.mark_settings_dirty();
                         }
+                    }
+                    ui.add_space(6.0);
+                    // A live preview: exactly what is being sent to Discord for the song now playing.
+                    {
+                        let style = app.discord_style();
+                        let seconds = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map_or(0, |elapsed| elapsed.as_secs() as i64);
+                        let activity = app
+                            .now_playing()
+                            .and_then(|now| crate::discord::activity_for(&now, &style, seconds));
+                        theme::subtle(ui, &palette, "PREVIEW (what Discord shows right now)");
+                        egui::Frame::new()
+                            .fill(palette.surface)
+                            .corner_radius(8)
+                            .inner_margin(10)
+                            .show(ui, |ui| match &activity {
+                                Some(activity) => {
+                                    theme::text(ui, &activity.details, theme::bold(13.5), palette.text);
+                                    theme::text(ui, &activity.state, theme::regular(12.5), palette.secondary);
+                                    theme::text(
+                                        ui,
+                                        &format!("Cover hover: {}", activity.large_text),
+                                        theme::regular(12.0),
+                                        palette.dim,
+                                    );
+                                    theme::text(
+                                        ui,
+                                        &format!("Small picture hover: {}", activity.small_text),
+                                        theme::regular(12.0),
+                                        palette.dim,
+                                    );
+                                    if let Some(image) = &activity.small_image {
+                                        theme::text(ui, &format!("Small picture: {image}"), theme::regular(11.5), palette.dim);
+                                    }
+                                    for (label, _) in &activity.buttons {
+                                        theme::text(ui, &format!("[ {label} ]"), theme::regular(12.5), palette.accent);
+                                    }
+                                }
+                                None => {
+                                    theme::text(
+                                        ui,
+                                        "Nothing to show: play a song (or it is paused and \"Show nothing while paused\" is on).",
+                                        theme::regular(12.5),
+                                        palette.secondary,
+                                    );
+                                }
+                            });
                     }
                     ui.add_space(4.0);
                     if theme::soft_button(ui, &palette, None, "Copy what I'm playing for Discord", false).clicked() {
