@@ -562,7 +562,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             gettext(locale, "Output buffer"),
             gettext(
                 locale,
-                "How much sound is lined up before it reaches your speakers. Higher (200 ms) is safest: no crackling, but Pause and volume changes are heard a split second later. Lower (50 ms) reacts fastest, but may crackle on a slow or busy computer. Not sure? Pick 100 ms, and go higher only if you hear crackling.",
+                "Your computer keeps a small amount of music waiting just ahead of what you hear, like a safety cushion. At 200 ms the cushion is big: the music will not crackle or skip even when the computer is busy (a game, a download), but pressing Pause or changing the volume is heard about a fifth of a second late. At 50 ms the cushion is tiny: Pause and volume react almost instantly, but on a busy or slow computer you may hear crackles or tiny skips. If you hear no problems, 100 ms is a good middle. Go up if you hear crackling; go down only if the controls feel slow.",
             ),
         )
         .when(cfg!(windows)),

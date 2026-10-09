@@ -339,6 +339,10 @@ pub struct App {
     pub guest: bool,
     /// Whether the floating Views and panels window is open.
     pub views_panel: bool,
+    /// The song the pointer is over, set while rows are drawn.
+    pub hovered_track: Option<String>,
+    /// What `hovered_track` held at the start of this frame.
+    pub hover_snapshot: Option<String>,
     pub palette: Palette,
     /// The language the interface is drawn in: [`Settings::language`]
     /// resolved against the operating system's preferred languages.
@@ -1008,6 +1012,8 @@ impl App {
             offline: false,
             guest: false,
             views_panel: false,
+            hovered_track: None,
+            hover_snapshot: None,
             palette,
             locale,
             window_level_supported: true,
@@ -10802,19 +10808,21 @@ impl App {
             }
             Action::SetBlockNudge(block, steps) => {
                 let steps = steps.clamp(-150, 150);
-                if block == 0 {
-                    self.settings.nudge_controls = steps;
-                } else {
-                    self.settings.nudge_volume = steps;
+                match block {
+                    0 => self.settings.nudge_controls = steps,
+                    1 => self.settings.nudge_seek = steps,
+                    _ => self.settings.nudge_volume = steps,
                 }
                 self.mark_settings_dirty();
             }
             Action::ResetBlockNudge => {
+                self.settings.nudge_seek = 0;
                 self.settings.nudge_controls = 0;
                 self.settings.nudge_volume = 0;
                 self.mark_settings_dirty();
             }
             Action::SetRowOrder(order) => {
+                self.settings.nudge_seek = 0;
                 self.settings.nudge_controls = 0;
                 self.settings.nudge_volume = 0;
                 self.settings.anchor_controls = None;
@@ -10855,6 +10863,46 @@ impl App {
             Action::ImportSettings => self.import_settings_file("chanceify-settings.json"),
             Action::LoadDefaultSettings => self.import_settings_file("defaults.json"),
             Action::ToggleViewsPanel => self.views_panel = !self.views_panel,
+            Action::ExportKeys => {
+                let dir = self.dirs.index_settings_dir();
+                let text = crate::ui::keys::keys_json(self);
+                let written = std::fs::create_dir_all(&dir)
+                    .and_then(|()| std::fs::write(dir.join("chanceify-keys.json"), text));
+                match written {
+                    Ok(()) => self.toast(format!("Key binds saved in {}", dir.display())),
+                    Err(error) => self.toast_error(format!("Could not save the key binds: {error}")),
+                }
+            }
+            Action::SaveKeysAsDefault => {
+                let dir = self.dirs.index_settings_dir();
+                let text = crate::ui::keys::keys_json(self);
+                let written = std::fs::create_dir_all(&dir)
+                    .and_then(|()| std::fs::write(dir.join("default-keys.json"), text));
+                match written {
+                    Ok(()) => self.toast("Saved as default-keys.json. Tell Claude \"pull\" and it goes into the next build."),
+                    Err(error) => self.toast_error(format!("Could not save the key binds: {error}")),
+                }
+            }
+            Action::ImportKeys => {
+                let path = self.dirs.index_settings_dir().join("chanceify-keys.json");
+                match std::fs::read_to_string(&path).ok().and_then(|text| crate::ui::keys::read_keys(&text)) {
+                    Some(keys) => {
+                        let count = keys.len();
+                        self.settings.key_bindings = keys;
+                        self.mark_settings_dirty();
+                        self.toast(format!("Loaded {count} key binds from chanceify-keys.json"));
+                    }
+                    None => self.toast_error(format!("No usable chanceify-keys.json in {}", path.parent().map_or_else(String::new, |p| p.display().to_string()))),
+                }
+            }
+            Action::LikeHovered => match self.hover_snapshot.clone() {
+                Some(uri) => self.actions.push(Action::ToggleSaved(uri)),
+                None => self.toast("Point at a song, then press the key."),
+            },
+            Action::LikePlaying => match self.now_playing().filter(|now| !now.is_episode) {
+                Some(now) => self.actions.push(Action::ToggleSaved(now.uri)),
+                None => self.toast("Nothing is playing."),
+            },
             Action::AdjustZoom(direction) => {
                 let zoom = match direction {
                     0 => 1.0,

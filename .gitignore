@@ -13,3 +13,5 @@ docs/.bundle/
 /.cache/
 
 /dist/
+
+/lastfm-keys.txt

@@ -1850,6 +1850,10 @@ fn track_row_contents(
             .is_some_and(|uri| uri == row.item.uri());
     let playing = is_current && app.believed_playing();
     let hovered = ui.rect_contains_pointer(rect) || response.has_focus();
+    // Remembered for the "like the song under the pointer" key.
+    if ui.rect_contains_pointer(rect) && row.item.is_track() {
+        app.hovered_track = Some(row.item.uri().to_string());
+    }
     if row.picked {
         // Keep the existing translucent selection, using a neutral palette
         // color so selecting a song does not mark it as playing.

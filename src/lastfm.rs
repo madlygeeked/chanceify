@@ -20,8 +20,14 @@ const API_URL: &str = "https://ws.audioscrobbler.com/2.0/";
 /// The key and secret every copy of chanceify™ signs in with, once Chance
 /// has registered one at <https://www.last.fm/api/account/create>. While
 /// these are empty, Settings asks for a key and secret of the person's own.
-pub const DEFAULT_API_KEY: &str = "";
-pub const DEFAULT_SECRET: &str = "";
+pub const DEFAULT_API_KEY: &str = match option_env!("CHANCEIFY_LASTFM_KEY") {
+    Some(key) => key,
+    None => "",
+};
+pub const DEFAULT_SECRET: &str = match option_env!("CHANCEIFY_LASTFM_SECRET") {
+    Some(secret) => secret,
+    None => "",
+};
 
 /// A song worth telling Last.fm about.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

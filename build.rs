@@ -83,9 +83,23 @@ fn build_stamp() {
     println!("cargo:rerun-if-changed=.git/HEAD");
 }
 
+/// The Last.fm key and secret come from `lastfm-keys.txt` (two lines: key,
+/// then secret), a file that is never committed. Without it the app asks
+/// each person for a key of their own.
+fn lastfm_keys() {
+    println!("cargo:rerun-if-changed=lastfm-keys.txt");
+    let text = std::fs::read_to_string("lastfm-keys.txt").unwrap_or_default();
+    let mut lines = text.lines().map(str::trim).filter(|line| !line.is_empty());
+    if let (Some(key), Some(secret)) = (lines.next(), lines.next()) {
+        println!("cargo:rustc-env=CHANCEIFY_LASTFM_KEY={key}");
+        println!("cargo:rustc-env=CHANCEIFY_LASTFM_SECRET={secret}");
+    }
+}
+
 fn main() {
     fastframe_i18n::build::compile_catalogs("assets/i18n");
     build_stamp();
+    lastfm_keys();
     #[cfg(windows)]
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         println!("cargo:rerun-if-changed=packaging/windows/spotifast.ico");

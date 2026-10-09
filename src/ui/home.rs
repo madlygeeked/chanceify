@@ -21,7 +21,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let tab = app.settings.home.tab.min(1);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
-        for (index, label) in ["For you", "Music and stats"].into_iter().enumerate() {
+        for (index, label) in ["For you", "Music stats"].into_iter().enumerate() {
             if theme::pill_button(ui, &palette, &gettext(app.locale, label), tab as usize == index)
                 .clicked()
                 && tab as usize != index

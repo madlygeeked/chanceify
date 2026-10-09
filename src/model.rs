@@ -1369,6 +1369,15 @@ pub enum Action {
     OpenIndexFolder,
     /// Opens or closes the floating Views and panels window.
     ToggleViewsPanel,
+    /// Writes the key binds to a file in the settings folder.
+    ExportKeys,
+    ImportKeys,
+    /// Writes the key binds as the set every new install starts with.
+    SaveKeysAsDefault,
+    /// Likes or unlikes the song the pointer is over.
+    LikeHovered,
+    /// Likes or unlikes the playing song.
+    LikePlaying,
     /// -1 smaller, 1 bigger, 0 back to 100%.
     AdjustZoom(i8),
     OpenMissingArtFolder,

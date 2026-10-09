@@ -112,6 +112,8 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "seekwidth", label: "Short, medium or full seek bar", default: UNSET, action: || Action::CycleSeekWidth },
     Bindable { id: "sharediscord", label: "Copy the song for Discord", default: UNSET, action: || Action::ShareToDiscord },
     Bindable { id: "lastfmlove", label: "Love the song on Last.fm", default: UNSET, action: || Action::LastfmLove },
+    Bindable { id: "likehover", label: "Like the song under the pointer", default: UNSET, action: || Action::LikeHovered },
+    Bindable { id: "likeplaying", label: "Like the playing song", default: UNSET, action: || Action::LikePlaying },
     Bindable { id: "tap", label: "Tap tempo", default: UNSET, action: || Action::TapTempo },
     Bindable { id: "next", label: "Next song", default: UNSET, action: || Action::Next },
     Bindable { id: "previous", label: "Previous song", default: UNSET, action: || Action::Previous },
@@ -235,6 +237,42 @@ pub const PRESETS: &[(&str, &[(&str, &str)])] = &[
     ),
 ];
 
+/// The key binds a new install starts with, baked in from
+/// `assets/default-keys.json`. Empty means "everything unset".
+const BAKED_DEFAULT_KEYS: &str = include_str!("../../assets/default-keys.json");
+
+/// The binds worth saving: only known shortcuts, written as chords.
+pub fn keys_json(app: &App) -> String {
+    let mut map = serde_json::Map::new();
+    for bindable in BINDABLE {
+        if let Some(text) = app.settings.key_bindings.get(bindable.id) {
+            map.insert(bindable.id.to_string(), serde_json::Value::String(text.clone()));
+        }
+    }
+    let file = serde_json::json!({ "chanceify_keys": 1, "key_bindings": map });
+    serde_json::to_string_pretty(&file).unwrap_or_default()
+}
+
+/// Reads binds from a keys file (or the bare map the baked defaults use),
+/// keeping only shortcuts that exist and chords that parse.
+pub fn read_keys(text: &str) -> Option<std::collections::BTreeMap<String, String>> {
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let value: serde_json::Value = serde_json::from_str(text).ok()?;
+    let map = value.get("key_bindings").unwrap_or(&value).as_object()?.clone();
+    let mut keys = std::collections::BTreeMap::new();
+    for (id, chord) in map {
+        let Some(chord) = chord.as_str() else {
+            continue;
+        };
+        let known = BINDABLE.iter().any(|b| b.id == id);
+        let usable = chord == UNSET.name() || parse_chord(chord).is_some();
+        if known && usable {
+            keys.insert(id, chord.to_string());
+        }
+    }
+    Some(keys)
+}
+
 /// Puts a preset's keys in place of whatever was set before. A starting key
 /// that a preset key now needs is cleared, so no two shortcuts share a key.
 pub fn apply_preset(app: &mut App, which: u8) {
@@ -268,7 +306,7 @@ pub fn apply_preset(app: &mut App, which: u8) {
 pub const CATEGORIES: &[(&str, &[&str])] = &[
     ("Views", &["views", "normalview", "mini", "fullscreen", "lyricsfull", "visshapes", "art"]),
     ("Panels", &["sidebar", "queue", "lyrics", "visualizer", "scenes"]),
-    ("Playback", &["playpause", "playspace", "next", "previous", "shuffle", "repeat", "speed", "tap", "lastfmlove", "sharediscord"]),
+    ("Playback", &["playpause", "playspace", "next", "previous", "shuffle", "repeat", "speed", "tap", "lastfmlove", "sharediscord", "likehover", "likeplaying"]),
     ("Volume", &["mute", "volup", "voldown", "volup5", "voldown5"]),
     ("Jump in the song", &["back10", "forward10", "seekback5", "seekfwd5", "seekwidth", "tenth0", "tenth1", "tenth2", "tenth3", "tenth4", "tenth5", "tenth6", "tenth7", "tenth8", "tenth9"]),
     ("Going places", &["search", "home", "liked", "settings", "pageback", "pageforward", "artistpage", "albumpage", "tutorial"]),
@@ -349,6 +387,13 @@ fn is_reserved(key: Key) -> bool {
 }
 
 pub fn handle(app: &mut App, ctx: &egui::Context) {
+    // Once per pass, however many times this runs: what the pointer was over.
+    let pass = ctx.cumulative_pass_nr();
+    let pass_id = egui::Id::new("hover-snapshot-pass");
+    if ctx.data(|data| data.get_temp::<u64>(pass_id)) != Some(pass) {
+        app.hover_snapshot = app.hovered_track.take();
+        ctx.data_mut(|data| data.insert_temp(pass_id, pass));
+    }
     if capture_rebind(app, ctx) {
         return;
     }
@@ -405,6 +450,16 @@ pub fn handle(app: &mut App, ctx: &egui::Context) {
             app.settings.track_columns.toggle(crate::model::SortColumn::Genre);
         }
         app.settings.keymap_version = 6;
+        app.actions.push(Action::SettingsChanged);
+    }
+    // 0.64: a new install starts with the key binds baked into the build.
+    if app.settings.keymap_version < 7 {
+        if app.settings.key_bindings.is_empty()
+            && let Some(keys) = read_keys(BAKED_DEFAULT_KEYS)
+        {
+            app.settings.key_bindings = keys;
+        }
+        app.settings.keymap_version = 7;
         app.actions.push(Action::SettingsChanged);
     }
     // The keys the reader has chosen, read once, before the input is

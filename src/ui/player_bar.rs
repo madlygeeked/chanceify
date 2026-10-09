@@ -3490,6 +3490,35 @@ fn eased_fill(ctx: &egui::Context, panel: Color32, tint: Option<Color32>) -> Col
     }
 }
 
+/// The colour of the like heart: the cover's own colour when the interface
+/// is following covers, the accent otherwise.
+fn heart_colour(app: &App) -> Color32 {
+    app.now_playing_tint().unwrap_or(app.palette.accent)
+}
+
+/// A heart for the playing song, drawn at `centre`. Filled in the cover's
+/// colour when the song is in Liked Songs; a click saves or removes it.
+fn like_heart(app: &mut App, ui: &mut egui::Ui, id: &str, centre: egui::Pos2, size: f32, uri: &str) {
+    let saved = app.is_saved(uri) == Some(true);
+    let rect = Rect::from_center_size(centre, Vec2::splat(size + 10.0));
+    let response = ui
+        .interact(rect, egui::Id::new(("np-heart", id)), Sense::click())
+        .on_hover_cursor(egui::CursorIcon::PointingHand);
+    let palette = app.palette;
+    let (icon, colour) = if saved {
+        (Icon::HeartFilled, heart_colour(app))
+    } else if response.hovered() {
+        (Icon::Heart, palette.text)
+    } else {
+        (Icon::Heart, palette.secondary)
+    };
+    theme::paint_icon(ui, icon, rect, size, colour);
+    let tip = if saved { "Remove from Liked Songs" } else { "Save to Liked Songs" };
+    if response.on_hover_text(tip).clicked() {
+        app.actions.push(Action::ToggleSaved(uri.to_string()));
+    }
+}
+
 pub(super) fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, now: Option<&NowPlaying>) {
     // The big lyrics screen already shows the cover, so the small one goes.
     if app.lyrics_fullscreen.is_some() {
@@ -3597,9 +3626,24 @@ pub(super) fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, 
             app.actions.push(Action::Open(Page::Show(id.clone())));
         }
     }
-    // No heart beside the words: the title gets the whole width, so it is not
-    // shortened to make room for a button the song list already carries.
-    let text_left = cover_rect.right() + 12.0;
+    // A heart beside the cover, filled when the song is in Liked Songs.
+    let heart_room = match &song {
+        Some(item) if item.is_track() && region.right() - cover_rect.right() > 150.0 => 26.0,
+        _ => 0.0,
+    };
+    if heart_room > 0.0
+        && let Some(item) = &song
+    {
+        like_heart(
+            app,
+            ui,
+            "bar",
+            pos2(cover_rect.right() + 8.0 + heart_room / 2.0 - 4.0, cy),
+            16.0,
+            item.uri(),
+        );
+    }
+    let text_left = cover_rect.right() + 12.0 + heart_room;
     let text_width = (region.right() - text_left).max(40.0);
     // Big and centred by default; on mouse-over the title shrinks and the
     // artist appears under it.
@@ -3729,7 +3773,9 @@ pub fn now_playing_overlay(app: &mut App, ui: &mut egui::Ui, art: Rect, now: &No
     let pad_x = 12.0;
     let pad_y = 7.0;
     let gap = 3.0;
-    let max_text_width = (art.width() - margin * 2.0 - pad_x * 2.0).max(40.0);
+    let liked_item = app.now_playing_item().filter(|item| item.is_track());
+    let heart_extra = if liked_item.is_some() { 30.0 } else { 0.0 };
+    let max_text_width = (art.width() - margin * 2.0 - pad_x * 2.0 - heart_extra).max(40.0);
 
     // The title is sized to fit, and the card to the title.
     let biggest = (art.width() * 0.2).clamp(20.0, 56.0);
@@ -3769,7 +3815,7 @@ pub fn now_playing_overlay(app: &mut App, ui: &mut egui::Ui, art: Rect, now: &No
         .min(max_text_width);
 
     let title_extent = title_galley.size();
-    let card_width = title_extent.x.max(artists_width * detail) + pad_x * 2.0;
+    let card_width = (title_extent.x + heart_extra).max(artists_width * detail) + pad_x * 2.0;
     let card_height = title_extent.y + pad_y * 2.0 + (sub_height + gap) * detail;
     let card = Rect::from_min_size(
         pos2(art.left() + margin, art.bottom() - margin - card_height),
@@ -3821,6 +3867,18 @@ pub fn now_playing_overlay(app: &mut App, ui: &mut egui::Ui, art: Rect, now: &No
         } else if let Some(id) = &now.show_id {
             app.actions.push(Action::Open(Page::Show(id.clone())));
         }
+    }
+    // The heart sits at the end of the title, in the cover's colour once liked.
+    if let Some(item) = &liked_item {
+        let size = (title_size * 0.6).clamp(16.0, 28.0);
+        like_heart(
+            app,
+            ui,
+            "overlay",
+            pos2(title_rect.right() + 6.0 + size / 2.0 + 4.0, title_rect.center().y),
+            size,
+            item.uri(),
+        );
     }
 
     // The artists, once the pointer is over the art.
@@ -4184,6 +4242,10 @@ fn transport(
         2 => max_left,
         _ => min_left,
     };
+    // The reader may have dragged the bar along the row (the dots over its
+    // left end), in steps of a grid, inside the room it has.
+    let seek_steps = app.settings.nudge_seek;
+    let slider_left = (slider_left + f32::from(seek_steps) * 12.0).clamp(min_left, max_left);
     let joined_text = both_text(shown_position);
     let before = match mode {
         0 => Some(util::format_duration_ms(shown_position)),
@@ -4251,6 +4313,32 @@ fn transport(
                 });
             });
         ui.ctx().request_repaint();
+    }
+    // Dots over the bar's left end while the pointer is over the row: drag
+    // them to move the bar along the row, as with the controls and volume.
+    if ui.rect_contains_pointer(row) {
+        let handle = Rect::from_min_size(pos2(slider_left - 2.0, row.top() + 1.0), vec2(14.0, 12.0));
+        let drag = ui.interact(handle, egui::Id::new(("block-handle", 1u8)), Sense::drag());
+        let color = if drag.hovered() || drag.dragged() { palette.text } else { palette.dim };
+        for dx in [3.0, 8.0] {
+            for dy in [3.0, 6.0, 9.0] {
+                ui.painter().circle_filled(pos2(slider_left - 2.0 + dx, row.top() + 1.0 + dy), 1.2, color);
+            }
+        }
+        if drag.hovered() || drag.dragged() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+        }
+        if drag.dragged() {
+            let key = egui::Id::new(("block-residual", 1u8));
+            let mut residual = ui.ctx().data(|data| data.get_temp::<f32>(key)).unwrap_or(0.0);
+            residual += drag.drag_delta().x;
+            let moved = (residual / 12.0).trunc();
+            residual -= moved * 12.0;
+            ui.ctx().data_mut(|data| data.insert_temp(key, residual));
+            if moved != 0.0 {
+                app.actions.push(Action::SetBlockNudge(1, seek_steps + moved as i16));
+            }
+        }
     }
     // A small grip on the bar's right end: drag it to make the bar longer or shorter.
     let grip = Rect::from_center_size(
@@ -4526,6 +4614,11 @@ fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, presets: &
     // volume changes from other apps: show their volume but don't offer to
     // change it.
     let adjustable = now.is_none_or(|now| now.can_set_volume);
+    let slider_origin = ui.next_widget_position();
+    let slider_w = ui
+        .ctx()
+        .data(|data| data.get_temp::<f32>(egui::Id::new("volume-w")))
+        .unwrap_or_else(|| volume_bar_width(app));
     let controls = ui.add_enabled_ui(adjustable, |ui| {
         match thin_slider_scaled(
             ui,
@@ -4570,6 +4663,29 @@ fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, presets: &
             app.actions.push(Action::SetVolume(percent));
         }
     });
+    // A small grip on the volume bar's right end, like the song bar's: drag
+    // it to make the bar longer or shorter.
+    {
+        let grip = Rect::from_center_size(
+            pos2(slider_origin.x + slider_w + 3.0, slider_origin.y),
+            vec2(8.0, 22.0),
+        );
+        let grab = ui.interact(grip, egui::Id::new("volume-grip"), Sense::drag());
+        if grab.hovered() || grab.dragged() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+        }
+        if grab.hovered() || grab.dragged() || ui.rect_contains_pointer(ui.max_rect()) {
+            ui.painter().rect_filled(
+                Rect::from_center_size(grip.center(), vec2(3.0, 14.0)),
+                1.5,
+                palette.text.gamma_multiply(0.6),
+            );
+        }
+        if grab.dragged() {
+            let wanted = (slider_w + grab.drag_delta().x).clamp(60.0, 400.0);
+            app.actions.push(Action::SetVolumeWidth(wanted));
+        }
+    }
     if adjustable && let Some(next) = wheel_volume(ui, controls.response.rect, shown) {
         app.volume_preview = None;
         app.actions.push(Action::SetVolume(next));

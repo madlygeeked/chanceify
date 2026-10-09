@@ -302,6 +302,15 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                             app.settings.key_bindings.clear();
                             app.actions.push(Action::SettingsChanged);
                         }
+                        if theme::pill_button(ui, &palette, "Export", false).clicked() {
+                            app.actions.push(Action::ExportKeys);
+                        }
+                        if theme::pill_button(ui, &palette, "Import", false).clicked() {
+                            app.actions.push(Action::ImportKeys);
+                        }
+                        if theme::pill_button(ui, &palette, "Save as the default for everyone", false).clicked() {
+                            app.actions.push(Action::SaveKeysAsDefault);
+                        }
                         theme::subtle(ui, &palette, "Try a set:");
                         for (index, (name, _)) in super::keys::PRESETS.iter().enumerate() {
                             if theme::pill_button(ui, &palette, name, false).clicked() {
