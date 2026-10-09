@@ -78,20 +78,22 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 _ => [mix(window, [0.0; 3], 0.35), mix(window, accent, 0.35), mix(window, accent, 0.65)],
             };
             ocean(&ui.painter().with_clip_rect(rect), rect, time, tones);
-            if app.settings.calm_look == 1
+            let look = app.settings.calm_look;
+            if look == 3 {
+                // The album-art swirl, over the ocean. The swirl is forced on
+                // for this one draw and the visualizer settings put back.
+                let saved = (app.settings.vis_shapes, app.settings.vis_shapes_set);
+                app.settings.vis_shapes = crate::settings::Settings::SHAPE_SWIRL;
+                app.settings.vis_shapes_set = true;
+                super::player_bar::lyrics_backdrop(app, ui, rect, now.as_ref(), 3);
+                (app.settings.vis_shapes, app.settings.vis_shapes_set) = saved;
+                ui.painter().with_clip_rect(rect).rect_filled(rect, 0.0, Color32::from_black_alpha(90));
+                ctx.request_repaint_after(std::time::Duration::from_micros(33_000));
+            }
+            if (look == 1 || look == 4)
                 && let Some(now) = &now
             {
-                // The app's own blurred copy of the cover, over the whole window.
-                let url = now.art_url.clone().or_else(|| now.art_small.clone());
-                let art = app.backend.art().clone();
-                if let Some(url) = url
-                    && let Some(handle) = app.softened_covers.texture(&ctx, &art, &url)
-                {
-                    egui::Image::from_texture(egui::load::SizedTexture::from_handle(&handle)).paint_at(ui, rect);
-                    ui.painter().rect_filled(rect, 0.0, Color32::from_black_alpha(130));
-                } else {
-                    ctx.request_repaint_after(std::time::Duration::from_millis(150));
-                }
+                cover_background(app, ui, rect, now, look == 4, time);
             }
             let quiet = Color32::from_gray(185);
             let softer = Color32::from_gray(140);
@@ -168,17 +170,33 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             playlist_picker(app, ui, rect);
             // How the background looks.
             {
-                let strip = Rect::from_min_size(pos2(rect.right() - 250.0, rect.bottom() - 40.0), vec2(238.0, 26.0));
+                let strip = Rect::from_min_size(pos2(rect.right() - 330.0, rect.bottom() - 40.0), vec2(318.0, 26.0));
                 let mut child = ui.new_child(
                     egui::UiBuilder::new()
                         .max_rect(strip)
                         .layout(egui::Layout::right_to_left(egui::Align::Center)),
                 );
-                for (value, label) in [(2u8, "Ocean"), (1, "Album"), (0, "Theme")] {
+                for (value, label) in [(4u8, "Spin"), (3, "Swirl"), (2, "Ocean"), (1, "Album"), (0, "Theme")] {
                     if child.selectable_label(app.settings.calm_look == value, label).clicked() {
                         app.settings.calm_look = value;
                         app.mark_settings_dirty();
                     }
+                }
+            }
+            if matches!(app.settings.calm_look, 1 | 4) {
+                let strip = Rect::from_min_size(pos2(rect.right() - 330.0, rect.bottom() - 70.0), vec2(318.0, 24.0));
+                let mut child = ui.new_child(
+                    egui::UiBuilder::new()
+                        .max_rect(strip)
+                        .layout(egui::Layout::right_to_left(egui::Align::Center)),
+                );
+                let mut blur = app.settings.calm_blur.clamp(0.0, 1.0);
+                if child
+                    .add(egui::Slider::new(&mut blur, 0.0..=1.0).show_value(false).text("Blur"))
+                    .changed()
+                {
+                    app.settings.calm_blur = blur;
+                    app.mark_settings_dirty();
                 }
             }
             ui.painter().text(
@@ -191,6 +209,40 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         });
     // Slow on purpose: a gentle frame rate is all the drift needs.
     ctx.request_repaint_after(std::time::Duration::from_millis(66));
+}
+
+/// The album cover as the background: blurred by `calm_blur` (0 is the sharp
+/// cover, 1 is the app's soft copy), and slowly turning when `spin` is on.
+fn cover_background(app: &mut App, ui: &mut egui::Ui, rect: Rect, now: &crate::app::NowPlaying, spin: bool, time: f64) {
+    let ctx = ui.ctx().clone();
+    let Some(url) = now.art_url.clone().or_else(|| now.art_small.clone()) else {
+        return;
+    };
+    let art = app.backend.art().clone();
+    let blur = app.settings.calm_blur.clamp(0.0, 1.0);
+    let Some(handle) = app.softened_covers.texture(&ctx, &art, &url) else {
+        ctx.request_repaint_after(std::time::Duration::from_millis(150));
+        return;
+    };
+    // A square that covers the window even when it is turned.
+    let side = if spin { rect.size().length() } else { rect.width().max(rect.height()) };
+    let square = Rect::from_center_size(rect.center(), vec2(side, side));
+    let angle = (time as f32) * 0.04;
+    let painter_clip = rect;
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+        ui.set_clip_rect(painter_clip);
+        let soft = egui::Image::from_texture(egui::load::SizedTexture::from_handle(&handle));
+        let soft = if spin { soft.rotate(angle, egui::Vec2::splat(0.5)) } else { soft };
+        soft.paint_at(ui, square);
+        if blur < 1.0 {
+            let sharp = egui::Image::new(url.clone())
+                .show_loading_spinner(false)
+                .tint(Color32::from_white_alpha(((1.0 - blur) * 255.0) as u8));
+            let sharp = if spin { sharp.rotate(angle, egui::Vec2::splat(0.5)) } else { sharp };
+            sharp.paint_at(ui, square);
+        }
+    });
+    ui.painter().with_clip_rect(rect).rect_filled(rect, 0.0, Color32::from_black_alpha(130));
 }
 
 /// A small arrow on the left edge: opens the playlists, and a click plays one.

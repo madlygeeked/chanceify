@@ -335,7 +335,11 @@ pub fn fullscreen(app: &mut App, ui: &mut egui::Ui) {
             );
             // Right-click anywhere on the page, off a line, for the options.
             let page = ui.interact(rect, egui::Id::new("lyrics-page"), Sense::click());
-            lyrics_menu(app, &page, false);
+            // Right-click opens the settings panel: the visualizer's and the
+            // lyrics' options together, in one place with no submenus.
+            if page.secondary_clicked() && !app.vis_panel {
+                app.actions.push(Action::ToggleVisPanel);
+            }
             let top = theme::titlebar_inset(ui.ctx()) + 24.0;
             if app.now_playing().is_some()
                 && rect.width() >= COVER_BESIDE_MIN_WIDTH
@@ -485,7 +489,6 @@ fn with_cover(app: &mut App, ui: &mut egui::Ui, rect: Rect, top: f32) {
             vec2(side, side + 90.0),
         );
         big_cover(app, ui, column, Align::Min);
-        controls_slim(app, ui, pos2(column.left(), column.bottom() + 8.0), side, false);
         // Lyrics centred in the window when that leaves room beside the
         // cover; otherwise centred in the room that is left. Everything is
         // measured from the window, so it scales with any resolution.
@@ -512,7 +515,6 @@ fn with_cover(app: &mut App, ui: &mut egui::Ui, rect: Rect, top: f32) {
             vec2(side, side + 90.0),
         );
         big_cover(app, ui, column, Align::Center);
-        controls_slim(app, ui, pos2(column.center().x, column.bottom() + 8.0), side, true);
         // Why there are no words, quietly, under the song, or that they
         // are still being fetched.
         let (heading, detail) = match &app.lyrics {
@@ -835,7 +837,14 @@ fn background(app: &mut App, ui: &mut egui::Ui, rect: Rect) {
         // reader's "how dark") keeps the words easy to read.
         let now = app.now_playing();
         // Shaped by the visualizer settings (Visualizer settings, below).
-        let moving = super::player_bar::lyrics_backdrop(app, ui, rect, now.as_ref(), 3);
+        // Bars and flow stay below the song and artist names, so they never
+        // cover or cut them off; the swirl fills the whole page.
+        let mut area = rect;
+        if app.settings.vis_shapes_value() & crate::settings::Settings::SHAPE_SWIRL == 0 {
+            let top = (rect.height() * 0.36).max(190.0).min(rect.height() * 0.8);
+            area = Rect::from_min_max(pos2(rect.left(), rect.top() + top), rect.max);
+        }
+        let moving = super::player_bar::lyrics_backdrop(app, ui, area, now.as_ref(), 3);
         if moving {
             ui.ctx().request_repaint_after(std::time::Duration::from_micros(16_667));
         }
@@ -1363,6 +1372,7 @@ fn controls_box(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f
 
 /// Full-screen lyrics: just the five buttons, small, with no panel behind
 /// them, at a fixed spot under the cover. Drawn last so it stays on top.
+#[allow(dead_code)]
 fn controls_slim(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f32, centred: bool) {
     let Some(now) = app.now_playing() else {
         return;

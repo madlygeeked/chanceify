@@ -1080,6 +1080,17 @@ pub struct Toast {
     pub created: Instant,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ViewKind {
+    Mini,
+    Visualizer,
+    FullVisualizer,
+    FullLyrics,
+    LibraryOnly,
+    Default,
+    Calm,
+}
+
 /// Actions emitted while drawing and applied afterward to avoid borrow conflicts.
 #[derive(Clone, Debug)]
 pub enum Action {
@@ -1399,6 +1410,12 @@ pub enum Action {
     SetBarFree(bool),
     SetFreePos(u8, [f32; 2]),
     SetFreeSeek([f32; 2]),
+    /// Go to one view, leaving whichever special view is on (mini player,
+    /// full screen, calm) first. Choosing the view already shown goes back
+    /// to the default one.
+    GoView(ViewKind),
+    /// Run an action from the normal window: any special view is left first.
+    InDefaultView(Box<Action>),
     SetLyricsCtlOff([f32; 2]),
     /// Opens the extra visualizer window, or closes it.
     ToggleExtraWindow,

@@ -635,15 +635,25 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 (seek_row, left_cursor)
             };
             let right_cursor = if app.settings.bar_free { avail_right } else { right_cursor };
-            let seek_rect = transport(
-                app,
-                ui,
-                now.as_ref(),
-                seek_row,
-                band,
-                blocks[0].left(),
-                (left_cursor, right_cursor),
-            );
+            // While the controls are popped out (by choice, or because the
+            // album art is big) the bar keeps their room but draws nothing.
+            let popped = app.float_slot(super::views_panel::default_float(ui.ctx())).is_some();
+            let seek_rect = ui
+                .scope(|ui| {
+                    if popped {
+                        ui.set_invisible();
+                    }
+                    transport(
+                        app,
+                        ui,
+                        now.as_ref(),
+                        seek_row,
+                        band,
+                        blocks[0].left(),
+                        (left_cursor, right_cursor),
+                    )
+                })
+                .inner;
             blocks[1] = seek_rect;
             // Right-click the buttons: the controls pop out into a panel you
             // can move, like the disc. Right-click them there to put away.
@@ -657,7 +667,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         && input.pointer.interact_pos().is_some_and(|at| buttons.contains(at))
                 });
                 if pressed {
-                    let place = if app.settings.float_controls.is_some() {
+                    let place = if popped && app.float_mode() == 0 {
                         None
                     } else {
                         Some(super::views_panel::default_float(ui.ctx()))
@@ -2262,6 +2272,35 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             .clicked()
             {
                 app.actions.push(Action::ToggleVisLyricsBack);
+            }
+            // The lyrics page's own options, here with the rest.
+            if app.lyrics_fullscreen.is_some() {
+                use crate::settings::Settings;
+                for (bit, label, inverted) in [
+                    (Settings::LYRICS_HIDE_ART, "Album art", true),
+                    (Settings::LYRICS_FLOAT_ART, "Floating art", false),
+                    (Settings::LYRICS_BOUNCE_ART, "Art bounces to the music", false),
+                    (Settings::LYRICS_HIDE_STAMPS, "Timestamps", true),
+                    (Settings::LYRICS_COUNTDOWN, "Countdown", false),
+                    (Settings::LYRICS_HIDE_ARTIST, "Artist name", true),
+                ] {
+                    let on = app.settings.lyrics_flag(bit) != inverted;
+                    if chip(ui, &palette, label, on, ui.available_width().min(290.0)).clicked() {
+                        app.actions.push(Action::ToggleLyricsFlag(bit));
+                    }
+                }
+                let current = app.settings.lyrics_align_value();
+                for (value, label) in [
+                    (0u8, "Left"),
+                    (2, "Right"),
+                    (3, "Focus, current line at the bottom"),
+                    (4, "Focus, current line in the middle"),
+                    (5, "Focus, current line at the top"),
+                ] {
+                    if chip(ui, &palette, label, current == value, ui.available_width().min(290.0)).clicked() {
+                        app.actions.push(Action::SetLyricsAlign(value));
+                    }
+                }
             }
             });
             };

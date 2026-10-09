@@ -7,7 +7,7 @@
 use egui::{Color32, Context, CornerRadius, Frame, Id, Margin, Rect, Stroke};
 
 use crate::app::App;
-use crate::model::Action;
+use crate::model::{Action, ViewKind};
 use crate::theme::{self, Icon, Palette};
 
 use super::widgets;
@@ -83,24 +83,22 @@ pub fn topbar_disc(ui: &mut egui::Ui, app: &mut App) {
 }
 
 pub fn corner_disc(app: &mut App, ctx: &Context) {
-    let full = app.fullscreen_vis || app.lyrics_fullscreen.is_some();
-    let moved = app.settings.views_disc;
+    // One fixed place: the top-left corner of every view without a top bar.
+    let moved: Option<[f32; 2]> = None;
     let palette = dark_palette(app);
     let screen = ctx.content_rect();
     let size = if app.mini_active { 16.0 } else { 22.0 };
     let home = if app.mini_active {
         egui::pos2(4.0, 4.0)
-    } else if full {
-        egui::pos2(14.0, 14.0 + theme::titlebar_inset(ctx))
     } else {
-        egui::pos2(12.0, screen.bottom() - theme::PLAYER_BAR_HEIGHT - 40.0)
+        egui::pos2(14.0, 14.0 + theme::titlebar_inset(ctx))
     };
     let at = moved.map_or(home, |[x, y]| egui::pos2(x, y));
     let at = egui::pos2(
         at.x.clamp(screen.left(), (screen.right() - size - 12.0).max(screen.left())),
         at.y.clamp(screen.top(), (screen.bottom() - size - 12.0).max(screen.top())),
     );
-    let mut drop_at: Option<egui::Pos2> = None;
+    let drop_at: Option<egui::Pos2> = None;
     let reset = false;
     let hit = egui::Rect::from_min_size(at, egui::Vec2::splat(size + 12.0));
     // The press, the move and the release are read straight from the pointer,
@@ -128,7 +126,7 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
         if let Some(p) = pos {
             if down && (moved || (p - start).length() > 6.0) {
                 grab = Some((start, offset, true));
-                drop_at = Some(p - offset);
+                let _ = offset;
             }
         }
         if released || !down && !pressed {
@@ -205,7 +203,7 @@ pub(super) fn default_float(ctx: &Context) -> [f32; 3] {
 /// dragged anywhere by its top strip, widened from its right edge, snapped
 /// onto the library sidebar, or put away from the right-click menu.
 pub fn floating_controls(app: &mut App, ctx: &Context) {
-    let Some([x, y, width]) = app.settings.float_controls else {
+    let Some([x, y, width]) = app.float_slot(default_float(ctx)) else {
         return;
     };
     if app.fullscreen_vis || app.calm_mode {
@@ -302,7 +300,7 @@ pub fn show(app: &mut App, ctx: &Context) {
             spread: 0,
             color: Color32::from_black_alpha(160),
         });
-    let mut close = false;
+    let close = false;
     egui::Window::new("Views")
         .id(Id::new("views-panel-v2"))
         .title_bar(false)
@@ -319,20 +317,18 @@ pub fn show(app: &mut App, ctx: &Context) {
                 // A bare disc where a title would be: press it to put the panel away.
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 8.0;
-                    if theme::icon_button(ui, Icon::Disc, 20.0, palette.accent, palette.text, "Close").clicked() {
-                        close = true;
-                    }
                     ui.horizontal_wrapped(|ui| {
                         ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
                         let presets = [
-                            ("Mini player", app.mini_active, Action::ToggleMiniPlayer),
-                            ("Visualizer", app.settings.vis_shapes_value() != 0, Action::ToggleVisShapes),
-                            ("Full screen visualizer", app.fullscreen_vis, Action::ToggleFullscreenVis),
-                            ("Library only", false, Action::LibraryOnlyView),
-                            ("Default view", false, Action::NormalView),
-                            ("My view", app.settings.my_view.is_some(), Action::ApplyMyView),
+                            ("Mini player", app.mini_active, Action::GoView(ViewKind::Mini)),
+                            ("Visualizer", app.settings.vis_shapes_value() != 0, Action::GoView(ViewKind::Visualizer)),
+                            ("Full screen visualizer", app.fullscreen_vis, Action::GoView(ViewKind::FullVisualizer)),
+                            ("Full screen lyrics", app.lyrics_fullscreen.is_some(), Action::GoView(ViewKind::FullLyrics)),
+                            ("Library only", false, Action::GoView(ViewKind::LibraryOnly)),
+                            ("Default view", false, Action::GoView(ViewKind::Default)),
+                            ("My view", app.settings.my_view.is_some(), Action::InDefaultView(Box::new(Action::ApplyMyView))),
                             ("Save my view", false, Action::SaveMyView),
-                            ("Calm mode", false, Action::ToggleCalm),
+                            ("Calm mode", app.calm_mode, Action::GoView(ViewKind::Calm)),
                             (if app.extra_vis { "Close visualizer window" } else { "New visualizer window" }, app.extra_vis, Action::ToggleExtraWindow),
                         ];
                         for (label, on, action) in presets {
@@ -343,18 +339,18 @@ pub fn show(app: &mut App, ctx: &Context) {
                     });
                 });
                 ui.add_space(8.0);
-                let float_on = app.settings.float_controls.is_some();
+                let float_on = app.float_slot(default_float(ctx)).is_some();
                 let rows: [(&str, bool, Action); 11] = [
                     ("Always on top", app.settings.mini_on_top, Action::ToggleMiniOnTop),
-                    ("Library", app.settings.sidebar_visible, Action::ToggleSidebar),
-                    ("Queue", app.show_queue_panel, Action::ToggleQueuePanel),
-                    ("Side lyrics", app.show_lyrics_panel, Action::ToggleLyricsPanel),
-                    ("Full screen lyrics", app.lyrics_fullscreen.is_some(), Action::ToggleLyricsFullscreen),
-                    ("Full screen visualizer", app.fullscreen_vis, Action::ToggleFullscreenVis),
+                    ("Library", app.settings.sidebar_visible, Action::InDefaultView(Box::new(Action::ToggleSidebar))),
+                    ("Queue", app.show_queue_panel, Action::InDefaultView(Box::new(Action::ToggleQueuePanel))),
+                    ("Side lyrics", app.show_lyrics_panel, Action::InDefaultView(Box::new(Action::ToggleLyricsPanel))),
+                    ("Full screen lyrics", app.lyrics_fullscreen.is_some(), Action::GoView(ViewKind::FullLyrics)),
+                    ("Full screen visualizer", app.fullscreen_vis, Action::GoView(ViewKind::FullVisualizer)),
                     ("Visualizer settings", app.vis_panel, Action::ToggleVisPanel),
-                    ("Visualizer", app.settings.vis_shapes_value() != 0, Action::ToggleVisShapes),
-                    ("Big album art", app.settings.art_expanded, Action::ToggleArtExpanded),
-                    ("Mini player", app.mini_active, Action::ToggleMiniPlayer),
+                    ("Visualizer", app.settings.vis_shapes_value() != 0, Action::InDefaultView(Box::new(Action::ToggleVisShapes))),
+                    ("Big album art", app.settings.art_expanded, Action::InDefaultView(Box::new(Action::ToggleArtExpanded))),
+                    ("Mini player", app.mini_active, Action::GoView(ViewKind::Mini)),
                     ("Pop-out controls", float_on, Action::SetFloatControls(if float_on { None } else { Some(default_float(ctx)) })),
                 ];
                 for (label, on, action) in rows {
@@ -402,12 +398,6 @@ pub fn show(app: &mut App, ctx: &Context) {
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
-                    if theme::soft_button(ui, &palette, None, "Reset the disc", false)
-                        .on_hover_text("Puts the Views disc back where it started")
-                        .clicked()
-                    {
-                        app.actions.push(Action::MoveViewsDisc(None));
-                    }
                     ui.spacing_mut().slider_width = 90.0;
                     let mut dim = app.settings.disc_dim;
                     if ui.add(egui::Slider::new(&mut dim, 0.05..=1.0).text("Disc when idle")).changed() {

@@ -1254,18 +1254,32 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
             22.0,
             if page == Page::Local { palette.text } else { palette.secondary },
             palette.text,
-            "Local songs (right-click: your Last.fm profile)",
+            "Local songs (right-click for more)",
         );
         if local_button.clicked() {
             app.actions.push(Action::Open(Page::Local));
         }
-        // Right-click: your Last.fm profile.
-        if local_button.secondary_clicked() && !app.settings.lastfm_user.is_empty() {
-            app.actions.push(Action::OpenUrl(format!(
-                "https://www.last.fm/user/{}",
-                super::settings::last_fm_part(&app.settings.lastfm_user)
-            )));
-        }
+        // Right-click: a small menu (nothing opens until it is picked).
+        egui::Popup::context_menu(&local_button)
+            .frame(super::widgets::menu_frame(&app.palette))
+            .show(|ui| {
+                let has_user = !app.settings.lastfm_user.is_empty();
+                if super::widgets::menu_item_enabled(
+                    ui,
+                    &app.palette,
+                    None,
+                    "Open my Last.fm profile",
+                    has_user,
+                ) {
+                    app.actions.push(Action::OpenUrl(format!(
+                        "https://www.last.fm/user/{}",
+                        super::settings::last_fm_part(&app.settings.lastfm_user)
+                    )));
+                }
+                if super::widgets::menu_item(ui, &app.palette, None, "Open local songs") {
+                    app.actions.push(Action::Open(Page::Local));
+                }
+            });
         ui.add_space(6.0);
         let can_back = app.can_go_back();
         let back = theme::icon_button(

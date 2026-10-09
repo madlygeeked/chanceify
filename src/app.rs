@@ -9757,6 +9757,39 @@ impl App {
         }
     }
 
+    /// Leaves the mini player, both full screens and calm mode, so what
+    /// comes next is drawn in the ordinary window.
+    fn leave_special_views(&mut self, ctx: &egui::Context) {
+        if self.mini_active {
+            self.apply(Action::ToggleMiniPlayer, ctx);
+        }
+        self.settings.mini_player = false;
+        self.fullscreen_vis = false;
+        self.calm_mode = false;
+        self.leave_lyrics_fullscreen(ctx);
+    }
+
+    /// Which pop-out slot the controls panel uses now: 2 in full-screen
+    /// lyrics, 1 while the album art is big, 0 for the one the reader sets.
+    pub fn float_mode(&self) -> u8 {
+        if self.lyrics_fullscreen.is_some() {
+            2
+        } else if self.settings.art_expanded && !self.fullscreen_vis && !self.calm_mode && !self.mini_active {
+            1
+        } else {
+            0
+        }
+    }
+
+    /// Where the pop-out controls are, if they are out.
+    pub fn float_slot(&self, default: [f32; 3]) -> Option<[f32; 3]> {
+        match self.float_mode() {
+            2 => Some(self.settings.float_lyrics.unwrap_or(default)),
+            1 => Some(self.settings.float_big.unwrap_or(default)),
+            _ => self.settings.float_controls,
+        }
+    }
+
     fn leave_lyrics_fullscreen(&mut self, ctx: &egui::Context) {
         if let Some(was_fullscreen) = self.lyrics_fullscreen.take() {
             ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(was_fullscreen));
@@ -10885,8 +10918,44 @@ impl App {
                 self.mark_settings_dirty();
             }
             Action::SetFloatControls(place) => {
-                self.settings.float_controls = place;
+                match self.float_mode() {
+                    2 => self.settings.float_lyrics = place,
+                    1 => self.settings.float_big = place,
+                    _ => self.settings.float_controls = place,
+                }
                 self.mark_settings_dirty();
+            }
+            Action::InDefaultView(inner) => {
+                self.leave_special_views(ctx);
+                self.apply(*inner, ctx);
+            }
+            Action::GoView(kind) => {
+                use crate::model::ViewKind as V;
+                let already = match kind {
+                    V::Mini => self.mini_active,
+                    V::FullVisualizer => self.fullscreen_vis,
+                    V::FullLyrics => self.lyrics_fullscreen.is_some(),
+                    V::Calm => self.calm_mode,
+                    _ => false,
+                };
+                self.leave_special_views(ctx);
+                if !already {
+                    match kind {
+                        V::Mini => self.apply(Action::ToggleMiniPlayer, ctx),
+                        V::Visualizer => {
+                            if self.settings.vis_shapes_value() == 0 {
+                                self.apply(Action::ToggleVisShapes, ctx);
+                            }
+                        }
+                        V::FullVisualizer => self.apply(Action::ToggleFullscreenVis, ctx),
+                        V::FullLyrics => self.apply(Action::ToggleLyricsFullscreen, ctx),
+                        V::LibraryOnly => self.apply(Action::LibraryOnlyView, ctx),
+                        V::Default => self.apply(Action::NormalView, ctx),
+                        V::Calm => self.apply(Action::ToggleCalm, ctx),
+                    }
+                } else {
+                    self.apply(Action::NormalView, ctx);
+                }
             }
             Action::ToggleExtraWindow => {
                 self.extra_vis = !self.extra_vis;
