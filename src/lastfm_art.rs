@@ -191,7 +191,11 @@ impl Checker {
 }
 
 fn ask(client: &reqwest::blocking::Client, job: &Job) -> Option<bool> {
-    let mut query: Vec<(&str, &str)> = vec![("api_key", &job.api_key), ("format", "json")];
+    let proxied = job.api_key == crate::lastfm::VIA_PROXY && !crate::lastfm::PROXY_URL.is_empty();
+    let mut query: Vec<(&str, &str)> = vec![("format", "json")];
+    if !proxied {
+        query.push(("api_key", &job.api_key));
+    }
     match job.kind {
         Kind::Album => {
             query.push(("method", "album.getinfo"));
@@ -203,7 +207,7 @@ fn ask(client: &reqwest::blocking::Client, job: &Job) -> Option<bool> {
             query.push(("artist", &job.artist));
         }
     }
-    let body: Value = client.get(API_URL).query(&query).send().ok()?.json().ok()?;
+    let body: Value = client.get(if proxied { crate::lastfm::PROXY_URL } else { API_URL }).query(&query).send().ok()?.json().ok()?;
     missing_from(&body, job.kind)
 }
 

@@ -7,12 +7,12 @@
 
 /// The revision this build came from, `dirty` when the tree had uncommitted
 /// changes, or `unknown` outside a Git checkout.
-pub const REVISION: &str = env!("SPOTIFAST_REVISION");
+pub const REVISION: &str = env!("CHANCEIFY_REVISION");
 
 /// What this build calls itself on screen: the window title, the tray, the
 /// About box.
 ///
-/// A local build is not the released Spotifast, so it should not present
+/// A local build is not the released Chanceify, so it should not present
 /// itself as one. Deliberately only the display name: the profile directory,
 /// the updater slug, the single-instance lock, the `spotify:` link handler and
 /// the HTTP user agent all keep their upstream names, so an existing sign-in
@@ -26,7 +26,7 @@ pub const GITHUB_URL: &str = "https://github.com/madlygeeked/chanceify";
 
 /// Seconds since the Unix epoch when this build was compiled, from
 /// `SOURCE_DATE_EPOCH` when the build asked to be reproducible.
-const BUILD_EPOCH: &str = env!("SPOTIFAST_BUILD_EPOCH");
+const BUILD_EPOCH: &str = env!("CHANCEIFY_BUILD_EPOCH");
 
 /// The crate version, for example `0.11.2`.
 pub fn version() -> &'static str {

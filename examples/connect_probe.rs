@@ -7,13 +7,13 @@
 use std::time::Duration;
 
 fn main() -> anyhow::Result<()> {
-    fastframe_log::Logging::new("spotifast", env!("CARGO_PKG_VERSION"))
+    fastframe_log::Logging::new("chanceify", env!("CARGO_PKG_VERSION"))
         .filter("warn")
         .init()?;
     let wanted = std::env::args().nth(1);
 
     println!("browsing for _spotify-connect._tcp ...");
-    let receivers = spotifast::zeroconf::discover(Duration::from_secs(4))?;
+    let receivers = chanceify::zeroconf::discover(Duration::from_secs(4))?;
     if receivers.is_empty() {
         println!("  none found");
         return Ok(());
@@ -26,7 +26,7 @@ fn main() -> anyhow::Result<()> {
             "  {} at {}:{}",
             receiver.name, receiver.address, receiver.port
         );
-        match spotifast::zeroconf::get_info(&http, receiver) {
+        match chanceify::zeroconf::get_info(&http, receiver) {
             Ok(info) => println!(
                 "  [{} {} | token={} | active_user={:?}]",
                 info.remote_name, info.device_type, info.token_type, info.active_user
@@ -44,15 +44,15 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     };
 
-    let Some(spotifast::credentials::Grant::Playback(grant)) =
-        stored_grant(spotifast::credentials::Slot::Playback)?
+    let Some(chanceify::credentials::Grant::Playback(grant)) =
+        stored_grant(chanceify::credentials::Slot::Playback)?
     else {
-        anyhow::bail!("Enable playback in Spotifast first");
+        anyhow::bail!("Enable playback in Chanceify first");
     };
-    let credentials = spotifast::zeroconf::Credentials::from_playback(&grant)?;
+    let credentials = chanceify::zeroconf::Credentials::from_playback(&grant)?;
     println!("\nhanding the account to {} ...", receiver.name);
-    let info = spotifast::zeroconf::get_info(&http, receiver)?;
-    match spotifast::zeroconf::add_user(&http, receiver, &info, &credentials, "Spotifast") {
+    let info = chanceify::zeroconf::get_info(&http, receiver)?;
+    match chanceify::zeroconf::add_user(&http, receiver, &info, &credentials, "Chanceify") {
         Ok(()) => println!("  accepted"),
         Err(error) => {
             println!("  refused: {error}");
@@ -77,10 +77,10 @@ fn main() -> anyhow::Result<()> {
 
 /// The account's devices as Spotify currently sees them.
 fn devices() -> anyhow::Result<Vec<String>> {
-    let Some(spotifast::credentials::Grant::Web(token)) =
-        stored_grant(spotifast::credentials::Slot::Shared)?
+    let Some(chanceify::credentials::Grant::Web(token)) =
+        stored_grant(chanceify::credentials::Slot::Shared)?
     else {
-        anyhow::bail!("Sign in to Spotifast first");
+        anyhow::bail!("Sign in to Chanceify first");
     };
     let http = reqwest::blocking::Client::new();
     let body: serde_json::Value = http
@@ -107,13 +107,13 @@ fn devices() -> anyhow::Result<Vec<String>> {
 }
 
 fn stored_grant(
-    slot: spotifast::credentials::Slot,
-) -> anyhow::Result<Option<spotifast::credentials::Grant>> {
+    slot: chanceify::credentials::Slot,
+) -> anyhow::Result<Option<chanceify::credentials::Grant>> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     let loaded = runtime.block_on(async {
-        let store = spotifast::credentials::Store::new(spotifast::paths::AppDirs::discover());
+        let store = chanceify::credentials::Store::new(chanceify::paths::AppDirs::discover());
         store.lease(slot).load().await
     })?;
     if let Some(warning) = loaded.warning {

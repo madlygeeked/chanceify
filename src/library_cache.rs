@@ -230,7 +230,7 @@ mod tests {
 
     fn dirs(name: &str) -> (std::path::PathBuf, AppDirs) {
         let root =
-            std::env::temp_dir().join(format!("spotifast-library-{name}-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-library-{name}-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),

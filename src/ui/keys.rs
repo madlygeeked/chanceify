@@ -633,7 +633,7 @@ mod tests {
     #[test]
     fn a_focused_text_field_keeps_the_arrow_keys_it_edits_with() {
         let root =
-            std::env::temp_dir().join(format!("spotifast-text-arrows-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-text-arrows-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),

@@ -1,4 +1,4 @@
-//! Spotifast's internals, exposed so diagnostics and tests can reach them.
+//! Chanceify's internals, exposed so diagnostics and tests can reach them.
 
 pub mod analysis;
 pub mod app_icons;

@@ -319,7 +319,7 @@ pub struct App {
     /// The window should close and reopen at once as the other kind: the
     /// big window or the Winamp mini player.
     pub switch_intent: bool,
-    /// Commands from control clients (a second `spotifast <verb>` launch,
+    /// Commands from control clients (a second `chanceify <verb>` launch,
     /// a Raycast script), on the platforms where they do not arrive through
     /// MPRIS. Drained every frame.
     control_commands: Option<std::sync::Arc<std::sync::Mutex<Vec<ControlCommand>>>>,
@@ -339,6 +339,8 @@ pub struct App {
     pub guest: bool,
     /// Whether the floating Views and panels window is open.
     pub views_panel: bool,
+    /// The recap picture window, while open.
+    pub recap: Option<crate::ui::recap::Recap>,
     /// The song the pointer is over, set while rows are drawn.
     pub hovered_track: Option<String>,
     /// What `hovered_track` held at the start of this frame.
@@ -865,12 +867,12 @@ fn play_pause_label(playing: bool) -> &'static str {
     if playing { "Pause" } else { "Play" }
 }
 
-/// The tray item: Spotifast's icon, and a menu that shows or hides the
+/// The tray item: Chanceify's icon, and a menu that shows or hides the
 /// window, controls playback and quits.
 fn tray_config() -> fastframe_tray::Config {
     use fastframe_tray::MenuItem;
     fastframe_tray::Config {
-        id: "spotifast",
+        id: "chanceify",
         title: crate::build_info::DISPLAY_NAME.into(),
         icon: crate::app_icons::vinyl_rgba,
         template_icon: Some(util::tray_template_rgba),
@@ -1012,6 +1014,7 @@ impl App {
             offline: false,
             guest: false,
             views_panel: false,
+            recap: None,
             hovered_track: None,
             hover_snapshot: None,
             palette,
@@ -1317,7 +1320,7 @@ impl App {
         self.wants_show = false;
         self.switch_intent = false;
         self.winamp_level_reassert = 0;
-        // A new window starts titled "Spotifast"; name the playing song
+        // A new window starts titled "Chanceify"; name the playing song
         // again rather than trust what the replaced window was told.
         self.window_title.clear();
         if let Some(tray) = &mut self.tray {
@@ -8666,7 +8669,7 @@ impl App {
 
     /// `settle` is false while the slider is still moving: the level is heard
     /// at once, and Spotify is told where it ended up on release.
-    /// Whether the playing device takes volume changes from Spotifast.
+    /// Whether the playing device takes volume changes from Chanceify.
     /// Spotify refuses them for some remote devices, so the controls are
     /// disabled for those rather than failing when used.
     pub fn can_set_volume(&self) -> bool {
@@ -9646,6 +9649,7 @@ impl App {
         if matches!(
             &action,
             Action::Open(_)
+                | Action::OpenSongRadio { .. }
                 | Action::OpenUri(_)
                 | Action::OpenLink(_)
                 | Action::FocusSearch
@@ -9659,6 +9663,7 @@ impl App {
         }
         match action {
             Action::Open(page) => self.open(page),
+            Action::OpenSongRadio { uri, track } => self.open_song_radio(&uri, &track),
             Action::ToggleInspector => crate::inspect::set_selector(!crate::inspect::selector()),
             Action::ToggleInspectLock => crate::inspect::toggle_lock(),
             Action::ToggleFullscreenVis => {
@@ -10863,6 +10868,11 @@ impl App {
             Action::ImportSettings => self.import_settings_file("chanceify-settings.json"),
             Action::LoadDefaultSettings => self.import_settings_file("defaults.json"),
             Action::ToggleViewsPanel => self.views_panel = !self.views_panel,
+            Action::OpenRecap => self.recap = Some(crate::ui::recap::Recap::new()),
+            Action::OpenRecapFolder => {
+                let folder = self.dirs.index_dir().join("recaps");
+                self.open_folder(folder);
+            }
             Action::ExportKeys => {
                 let dir = self.dirs.index_settings_dir();
                 let text = crate::ui::keys::keys_json(self);
@@ -13119,6 +13129,84 @@ mod tests {
     #[test]
     fn middle_clicking_a_playlist_row_autoscrolls_only_on_windows_by_default() {
         middle_click_a_playlist_row(false);
+    }
+
+    /// A narrow window takes width from the side panels before the top bar
+    /// runs out of room (#624), and the widths the listener chose come back
+    /// once the window widens. With the Queue open, the window's minimum
+    /// grows to the panels' least widths and the page's.
+    #[test]
+    fn side_panels_give_the_top_bar_its_room_and_keep_their_widths() {
+        fn draw(ctx: &egui::Context, app: &mut App, width: f32) -> Vec<egui::ViewportCommand> {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(width, 700.0),
+                    )),
+                    ..Default::default()
+                },
+                |ui| app.frame_ui(ui),
+            );
+            output.textures_delta.clear();
+            output
+                .viewport_output
+                .remove(&egui::ViewportId::ROOT)
+                .map(|viewport| viewport.commands)
+                .unwrap_or_default()
+        }
+        let panel = |ctx: &egui::Context, id: &str| {
+            egui::containers::panel::PanelState::load(ctx, egui::Id::new(id))
+                .unwrap()
+                .size()
+                .x
+        };
+        let ctx = egui::Context::default();
+        let mut app = test_app("panels-give-way");
+        app.attach(&ctx);
+        crate::demo::populate(&mut app);
+        app.settings.sidebar_width = 400.0;
+        app.settings.queue_width = 500.0;
+        app.show_queue_panel = true;
+
+        let mut commands = Vec::new();
+        for _ in 0..3 {
+            commands.extend(draw(&ctx, &mut app, 1000.0));
+        }
+        let least = crate::ui::topbar::least_width(&ctx);
+        let sidebar = panel(&ctx, "sidebar");
+        let queue = panel(&ctx, "queue-panel");
+        assert!(
+            sidebar + queue + least <= 1000.5,
+            "the page keeps {} of the {least} points its bar needs",
+            1000.0 - sidebar - queue
+        );
+        assert!(sidebar >= 210.0 && queue >= crate::theme::SIDE_PANEL_MIN_WIDTH);
+        assert_eq!(app.settings.sidebar_width, 400.0);
+        assert_eq!(app.settings.queue_width, 500.0);
+        let min = (210.0 + crate::theme::SIDE_PANEL_MIN_WIDTH + least).round();
+        assert!(
+            commands.iter().any(|command| matches!(
+                command,
+                egui::ViewportCommand::MinInnerSize(size) if size.x == min
+            )),
+            "the window's minimum makes room for the Queue: {commands:?}"
+        );
+
+        for _ in 0..2 {
+            draw(&ctx, &mut app, 1800.0);
+        }
+        assert_eq!(panel(&ctx, "sidebar"), 400.0);
+        assert_eq!(panel(&ctx, "queue-panel"), 500.0);
+
+        // Closing the Queue gives the window its usual minimum back.
+        app.show_queue_panel = false;
+        let commands = draw(&ctx, &mut app, 1800.0);
+        assert!(commands.iter().any(|command| matches!(
+            command,
+            egui::ViewportCommand::MinInnerSize(size)
+                if size.x == crate::window::MAIN_MIN_SIZE[0]
+        )));
     }
 
     /// Linux autoscrolls once the listener turns it on; macOS never does.
@@ -17131,7 +17219,7 @@ mod tests {
         );
     }
 
-    /// If Spotify returns an unchanged queue order after shuffle, Spotifast
+    /// If Spotify returns an unchanged queue order after shuffle, Chanceify
     /// retries up to the limit and then accepts the result as a bounded fallback.
     #[test]
     fn unchanged_shuffle_result_has_bounded_fallback() {
@@ -17171,7 +17259,7 @@ mod tests {
             assert!(app.queue_recheck_at.is_some());
         }
 
-        // The next response exceeds the retry limit, so Spotifast accepts it.
+        // The next response exceeds the retry limit, so Chanceify accepts it.
         app.handle_api(ApiResponse::Queue {
             seq,
             result: Ok(unchanged_response),
@@ -17829,7 +17917,7 @@ mod tests {
 
     fn test_app(name: &str) -> App {
         let root =
-            std::env::temp_dir().join(format!("spotifast-{name}-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-{name}-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let mut app = App::new(
             &Waker::default(),
@@ -18922,7 +19010,7 @@ mod tests {
     #[test]
     fn the_queue_comes_back_after_a_restart() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-queue-restart-test-{}",
+            "chanceify-queue-restart-test-{}",
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&root);
@@ -19180,7 +19268,7 @@ mod tests {
 
     /// A replaced window, as when the mini player's taskbar setting
     /// changes, is titled with the playing song again, not left as
-    /// "Spotifast".
+    /// "Chanceify".
     #[test]
     fn a_new_window_is_titled_with_the_playing_song() {
         let ctx = egui::Context::default();
@@ -19551,7 +19639,7 @@ mod tests {
         assert!(!app.window_hidden, "a window this app still owns");
 
         // #when something asks for the window: the Dock, the tray, or
-        // `spotifast show`
+        // `chanceify show`
         let mut output = ctx.run_ui(Default::default(), |ui| {
             app.apply(Action::ShowWindow, ui.ctx());
         });
@@ -20010,7 +20098,7 @@ mod tests {
     /// A headless app with an account signed in, so the paths that ask Spotify
     /// something are open. Requests are recorded rather than sent.
     fn signed_in_app(name: &str) -> App {
-        let root = std::env::temp_dir().join(format!("spotifast-{name}-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("chanceify-{name}-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -20055,7 +20143,7 @@ mod tests {
 
     fn headless_app() -> App {
         let root =
-            std::env::temp_dir().join(format!("spotifast-volume-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-volume-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -20839,7 +20927,7 @@ mod tests {
                 manual,
                 result: Ok(Some(crate::updates::Release {
                     version: "1.2.3".into(),
-                    url: "https://github.com/crmne/spotifast/releases/tag/v1.2.3".into(),
+                    url: "https://github.com/madlygeeked/chanceify/releases/tag/v1.2.3".into(),
                 })),
             }]);
             let ctx = egui::Context::default();
@@ -20856,7 +20944,7 @@ mod tests {
         let mut app = headless_app();
         app.update = Some(crate::updates::Release {
             version: "1.2.3".into(),
-            url: "https://github.com/crmne/spotifast/releases/tag/v1.2.3".into(),
+            url: "https://github.com/madlygeeked/chanceify/releases/tag/v1.2.3".into(),
         });
         app.update_checking = true;
         app.handle_backend_events(vec![Event::UpdateChecked {
@@ -20907,7 +20995,7 @@ mod tests {
             manual: false,
             result: Ok(Some(crate::updates::Release {
                 version: "1.2.3".into(),
-                url: "https://github.com/crmne/spotifast/releases/tag/v1.2.3".into(),
+                url: "https://github.com/madlygeeked/chanceify/releases/tag/v1.2.3".into(),
             })),
         }]);
 
@@ -24072,7 +24160,7 @@ mod tests {
         app.selected_device = None;
         app.plays = crate::history::History::default();
         let state_dir =
-            std::env::temp_dir().join(format!("spotifast-repeat-history-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-repeat-history-{}", std::process::id()));
         app.dirs.state = state_dir.clone();
         for sequence in [1, 2] {
             app.handle_local(LocalState {
@@ -24947,7 +25035,7 @@ mod tests {
                 "unknown",
                 // Local playback is this computer, which Spotify has not
                 // named because it is not a remote device.
-                "Spotifast",
+                "Chanceify",
             ]
         );
         // No devices seen yet is an empty array, not an empty string, so a
@@ -25217,10 +25305,10 @@ mod tests {
     #[test]
     fn mpris_search_links_open_search_on_a_private_bus() {
         use std::time::{Duration, Instant};
-        const CHILD: &str = "SPOTIFAST_SEARCH_PRIVATE_BUS";
+        const CHILD: &str = "CHANCEIFY_SEARCH_PRIVATE_BUS";
         if std::env::var_os(CHILD).is_none() {
             let root = std::env::temp_dir().join(format!(
-                "spotifast-search-bus-{:016x}",
+                "chanceify-search-bus-{:016x}",
                 rand::random::<u64>()
             ));
             std::fs::create_dir(&root).unwrap();
@@ -25261,7 +25349,7 @@ mod tests {
             .unwrap();
         let call = |uri: &str| {
             client.call_method(
-                Some("org.mpris.MediaPlayer2.spotifast"),
+                Some("org.mpris.MediaPlayer2.chanceify"),
                 "/org/mpris/MediaPlayer2",
                 Some("org.mpris.MediaPlayer2.Player"),
                 "OpenUri",
@@ -25288,7 +25376,7 @@ mod tests {
         assert!(matches!(app.actions.as_slice(), [Action::OpenLink(_)]));
         let schemes: Vec<String> = zbus::blocking::Proxy::new(
             &client,
-            "org.mpris.MediaPlayer2.spotifast",
+            "org.mpris.MediaPlayer2.chanceify",
             "/org/mpris/MediaPlayer2",
             "org.mpris.MediaPlayer2",
         )
@@ -25465,7 +25553,7 @@ mod tests {
     #[test]
     fn the_last_playlist_tree_stays_visible_for_its_account() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-rootlist-restart-test-{}",
+            "chanceify-rootlist-restart-test-{}",
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&root);

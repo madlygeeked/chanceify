@@ -4698,7 +4698,7 @@ fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, presets: &
         )
         .on_hover_text(gettext(
             app.locale,
-            "This device's volume can't be changed from Spotifast",
+            "This device's volume can't be changed from Chanceify",
         ));
     }
     // Shortcut buttons. Click one to jump to that volume; right-click to

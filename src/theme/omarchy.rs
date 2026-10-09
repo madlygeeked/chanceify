@@ -1,4 +1,4 @@
-//! The part of the Omarchy set-up fastframe-theme leaves to Spotifast:
+//! The part of the Omarchy set-up fastframe-theme leaves to Chanceify:
 //! upgrading the theme hook a Fastpotify-era package installed.
 
 use std::{
@@ -25,14 +25,14 @@ pub(super) fn upgrade_legacy_hook() {
     }
 }
 
-/// `<prefix>/share/spotifast/omarchy` beside the running `<prefix>/bin`.
+/// `<prefix>/share/chanceify/omarchy` beside the running `<prefix>/bin`.
 fn packaged_assets() -> Option<PathBuf> {
     let executable = std::env::current_exe().ok()?;
     Some(
         executable
             .parent()?
             .parent()?
-            .join("share/spotifast/omarchy"),
+            .join("share/chanceify/omarchy"),
     )
 }
 
@@ -45,12 +45,12 @@ fn upgrade(assets: &Path, home: &Path) -> io::Result<()> {
     {
         return Ok(());
     }
-    let hook_path = home.join(".config/omarchy/hooks/theme-set.d/spotifast-theme");
+    let hook_path = home.join(".config/omarchy/hooks/theme-set.d/chanceify-theme");
     if !fs::symlink_metadata(&hook_path).is_ok_and(|metadata| metadata.is_file()) {
         return Ok(());
     }
-    let hook = read_small(&assets.join("spotifast-theme"))?;
-    let previous = hook.replace("/spotifast/themes", "/fastpotify/themes");
+    let hook = read_small(&assets.join("chanceify-theme"))?;
+    let previous = hook.replace("/chanceify/themes", "/fastpotify/themes");
     if read_small(&hook_path)? != previous {
         return Ok(());
     }
@@ -81,14 +81,14 @@ mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
 
-    const HOOK: &str = include_str!("../../contrib/omarchy/spotifast-theme");
+    const HOOK: &str = include_str!("../../contrib/omarchy/chanceify-theme");
 
     struct Scratch(PathBuf);
 
     impl Scratch {
         fn new() -> Self {
             let path = std::env::temp_dir()
-                .join(format!("spotifast omarchy setup {}", rand::random::<u64>()));
+                .join(format!("chanceify omarchy setup {}", rand::random::<u64>()));
             fs::create_dir(&path).unwrap();
             Self(path)
         }
@@ -103,11 +103,11 @@ mod tests {
     #[test]
     fn only_the_exact_fastpotify_hook_is_upgraded() {
         let root = Scratch::new();
-        let assets = root.0.join("package/share/spotifast/omarchy");
+        let assets = root.0.join("package/share/chanceify/omarchy");
         let home = root.0.join("user");
         let hooks = home.join(".config/omarchy/hooks/theme-set.d");
-        let hook = hooks.join("spotifast-theme");
-        let legacy = HOOK.replace("/spotifast/themes", "/fastpotify/themes");
+        let hook = hooks.join("chanceify-theme");
+        let legacy = HOOK.replace("/chanceify/themes", "/fastpotify/themes");
         assert_ne!(legacy, HOOK);
 
         // No package, no Omarchy: nothing is touched.
@@ -121,7 +121,7 @@ mod tests {
         ] {
             fs::create_dir_all(path).unwrap();
         }
-        fs::write(assets.join("spotifast-theme"), HOOK).unwrap();
+        fs::write(assets.join("chanceify-theme"), HOOK).unwrap();
         // No hook installed: installing one is fastframe-theme's job.
         upgrade(&assets, &home).unwrap();
         assert!(!hook.exists());

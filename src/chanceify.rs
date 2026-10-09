@@ -1,4 +1,4 @@
-//! Spotifast desktop command.
+//! Chanceify desktop command.
 
 #![cfg_attr(
     all(target_os = "windows", not(feature = "console")),

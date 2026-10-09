@@ -280,8 +280,8 @@ pub fn enable_desktop_themes(catalog: &mut Catalog, themes: &std::path::Path) {
     #[cfg(target_os = "linux")]
     omarchy::upgrade_legacy_hook();
     catalog.enable_desktop_themes(fastframe_theme::DesktopThemes {
-        slug: "spotifast",
-        omarchy_template: include_str!("../contrib/omarchy/spotifast.json.tpl"),
+        slug: "chanceify",
+        omarchy_template: include_str!("../contrib/omarchy/chanceify.json.tpl"),
         // The template has not changed since it first shipped.
         omarchy_previous_templates: &[],
         presets: true,
@@ -322,7 +322,7 @@ pub fn catalog_detail(
         ),
         Status::Problem(_) => gettext(
             locale,
-            "Custom themes could not be loaded. Run spotifast reload-themes to try again.",
+            "Custom themes could not be loaded. Run chanceify reload-themes to try again.",
         ),
     }
 }
@@ -524,9 +524,9 @@ fn install_fonts(ctx: &egui::Context) {
 
 fastframe_icons::icons! {
     /// Every icon the interface draws. The shared Lucide icons come from
-    /// fastframe-icons; the rest are Spotifast's own files.
+    /// fastframe-icons; the rest are Chanceify's own files.
     pub enum Icon {
-        prefix: "spotifast-icon-",
+        prefix: "chanceify-icon-",
         directory: "../assets/icons/",
         ArrowLeft => lucide "arrow-left",
         ArrowRight => "arrow-right",
@@ -687,7 +687,7 @@ pub fn icon_button(
 /// Horizontal offset that optically centers play triangles.
 ///
 /// Lucide includes a 1/24-width shift; a measured 3% shift centers the icon at
-/// Spotifast's sizes. Use this everywhere instead of per-call adjustments.
+/// Chanceify's sizes. Use this everywhere instead of per-call adjustments.
 pub fn play_glyph_offset(icon: Icon, icon_size: f32) -> Vec2 {
     if matches!(icon, Icon::PlayFilled | Icon::Play) {
         Vec2::new(icon_size * (0.03 - 1.0 / 24.0), 0.0)
@@ -703,7 +703,7 @@ pub fn logo(ui: &egui::Ui, center: egui::Pos2, diameter: f32) {
     let ppp = ui.ctx().pixels_per_point();
     // The raster keeps two pixels of margin on each side of the disc.
     let pixels = (diameter * ppp).round() as usize + 4;
-    let id = egui::Id::new(("spotifast-logo", pixels));
+    let id = egui::Id::new(("chanceify-logo", pixels));
     let texture = ui
         .ctx()
         .data(|data| data.get_temp::<egui::TextureHandle>(id))
@@ -714,7 +714,7 @@ pub fn logo(ui: &egui::Ui, center: egui::Pos2, diameter: f32) {
             );
             let texture =
                 ui.ctx()
-                    .load_texture("spotifast-logo", image, egui::TextureOptions::LINEAR);
+                    .load_texture("chanceify-logo", image, egui::TextureOptions::LINEAR);
             ui.ctx()
                 .data_mut(|data| data.insert_temp(id, texture.clone()));
             texture
@@ -1170,11 +1170,11 @@ mod tests {
     fn the_shipped_omarchy_files_are_the_shared_ones() {
         let lines = |text: &str| text.replace("\r\n", "\n");
         assert_eq!(
-            lines(include_str!("../contrib/omarchy/spotifast-theme")),
-            lines(&fastframe_theme::omarchy::hook_script("spotifast"))
+            lines(include_str!("../contrib/omarchy/chanceify-theme")),
+            lines(&fastframe_theme::omarchy::hook_script("chanceify"))
         );
         assert_eq!(
-            lines(include_str!("../contrib/omarchy/spotifast.json.tpl")),
+            lines(include_str!("../contrib/omarchy/chanceify.json.tpl")),
             lines(fastframe_theme::omarchy::BASE_TEMPLATE)
         );
     }
@@ -1257,7 +1257,7 @@ mod tests {
     }
 
     #[test]
-    fn a_local_palette_keeps_spotifasts_widget_style_local() {
+    fn a_local_palette_keeps_chanceifys_widget_style_local() {
         let ctx = egui::Context::default();
         apply(&ctx, &Palette::light());
         let dark = Palette::dark();

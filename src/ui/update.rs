@@ -30,7 +30,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
             color: palette.shadow,
         });
     egui::Window::new(title.as_ref())
-        .id(egui::Id::new("spotifast-update"))
+        .id(egui::Id::new("chanceify-update"))
         .title_bar(false)
         .resizable(false)
         .auto_sized()

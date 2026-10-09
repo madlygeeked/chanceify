@@ -560,7 +560,7 @@ pub fn populate(app: &mut App) {
     app.devices = vec![
         Device {
             id: Some("local-demo".into()),
-            name: "Spotifast".into(),
+            name: "Chanceify".into(),
             is_active: false,
             is_restricted: false,
             volume_percent: Some(70),
@@ -908,7 +908,7 @@ pub fn apply_flags(app: &mut App, page: Option<&str>, show: Option<&str>) {
             "update" => {
                 app.update = Some(crate::updates::Release {
                     version: "0.7.1".into(),
-                    url: "https://spotifast.rocks/download/".into(),
+                    url: "https://madlygeeked.github.io/chanceify/download/".into(),
                 });
             }
             "personal-app" => app.dialog = Some(Dialog::PersonalAppIntro),
@@ -1233,7 +1233,7 @@ mod tests {
 
     fn accessible_app(name: &str) -> (egui::Context, App) {
         let root =
-            std::env::temp_dir().join(format!("spotifast-a11y-{name}-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-a11y-{name}-{}", std::process::id()));
         let ctx = egui::Context::default();
         ctx.enable_accesskit();
         let waker = crate::backend::Waker::default();
@@ -5370,7 +5370,7 @@ mod tests {
             crate::ui::settings::show,
         );
         assert!(app.actions.iter().any(|action| matches!(action,
-            Action::OpenUrl(url) if url == "https://spotifast.rocks/settings-and-files/#custom-themes")));
+            Action::OpenUrl(url) if url == "https://madlygeeked.github.io/chanceify/settings-and-files/#custom-themes")));
         app.backend.shutdown();
     }
 
@@ -5978,7 +5978,7 @@ mod tests {
     #[test]
     fn a_toast_is_wide_enough_to_read() {
         let root =
-            std::env::temp_dir().join(format!("spotifast-toast-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-toast-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -6052,7 +6052,7 @@ mod tests {
     #[test]
     fn the_shortcuts_dialog_fits_a_small_window() {
         let root =
-            std::env::temp_dir().join(format!("spotifast-shortcuts-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-shortcuts-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -6105,7 +6105,7 @@ mod tests {
     #[test]
     fn interface_zoom_puts_minus_on_the_left() {
         let root =
-            std::env::temp_dir().join(format!("spotifast-zoom-order-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-zoom-order-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -6186,7 +6186,7 @@ mod tests {
     #[test]
     fn the_frame_rate_dial_steps_between_its_stops() {
         let root =
-            std::env::temp_dir().join(format!("spotifast-fps-dial-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-fps-dial-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -6267,7 +6267,7 @@ mod tests {
     #[test]
     fn the_narrowest_panels_keep_their_headers_on_one_row() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-queue-header-test-{}",
+            "chanceify-queue-header-test-{}",
             std::process::id()
         ));
         let dirs = AppDirs {
@@ -6363,7 +6363,7 @@ mod tests {
     #[test]
     fn the_queue_names_where_the_song_plays_from() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-playing-from-test-{}",
+            "chanceify-playing-from-test-{}",
             std::process::id()
         ));
         let dirs = AppDirs {
@@ -6615,7 +6615,7 @@ mod tests {
     #[test]
     fn fullscreen_lyrics_highlight_preserves_line_layout() {
         let root =
-            std::env::temp_dir().join(format!("spotifast-lyrics-layout-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-lyrics-layout-{}", std::process::id()));
         let ctx = egui::Context::default();
         let waker = crate::backend::Waker::default();
         waker.attach(&ctx);
@@ -6685,7 +6685,7 @@ mod tests {
     #[test]
     fn every_surface_renders_headless() {
         let root =
-            std::env::temp_dir().join(format!("spotifast-render-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-render-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -6803,7 +6803,7 @@ mod tests {
     #[test]
     fn a_long_virtual_queue_and_library_still_draw() {
         let root =
-            std::env::temp_dir().join(format!("spotifast-virtual-long-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-virtual-long-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -6869,7 +6869,7 @@ mod tests {
 
     fn drop_songs_on_sidebar(count: usize) {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-drag-test-{}-{count}",
+            "chanceify-drag-test-{}-{count}",
             std::process::id()
         ));
         let dirs = AppDirs {
@@ -7280,7 +7280,7 @@ mod tests {
     #[test]
     fn dragging_the_now_playing_song_supplies_a_playlist_row() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-now-playing-drag-test-{}",
+            "chanceify-now-playing-drag-test-{}",
             std::process::id()
         ));
         let dirs = AppDirs {
@@ -7706,7 +7706,7 @@ mod tests {
         app.backend.shutdown();
     }
 
-    /// "Next up" plays from the current context, not from a list Spotifast
+    /// "Next up" plays from the current context, not from a list Chanceify
     /// can rewrite, so it is never a drop target: dropping a queued row on
     /// it must not move or insert anything, even though the row sits inside
     /// the same scrollable list as "Playing next".
@@ -8212,7 +8212,7 @@ mod tests {
     #[test]
     fn dragging_within_the_pinned_block_reorders_it() {
         let root =
-            std::env::temp_dir().join(format!("spotifast-reorder-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-reorder-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -8290,7 +8290,7 @@ mod tests {
     #[test]
     fn dropping_between_unpinned_playlists_creates_the_custom_order() {
         let root =
-            std::env::temp_dir().join(format!("spotifast-unpinned-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-unpinned-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -9079,7 +9079,7 @@ mod tests {
     /// before asking the server.
     #[test]
     fn dragging_a_row_within_a_playlist_reorders_it() {
-        let root = std::env::temp_dir().join(format!("spotifast-move-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("chanceify-move-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -9365,7 +9365,7 @@ mod tests {
     #[test]
     fn clicking_search_in_library_shelf_focuses_search_field() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-sidebar-search-focus-test-{}",
+            "chanceify-sidebar-search-focus-test-{}",
             std::process::id()
         ));
         let dirs = AppDirs {
@@ -10468,6 +10468,124 @@ mod tests {
             "a row must not list the playlist it is already inside"
         );
 
+        app.backend.shutdown();
+    }
+
+    /// #644: Go to song radio from a list names the radio after the song
+    /// even when the song was never played or seen on a radio, instead of
+    /// opening a page titled just "Radio" with no cover.
+    #[test]
+    fn song_radio_from_liked_songs_is_named_after_the_song() {
+        let (ctx, mut app) = accessible_app("liked-song-radio");
+        let view = crate::ui::collection::liked;
+        let song = app
+            .library
+            .liked
+            .items
+            .last()
+            .expect("a liked song")
+            .track
+            .clone();
+        let seed = song.uri.clone();
+        // Only songs that played or came back from a radio are cached.
+        app.track_cache.clear();
+        view_frame(&ctx, &mut app, vec![], view);
+        let text = view_frame(&ctx, &mut app, vec![], view);
+        let row = text
+            .iter()
+            .rev()
+            .find(|(text, _)| text == &song.name)
+            .unwrap_or_else(|| panic!("{} in Liked Songs", song.name))
+            .1
+            .center();
+        view_frame(
+            &ctx,
+            &mut app,
+            pointer_click(row, egui::PointerButton::Secondary),
+            view,
+        );
+        let text = view_frame(&ctx, &mut app, vec![], view);
+        let radio = text
+            .iter()
+            .find(|(text, _)| text == "Go to song radio")
+            .expect("the song's menu")
+            .1
+            .center();
+        app.actions.clear();
+        view_frame(
+            &ctx,
+            &mut app,
+            pointer_click(radio, egui::PointerButton::Primary),
+            view,
+        );
+        let actions = std::mem::take(&mut app.actions);
+        assert!(
+            matches!(actions.as_slice(), [Action::OpenSongRadio { uri, .. }] if uri == &seed),
+            "the menu opens the song's radio: {actions:?}"
+        );
+        assert!(
+            app.track_cache.is_empty(),
+            "the menu leaves the cache to the action, applied after drawing"
+        );
+        for action in actions {
+            app.apply(action, &ctx);
+        }
+        assert_eq!(app.page(), &Page::Radio(seed.clone()));
+        assert_eq!(
+            app.radio_name(&seed),
+            Some(format!("{} Radio", song.name)),
+            "the radio is named after the song"
+        );
+        assert_eq!(
+            app.radio_pages[&seed].name,
+            Some(format!("{} Radio", song.name)),
+            "the page keeps the name"
+        );
+        app.backend.shutdown();
+    }
+
+    /// A song already cached from an album's song list, which comes without
+    /// the album, takes the row's album for the radio's cover, while what
+    /// the cache already knows is kept.
+    #[test]
+    fn song_radio_takes_the_rows_album_art_for_a_cached_song() {
+        let (ctx, mut app) = accessible_app("song-radio-album-art");
+        let song = app
+            .library
+            .liked
+            .items
+            .last()
+            .expect("a liked song")
+            .track
+            .clone();
+        assert!(
+            song.album.as_ref().is_some_and(|a| !a.images.is_empty()),
+            "the demo's liked song has album art"
+        );
+        let seed = song.uri.clone();
+        let id = crate::util::uri_id(&seed).expect("a track id").to_owned();
+        let mut cached = song.clone();
+        cached.album = None;
+        cached.name = "Cached name".into();
+        app.track_cache.clear();
+        app.track_cache.insert(id.clone(), cached);
+        app.apply(
+            Action::OpenSongRadio {
+                uri: seed.clone(),
+                track: Box::new(song.clone()),
+            },
+            &ctx,
+        );
+        assert_eq!(app.page(), &Page::Radio(seed.clone()));
+        assert_eq!(
+            app.radio_images(&seed),
+            song.album.as_ref().unwrap().images,
+            "the cover comes from the row's album"
+        );
+        assert_eq!(
+            app.track_cache[&id].name, "Cached name",
+            "the cached song is kept"
+        );
         app.backend.shutdown();
     }
 }

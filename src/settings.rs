@@ -5,7 +5,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 /// Local Library identity only. Never sent to Spotify as a context URI.
-pub const LIKED_SONGS_KEY: &str = "spotifast:liked-songs";
+pub const LIKED_SONGS_KEY: &str = "chanceify:liked-songs";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -868,7 +868,7 @@ pub struct Settings {
     /// An optional personal Spotify Web API application id. The shared
     /// application remains active for coverage when this is present.
     pub web_client_id: Option<String>,
-    /// Legacy reminder time, retained for older Spotifast versions.
+    /// Legacy reminder time, retained for older Chanceify versions.
     pub personal_app_nudge_at: Option<String>,
     /// The listener has dismissed or followed the personal-app introduction.
     pub personal_app_intro_seen: bool,
@@ -2305,7 +2305,7 @@ mod tests {
     /// rather than dropped as unreadable and replaced with the defaults.
     #[test]
     fn a_settings_file_saved_with_a_byte_order_mark_keeps_its_preferences() {
-        let dir = std::env::temp_dir().join(format!("spotifast-bom-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("chanceify-bom-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("settings.json");
         std::fs::write(
@@ -2747,7 +2747,7 @@ mod tests {
 
     #[test]
     fn a_legacy_socks_url_becomes_socks_mode() {
-        let dir = std::env::temp_dir().join(format!("spotifast-proxy-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("chanceify-proxy-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("settings.json");
         std::fs::write(
@@ -3025,7 +3025,7 @@ mod session_tests {
     #[test]
     fn a_new_session_atomically_replaces_the_previous_one() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-session-test-{}-{:?}",
+            "chanceify-session-test-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));

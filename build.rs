@@ -67,7 +67,7 @@ fn build_stamp() {
     } else {
         revision
     };
-    println!("cargo:rustc-env=SPOTIFAST_REVISION={revision}");
+    println!("cargo:rustc-env=CHANCEIFY_REVISION={revision}");
     // Seconds since the epoch, from SOURCE_DATE_EPOCH when the build is meant
     // to be reproducible. A build script cannot format a date without a crate,
     // so the app formats this itself.
@@ -78,7 +78,7 @@ fn build_stamp() {
             .unwrap_or(0)
             .to_string()
     });
-    println!("cargo:rustc-env=SPOTIFAST_BUILD_EPOCH={epoch}");
+    println!("cargo:rustc-env=CHANCEIFY_BUILD_EPOCH={epoch}");
     // Rebuild when the revision changes so the stamp never lags the checkout.
     println!("cargo:rerun-if-changed=.git/HEAD");
 }
@@ -102,10 +102,10 @@ fn main() {
     lastfm_keys();
     #[cfg(windows)]
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
-        println!("cargo:rerun-if-changed=packaging/windows/spotifast.ico");
+        println!("cargo:rerun-if-changed=assets/chanceify.ico");
         let mut resource = winresource::WindowsResource::new();
         resource
-            .set_icon("packaging/windows/spotifast.ico")
+            .set_icon("assets/chanceify.ico")
             .set("ProductName", "chanceify")
             .set("FileDescription", "music reimagined .");
         if let Err(error) = resource.compile() {

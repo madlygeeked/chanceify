@@ -23,13 +23,13 @@ impl Watcher {
 
 fn config() -> fastframe_tray::Config {
     fastframe_tray::Config {
-        id: "spotifast",
-        title: "Spotifast".into(),
-        icon: spotifast::util::app_icon_rgba,
+        id: "chanceify",
+        title: "Chanceify".into(),
+        icon: chanceify::util::app_icon_rgba,
         template_icon: None,
         menu: vec![fastframe_tray::MenuItem::action(
             "show",
-            "Show or hide Spotifast",
+            "Show or hide Chanceify",
         )],
     }
 }
@@ -39,7 +39,7 @@ fn config() -> fastframe_tray::Config {
 /// A subprocess keeps the test's bus and sandbox environment isolated.
 #[test]
 fn flatpak_tray_registers_without_owning_a_name() {
-    const CHILD: &str = "SPOTIFAST_TRAY_TEST_CHILD";
+    const CHILD: &str = "CHANCEIFY_TRAY_TEST_CHILD";
     if std::env::var_os(CHILD).is_some() {
         let (registered, registrations) = std::sync::mpsc::channel();
         let server = zbus::blocking::connection::Builder::session()
@@ -72,7 +72,7 @@ fn flatpak_tray_registers_without_owning_a_name() {
         return;
     }
 
-    let root = std::env::temp_dir().join(format!("spotifast-tray-bus-{}", std::process::id()));
+    let root = std::env::temp_dir().join(format!("chanceify-tray-bus-{}", std::process::id()));
     std::fs::create_dir_all(&root).unwrap();
     let config = root.join("bus.conf");
     std::fs::write(&config, r#"<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
@@ -105,7 +105,7 @@ fn flatpak_tray_registers_without_owning_a_name() {
             "--nocapture",
         ])
         .env(CHILD, "1")
-        .env("FLATPAK_ID", "rocks.spotifast.Spotifast")
+        .env("FLATPAK_ID", "rocks.chanceify.Chanceify")
         .env("DBUS_SESSION_BUS_ADDRESS", address.trim())
         .status();
     let _ = bus.kill();

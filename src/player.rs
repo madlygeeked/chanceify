@@ -1581,7 +1581,7 @@ mod tests {
     fn an_inactive_connect_device_keeps_its_engine_session() {
         let mut state = LocalState {
             connected: true,
-            active_client: "Spotifast".into(),
+            active_client: "Chanceify".into(),
             ..LocalState::default()
         };
 

@@ -1084,6 +1084,12 @@ pub struct Toast {
 #[derive(Clone, Debug)]
 pub enum Action {
     Open(Page),
+    /// Opens the radio of a song shown in a list, after caching the row's
+    /// song so the page has its name and cover.
+    OpenSongRadio {
+        uri: String,
+        track: Box<Track>,
+    },
     /// Run the stream at a chosen rate, 0.5 to 2.0. Applied without a gap,
     /// so it is a thing to do mid-song rather than a setting to set first.
     SetSpeed(f32),
@@ -1369,6 +1375,9 @@ pub enum Action {
     OpenIndexFolder,
     /// Opens or closes the floating Views and panels window.
     ToggleViewsPanel,
+    /// Opens the recap picture window.
+    OpenRecap,
+    OpenRecapFolder,
     /// Writes the key binds to a file in the settings folder.
     ExportKeys,
     ImportKeys,

@@ -1,11 +1,11 @@
-# Spotifast agent guide
+# Chanceify agent guide
 
 Follow `CHANCEIFY.md` and this file; there is no separate contribution policy.
 These instructions add implementation constraints for coding agents.
 
 ## Product boundaries
 
-- Keep Spotifast a small native Spotify client. Do not add a browser engine,
+- Keep Chanceify a small native Spotify client. Do not add a browser engine,
   telemetry, a hosted backend, or alternate sources for Spotify audio.
 - Playback capabilities come from librespot. Do not advertise or implement a
   capability merely because its name appears in a protobuf or enum. In
@@ -39,13 +39,13 @@ These instructions add implementation constraints for coding agents.
   them in logical order. Pass logical text to `crate::bidi`, which reorders
   the laid-out runs; never reorder the string before layout.
 
-Read `docs/_reference/how-it-connects.md` before changing authentication,
+Read `dev/how-it-connects.md` before changing authentication,
 Spotify requests, Connect, credential storage, or network behaviour. Read
-`docs/_reference/queue.md` before touching the queue: its rules are the
+`dev/queue.md` before touching the queue: its rules are the
 contract, and the queue tests in `src/app.rs` enforce them. Read the
 nearby module tests before changing a state machine or API fallback.
 
-`docs/_reference/what-spotify-allows.md` lists what the Web API, the
+`dev/what-spotify-allows.md` lists what the Web API, the
 librespot session, and librespot playback each offer, and the requests
 none of them can serve (pins synchronised with Spotify, folder editing,
 Smart Shuffle, lossless, local files, and more), each with its reason.

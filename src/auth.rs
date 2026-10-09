@@ -596,7 +596,7 @@ mod tests {
             ..token.clone()
         };
         assert!(expired.needs_refresh());
-        let dir = std::env::temp_dir().join(format!("spotifast-token-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("chanceify-token-{}", std::process::id()));
         let path = dir.join("token.json");
         token.save(&path).unwrap();
         assert_eq!(StoredToken::load(&path), Some(token));
@@ -607,7 +607,7 @@ mod tests {
     #[test]
     fn legacy_tokens_move_to_the_matching_session() {
         let dir = std::env::temp_dir().join(format!(
-            "spotifast-token-migration-{}-{}",
+            "chanceify-token-migration-{}-{}",
             std::process::id(),
             now_secs()
         ));

@@ -8,11 +8,11 @@
 //! apps holding a quota extension from before then may still use it. This
 //! prints the status and body rather than assuming either answer.
 
-use spotifast::api::models::Track;
+use chanceify::api::models::Track;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
-    fastframe_log::Logging::new("spotifast", env!("CARGO_PKG_VERSION"))
+    fastframe_log::Logging::new("chanceify", env!("CARGO_PKG_VERSION"))
         .filter("warn")
         .init()?;
     let arg = std::env::args()
@@ -20,17 +20,17 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|| "spotify:track:4uLU6hMCjMI75M1A2tKUQC".into());
     let id = arg.rsplit(':').next().unwrap_or_default().to_string();
 
-    let dirs = spotifast::paths::AppDirs::discover();
+    let dirs = chanceify::paths::AppDirs::discover();
     {
-        let store = spotifast::credentials::Store::new(dirs);
+        let store = chanceify::credentials::Store::new(dirs);
         let loaded = store
-            .lease(spotifast::credentials::Slot::Shared)
+            .lease(chanceify::credentials::Slot::Shared)
             .load()
             .await?;
         if let Some(warning) = loaded.warning {
             eprintln!("{warning}");
         }
-        let Some(spotifast::credentials::Grant::Web(token)) = loaded.grant else {
+        let Some(chanceify::credentials::Grant::Web(token)) = loaded.grant else {
             anyhow::bail!("No stored web sign-in found");
         };
         println!("client_id: {}", token.client_id);
@@ -41,8 +41,8 @@ async fn main() -> anyhow::Result<()> {
         if token.expired() {
             println!("refreshing…");
             let refreshed =
-                spotifast::auth::refresh(&client, &token.client_id, &token.refresh_token).await?;
-            token = spotifast::auth::StoredToken::from_response(
+                chanceify::auth::refresh(&client, &token.client_id, &token.refresh_token).await?;
+            token = chanceify::auth::StoredToken::from_response(
                 &token.client_id,
                 refreshed,
                 Some(&token.refresh_token),

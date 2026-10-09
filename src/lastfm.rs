@@ -17,16 +17,31 @@ use serde::{Deserialize, Serialize};
 
 const API_URL: &str = "https://ws.audioscrobbler.com/2.0/";
 
-/// The key and secret every copy of chanceify™ signs in with, once Chance
-/// has registered one at <https://www.last.fm/api/account/create>. While
-/// these are empty, Settings asks for a key and secret of the person's own.
-pub const DEFAULT_API_KEY: &str = match option_env!("CHANCEIFY_LASTFM_KEY") {
-    Some(key) => key,
-    None => "",
+/// Chance's small Cloudflare Worker (see `worker/lastfm-proxy.js`). It holds
+/// the Last.fm key and secret, so they are never inside this program or on
+/// GitHub. Empty means no proxy: Settings then asks for a key of your own.
+pub const PROXY_URL: &str = "";
+
+/// Stands in for the key and secret while the proxy does the signing.
+pub const VIA_PROXY: &str = "via-proxy";
+
+/// What every copy of chanceify™ signs in with: the proxy if there is one,
+/// else a key and secret built in from the untracked `lastfm-keys.txt`.
+pub const DEFAULT_API_KEY: &str = if !PROXY_URL.is_empty() {
+    VIA_PROXY
+} else {
+    match option_env!("CHANCEIFY_LASTFM_KEY") {
+        Some(key) => key,
+        None => "",
+    }
 };
-pub const DEFAULT_SECRET: &str = match option_env!("CHANCEIFY_LASTFM_SECRET") {
-    Some(secret) => secret,
-    None => "",
+pub const DEFAULT_SECRET: &str = if !PROXY_URL.is_empty() {
+    VIA_PROXY
+} else {
+    match option_env!("CHANCEIFY_LASTFM_SECRET") {
+        Some(secret) => secret,
+        None => "",
+    }
 };
 
 /// A song worth telling Last.fm about.
@@ -441,23 +456,27 @@ impl Worker {
 
     /// Sends one signed request.
     fn call(&mut self, method: &str, extra: &[(&str, String)], signed_in: bool) -> Reply {
-        let mut params: Vec<(String, String)> = vec![
-            ("method".into(), method.to_string()),
-            ("api_key".into(), self.key.clone()),
-        ];
+        let proxied = self.key == VIA_PROXY && !PROXY_URL.is_empty();
+        let mut params: Vec<(String, String)> = vec![("method".into(), method.to_string())];
+        if !proxied {
+            params.push(("api_key".into(), self.key.clone()));
+        }
         for (name, value) in extra {
             params.push(((*name).to_string(), value.clone()));
         }
         if signed_in {
             params.push(("sk".into(), self.session.clone()));
         }
-        let api_sig = signature(&params, &self.secret);
-        params.push(("api_sig".into(), api_sig));
+        if !proxied {
+            let api_sig = signature(&params, &self.secret);
+            params.push(("api_sig".into(), api_sig));
+        }
         params.push(("format".into(), "json".into()));
+        let url = if proxied { PROXY_URL } else { API_URL };
         let Some(client) = self.client() else {
             return Reply::Network("could not set up the connection".into());
         };
-        let response = match client.post(API_URL).form(&params).send() {
+        let response = match client.post(url).form(&params).send() {
             Ok(response) => response,
             Err(error) => return Reply::Network(error.to_string()),
         };
@@ -512,9 +531,13 @@ impl Worker {
                     });
                     return;
                 };
+                // Through the proxy the public key comes back with the token.
+                let public_key = body
+                    .get("api_key")
+                    .and_then(serde_json::Value::as_str)
+                    .map_or_else(|| self.key.clone(), str::to_string);
                 let url = format!(
-                    "https://www.last.fm/api/auth/?api_key={}&token={}",
-                    self.key, token
+                    "https://www.last.fm/api/auth/?api_key={public_key}&token={token}"
                 );
                 if let Err(error) = open::that(&url) {
                     log::warn!("could not open the browser: {error}");

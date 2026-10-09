@@ -227,6 +227,10 @@ fn stats_section(app: &mut App, ui: &mut egui::Ui) {
     if summary.streak_days > 1 {
         theme::subtle(ui, &palette, &format!("{} days in a row", summary.streak_days));
     }
+    ui.add_space(6.0);
+    if theme::pill_button(ui, &palette, &gettext(app.locale, "Make a recap picture"), false).clicked() {
+        app.actions.push(Action::OpenRecap);
+    }
     ui.add_space(10.0);
     // The last two weeks, one bar a day.
     let top = summary.per_day.iter().copied().max().unwrap_or(0).max(1) as f32;

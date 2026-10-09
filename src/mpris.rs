@@ -1,4 +1,4 @@
-//! Linux desktop media controls (MPRIS) for Spotifast.
+//! Linux desktop media controls (MPRIS) for Chanceify.
 //!
 //! D-Bus runs on its own thread with a local executor and exchanges bounded
 //! messages with the interface, which stays the only owner of playback
@@ -17,7 +17,7 @@ use crate::media::{MediaCommand, MediaState, MediaTrack};
 use crate::player::{Playback, RepeatMode};
 
 const PLAYING_POSITION_INTERVAL: Duration = Duration::from_millis(1000);
-const TRACK_OBJECT_PATH_PREFIX: &str = "/rocks/spotifast/Track/";
+const TRACK_OBJECT_PATH_PREFIX: &str = "/rocks/chanceify/Track/";
 
 enum Update {
     State(MediaState, bool),
@@ -41,7 +41,7 @@ impl MediaService {
         let (command_tx, commands) = std::sync::mpsc::channel();
         let wake: std::sync::Arc<dyn Fn() + Send + Sync> = std::sync::Arc::new(wake);
         let spawned = thread::Builder::new()
-            .name("spotifast-mpris".to_string())
+            .name("chanceify-mpris".to_string())
             .spawn(move || {
                 let runtime = match tokio::runtime::Builder::new_current_thread()
                     .enable_all()
@@ -129,7 +129,7 @@ async fn run(
     commands: Sender<MediaCommand>,
     wake: std::sync::Arc<dyn Fn() + Send + Sync>,
 ) -> mpris_server::zbus::Result<()> {
-    let player = Player::builder("spotifast")
+    let player = Player::builder("chanceify")
         .identity(crate::build_info::DISPLAY_NAME)
         .desktop_entry(desktop_entry())
         .can_raise(true)
@@ -368,9 +368,9 @@ fn desktop_entry_for(app_id: Option<&str>, in_flatpak: bool) -> &str {
     if let Some(app_id) = app_id.filter(|id| !id.is_empty()) {
         app_id
     } else if in_flatpak {
-        "rocks.spotifast.Spotifast"
+        "rocks.chanceify.Chanceify"
     } else {
-        "spotifast"
+        "chanceify"
     }
 }
 
@@ -380,14 +380,14 @@ mod tests {
 
     #[test]
     fn desktop_entry_matches_the_installed_flatpak_id() {
-        for id in ["rocks.spotifast.Spotifast", "rocks.fastpotify.Fastpotify"] {
+        for id in ["rocks.chanceify.Chanceify", "rocks.fastpotify.Fastpotify"] {
             assert_eq!(desktop_entry_for(Some(id), true), id);
         }
-        assert_eq!(desktop_entry_for(None, false), "spotifast");
-        assert_eq!(desktop_entry_for(None, true), "rocks.spotifast.Spotifast");
+        assert_eq!(desktop_entry_for(None, false), "chanceify");
+        assert_eq!(desktop_entry_for(None, true), "rocks.chanceify.Chanceify");
         assert_eq!(
             desktop_entry_for(Some(""), true),
-            "rocks.spotifast.Spotifast"
+            "rocks.chanceify.Chanceify"
         );
     }
 
@@ -431,12 +431,12 @@ mod tests {
     fn a_volume_write_is_answered_with_the_new_level_on_a_private_bus() {
         use std::time::Duration;
         use zbus::zvariant::{OwnedValue, Value};
-        const CHILD: &str = "SPOTIFAST_VOLUME_PRIVATE_BUS";
+        const CHILD: &str = "CHANCEIFY_VOLUME_PRIVATE_BUS";
         const NAME: &str =
             "media_controls::tests::a_volume_write_is_answered_with_the_new_level_on_a_private_bus";
         if std::env::var_os(CHILD).is_none() {
             let root = std::env::temp_dir().join(format!(
-                "spotifast-volume-bus-{:016x}",
+                "chanceify-volume-bus-{:016x}",
                 rand::random::<u64>()
             ));
             std::fs::create_dir(&root).unwrap();
@@ -471,7 +471,7 @@ mod tests {
             .build()
             .unwrap();
         let properties = zbus::blocking::fdo::PropertiesProxy::builder(&client)
-            .destination("org.mpris.MediaPlayer2.spotifast")
+            .destination("org.mpris.MediaPlayer2.chanceify")
             .unwrap()
             .path("/org/mpris/MediaPlayer2")
             .unwrap()

@@ -1004,7 +1004,7 @@ impl Backend {
         let (event_tx, event_rx) = std::sync::mpsc::channel();
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
-            .thread_name("spotifast-runtime")
+            .thread_name("chanceify-runtime")
             .enable_all()
             .build()
             .expect("unable to start the async runtime");
@@ -1025,7 +1025,7 @@ impl Backend {
         let worker_art = art.clone();
         let worker_commands = command_tx.clone();
         let thread = std::thread::Builder::new()
-            .name("spotifast-backend".to_string())
+            .name("chanceify-backend".to_string())
             .spawn(move || {
                 runtime.block_on(async move {
                     let mut worker = Worker::new(
@@ -5058,7 +5058,7 @@ mod playlist_cache_tests {
     #[tokio::test]
     async fn a_fully_cached_playlist_is_walked_without_asking_spotify() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-membership-from-cache-{}-{:?}",
+            "chanceify-membership-from-cache-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -5108,7 +5108,7 @@ mod playlist_cache_tests {
     #[tokio::test]
     async fn a_partial_cache_is_not_taken_for_the_whole_playlist() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-membership-partial-cache-{}-{:?}",
+            "chanceify-membership-partial-cache-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -5146,7 +5146,7 @@ mod playlist_cache_tests {
     #[test]
     fn incremental_checkpoints_append_only_new_rows_and_recover_from_failed_publication() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-playlist-cache-incremental-{}-{:?}",
+            "chanceify-playlist-cache-incremental-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -5220,7 +5220,7 @@ mod playlist_cache_tests {
     #[tokio::test]
     async fn incremental_cache_replaces_changed_snapshot_and_keeps_legacy_reader() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-playlist-cache-migration-{}-{:?}",
+            "chanceify-playlist-cache-migration-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -5292,7 +5292,7 @@ mod playlist_cache_tests {
     #[tokio::test]
     async fn reopening_a_cache_removes_rows_left_by_an_interrupted_replacement() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-playlist-cache-orphan-test-{}-{:?}",
+            "chanceify-playlist-cache-orphan-test-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -5358,7 +5358,7 @@ mod playlist_cache_tests {
     #[tokio::test]
     async fn the_file_reader_accepts_legacy_caches_and_ignores_unknown_fields() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-playlist-cache-legacy-read-test-{}-{:?}",
+            "chanceify-playlist-cache-legacy-read-test-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -5382,7 +5382,7 @@ mod playlist_cache_tests {
     #[tokio::test]
     async fn the_file_reader_rejects_missing_corrupt_and_trailing_data() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-playlist-cache-invalid-read-test-{}-{:?}",
+            "chanceify-playlist-cache-invalid-read-test-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -5408,7 +5408,7 @@ mod playlist_cache_tests {
     #[tokio::test]
     async fn a_new_checkpoint_atomically_replaces_the_previous_one() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-playlist-cache-test-{}-{:?}",
+            "chanceify-playlist-cache-test-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -5437,7 +5437,7 @@ mod playlist_cache_tests {
     #[tokio::test]
     async fn streaming_preserves_the_cache_bytes_and_duplicate_unavailable_rows() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-playlist-cache-stream-test-{}-{:?}",
+            "chanceify-playlist-cache-stream-test-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -5490,7 +5490,7 @@ mod playlist_cache_tests {
     #[tokio::test]
     async fn failed_checkpoint_keeps_existing_data_and_cleans_only_its_temporary_file() {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-playlist-cache-failure-test-{}-{:?}",
+            "chanceify-playlist-cache-failure-test-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -5682,7 +5682,7 @@ mod authorization_tests {
 
     #[test]
     fn proxy_changes_compare_with_the_running_engine() {
-        const CHILD: &str = "SPOTIFAST_PROXY_SNAPSHOT_TEST";
+        const CHILD: &str = "CHANCEIFY_PROXY_SNAPSHOT_TEST";
         if std::env::var_os(CHILD).is_none() {
             let status = std::process::Command::new(std::env::current_exe().unwrap())
                 .args([
@@ -5997,7 +5997,7 @@ mod authorization_tests {
             .build()
             .unwrap();
         let root =
-            std::env::temp_dir().join(format!("spotifast-auth-{name}-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-auth-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let dirs = AppDirs {
             config: root.join("config"),

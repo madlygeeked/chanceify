@@ -1,7 +1,7 @@
-# Chanceify — local changes to Spotifast
+# Chanceify — local changes to Chanceify
 
 Every customisation made to this fork, why it exists, and what to check after
-an upstream update. This file is the map: when Spotifast moves under us, work
+an upstream update. This file is the map: when Chanceify moves under us, work
 top to bottom and see which of these still apply.
 
 Upstream: <https://github.com/crmne/spotifast> · Branch: `chanceify` ·
@@ -125,7 +125,7 @@ Two changes that make this build feel like its own thing.
 **Display name.** `build_info::DISPLAY_NAME` is `Chanceify`, used for the
 window title, the tray item and its menu, the login screen, the About box, and
 the update toasts. A local build should not present itself as released
-Spotifast.
+Chanceify.
 
 Only the *display* name changed. These keep their upstream names on purpose,
 and `tests/branding.rs` checks the last two:

@@ -417,7 +417,7 @@ pub fn save_report_to_file(lines: &[String], note: &str) {
     use std::path::PathBuf;
     
     let debug_dir = PathBuf::from(format!(
-        "{}\\AppData\\Local\\paolino\\spotifast\\debug",
+        "{}\\AppData\\Local\\paolino\\chanceify\\debug",
         std::env::var("USERPROFILE").unwrap_or_default()
     ));
     

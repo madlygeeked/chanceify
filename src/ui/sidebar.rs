@@ -848,10 +848,22 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     // The traffic lights float over the top-left of the sidebar now, so the
     // first nav row has to start below them.
     let top = 12 + theme::titlebar_inset(ui.ctx()) as i8;
+    let beside = if app.show_queue_panel || app.show_lyrics_panel {
+        theme::SIDE_PANEL_MIN_WIDTH
+    } else {
+        0.0
+    };
+    let fit = super::yielding_panel(
+        ui.ctx(),
+        "sidebar",
+        SIDEBAR_MIN_WIDTH..=sidebar_max_width(ui),
+        app.settings.sidebar_width,
+        ui.available_width() - super::topbar::least_width(ui.ctx()) - beside,
+    );
     let panel = egui::Panel::left("sidebar")
         .resizable(true)
         .default_size(app.settings.sidebar_width)
-        .size_range(SIDEBAR_MIN_WIDTH..=sidebar_max_width(ui))
+        .size_range(fit.range.clone())
         .show_separator_line(false)
         .frame(Frame::new().fill(palette.panel).inner_margin(Margin {
             left: 12,
@@ -877,7 +889,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         data.insert_temp(egui::Id::new("tour-sidebar"), response.response.rect)
     });
     let width = response.response.rect.width();
-    if (width - app.settings.sidebar_width).abs() > 1.0 {
+    if (width - app.settings.sidebar_width).abs() > 1.0
+        && super::panel_width_chosen(ui.ctx(), "sidebar", &fit)
+    {
         app.settings.sidebar_width = width;
         app.actions.push(Action::SettingsChanged);
     }
@@ -2017,7 +2031,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
 
 const EXPANDED_ART_GAP: f32 = 10.0;
 const LIBRARY_ITEM_PADDING: f32 = 8.0;
-const SIDEBAR_MIN_WIDTH: f32 = 210.0;
+use super::SIDEBAR_MIN_WIDTH;
 /// How much of the expanded cover's width the sidebar has to give it,
 /// and how much of its height may set the ceiling. The same figure the art
 /// itself is measured against, so the two cannot drift apart.
@@ -2758,7 +2772,7 @@ mod ordering_tests {
 
     fn app(name: &str) -> App {
         let root =
-            std::env::temp_dir().join(format!("spotifast-order-{name}-{}", std::process::id()));
+            std::env::temp_dir().join(format!("chanceify-order-{name}-{}", std::process::id()));
         let mut app = App::new(
             &crate::backend::Waker::default(),
             crate::paths::AppDirs {

@@ -1270,7 +1270,10 @@ pub fn item_menu(
                 Some(Icon::Radio),
                 &gettext(locale, "Go to song radio"),
             ) {
-                app.actions.push(Action::Open(Page::Radio(uri.clone())));
+                app.actions.push(Action::OpenSongRadio {
+                    uri: uri.clone(),
+                    track: Box::new(track.clone()),
+                });
             }
             let artists: Vec<&ArtistRef> = track
                 .artists
@@ -4687,7 +4690,7 @@ mod tests {
 
     fn test_app() -> App {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-virtual-{}-{}",
+            "chanceify-virtual-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

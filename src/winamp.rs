@@ -406,7 +406,7 @@ mod tests {
     use super::*;
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("spotifast-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("chanceify-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -434,7 +434,7 @@ mod tests {
             crate::speed::shared(),
         );
         let start = Instant::now();
-        assert_eq!(state.marquee("Spotifast", start).0, "Spotifast");
+        assert_eq!(state.marquee("Chanceify", start).0, "Chanceify");
         assert!(!state.marquee_scrolling());
 
         let long = "Radiohead - Everything In Its Right Place (4:11)";

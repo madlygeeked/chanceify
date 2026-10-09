@@ -113,7 +113,7 @@ impl Bridge {
     ) -> Result<Self, String> {
         let mut controls = MediaControls::new(PlatformConfig {
             display_name: "chanceify™",
-            dbus_name: "spotifast",
+            dbus_name: "chanceify",
             hwnd,
         })
         .map_err(|error| error.to_string())?;
@@ -235,7 +235,7 @@ mod host {
 
     /// A window that is never shown, for the controls to belong to.
     fn create_hidden_window() -> Result<HWND, String> {
-        let class_name = wide("SpotifastMediaControls");
+        let class_name = wide("ChanceifyMediaControls");
         let title = wide(crate::build_info::DISPLAY_NAME);
         let instance = unsafe { GetModuleHandleW(std::ptr::null()) };
         let class = WNDCLASSW {
@@ -285,7 +285,7 @@ mod host {
     ) -> Result<u32, String> {
         let (ready_tx, ready_rx) = std::sync::mpsc::channel();
         let spawned = std::thread::Builder::new()
-            .name("spotifast-media".to_owned())
+            .name("chanceify-media".to_owned())
             .spawn(move || {
                 // The controls are WinRT objects, which want COM on the thread
                 // that makes them; apartment-threaded, so their callbacks
@@ -451,7 +451,7 @@ mod tests {
     /// fetch that fails takes the process with it.
     #[test]
     fn artwork_is_a_local_file() {
-        let url = file_url(Path::new("/tmp/spotifast/art/0badc0de"));
+        let url = file_url(Path::new("/tmp/chanceify/art/0badc0de"));
         assert!(url.starts_with("file://"));
         assert!(!url.starts_with("http"));
     }
@@ -496,7 +496,7 @@ mod tests {
             ..Default::default()
         };
         let with_art = crate::media::MediaTrack {
-            art_file: Some(std::path::PathBuf::from("/tmp/spotifast/art/0badc0de")),
+            art_file: Some(std::path::PathBuf::from("/tmp/chanceify/art/0badc0de")),
             ..bare.clone()
         };
         assert_ne!(bare, with_art);

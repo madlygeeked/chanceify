@@ -156,7 +156,7 @@ mod tests {
         let http = Http::default();
         let clone = http.clone();
         let replacement = reqwest::Client::builder()
-            .user_agent("spotifast-test")
+            .user_agent("chanceify-test")
             .build()
             .unwrap();
         http.replace(replacement.clone());

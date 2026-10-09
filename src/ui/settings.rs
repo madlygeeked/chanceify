@@ -60,7 +60,7 @@ impl<'a> RowText<'a> {
 }
 
 /// The guide to writing a palette file for the themes folder.
-const THEMES_GUIDE_URL: &str = "https://spotifast.rocks/settings-and-files/#custom-themes";
+const THEMES_GUIDE_URL: &str = "https://madlygeeked.github.io/chanceify/settings-and-files/#custom-themes";
 
 fn section_matches(needle: &str, title: &str, rows: &[RowText<'_>]) -> bool {
     let needle = needle.trim().to_lowercase();
@@ -432,7 +432,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     .clicked()
                 {
                     app.actions.push(Action::OpenUrl(
-                        "https://spotifast.rocks/make-it-even-faster/#make-a-spotify-app".into(),
+                        "https://madlygeeked.github.io/chanceify/make-it-even-faster/#make-a-spotify-app".into(),
                     ));
                 }
             });

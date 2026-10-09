@@ -73,6 +73,28 @@ impl App {
         images.unwrap_or_default()
     }
 
+    /// Opens the radio of a song shown in a list. The page takes its name
+    /// and cover from the song cache, which holds only songs that played or
+    /// came back from a radio, so a song from Liked Songs, a playlist or a
+    /// search opened as an unnamed "Radio" with no cover (#644). The row
+    /// already has the song's details, so cache them first. A cached entry
+    /// is kept, but takes the row's album when it has no artwork of its own:
+    /// an album's song list comes without the album.
+    pub(crate) fn open_song_radio(&mut self, uri: &str, track: &Track) {
+        if let Some(id) = util::uri_id(uri) {
+            let cached = self
+                .track_cache
+                .entry(id.to_owned())
+                .or_insert_with(|| track.clone());
+            let has_art = |t: &Track| t.album.as_ref().is_some_and(|a| !a.images.is_empty());
+            if !has_art(cached) && has_art(track) {
+                cached.album = track.album.clone();
+            }
+            self.track_used.insert(id.to_owned(), Instant::now());
+        }
+        self.open(Page::Radio(uri.to_string()));
+    }
+
     /// Asks for the seed's songs unless the page already has or awaits them.
     pub(super) fn load_radio(&mut self, seed: &str) {
         let name = self.radio_name(seed);

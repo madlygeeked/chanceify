@@ -3,7 +3,7 @@
 //! librespot's rodio sink panics if no output device is available. Release
 //! builds abort on that panic. This sink opens the device when playback starts
 //! and reports a device it cannot open through the UI, from the first write
-//! (see `start`). Spotifast can then remain available as a Connect remote
+//! (see `start`). Chanceify can then remain available as a Connect remote
 //! until an output appears.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};

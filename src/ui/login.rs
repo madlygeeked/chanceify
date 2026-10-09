@@ -337,7 +337,7 @@ mod tests {
         ctx.enable_accesskit();
         theme::install(&ctx);
         let root = std::env::temp_dir().join(format!(
-            "spotifast-proxy-short-login-{}",
+            "chanceify-proxy-short-login-{}",
             std::process::id()
         ));
         let mut app = App::new(
