@@ -9,8 +9,6 @@ body:
       options:
         - label: I searched open and closed issues for this request.
           required: true
-        - label: I read the project boundaries in CONTRIBUTING.md.
-          required: true
   - type: textarea
     id: problem
     attributes:

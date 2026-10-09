@@ -1,6 +1,6 @@
 # Copilot instructions for Spotifast
 
-Use `AGENTS.md` and `CONTRIBUTING.md` as the source of truth for every change
+Use `AGENTS.md` as the source of truth for every change
 and review.
 
 When answering or triaging an issue that asks for a Spotify-facing feature,

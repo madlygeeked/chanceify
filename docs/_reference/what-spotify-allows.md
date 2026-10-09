@@ -118,8 +118,8 @@ The Web API and librespot do not provide these features:
 - **Playback speed and crossfade.** librespot supports neither. Spotifast
   would have to add them to its own audio path.
 - **Free-account playback.** Replacing Spotify audio with another source is
-  also out of scope. See the
-  [contribution guide](https://github.com/crmne/spotifast/blob/main/CONTRIBUTING.md).
+  also out of scope. Chanceify
+  does not do this.
 - **Friend activity, private-session status, and similar social features.**
   Spotify has no public API for them.
 - **Canvas videos and video podcasts.** librespot does not provide them.

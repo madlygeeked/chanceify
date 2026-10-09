@@ -1,6 +1,6 @@
 # Spotifast agent guide
 
-Follow `CONTRIBUTING.md`; it is the canonical product and contribution policy.
+Follow `CHANCEIFY.md` and this file; there is no separate contribution policy.
 These instructions add implementation constraints for coding agents.
 
 ## Product boundaries
@@ -103,7 +103,7 @@ picture. Zero volume still dances.
   approval of changed appearance or interaction.
 - Inspect before-and-after evidence at representative window sizes and in both
   light and dark themes. If that evidence is missing, request it.
-- Use the HTML comparison format in `CONTRIBUTING.md` under "Visual reviews":
+- Use a simple HTML before/after comparison:
   matching captures, theme and size selectors, Before/After controls, and
   relevant interaction states. For a batch, provide one index with PR numbers,
   a selector, Previous/Next controls and links to individual comparisons.
@@ -161,7 +161,7 @@ mise or mbx.
   for deterministic UI coverage and screenshots.
 - Update the README and docs when user-visible behaviour, settings, files, or
   network access changes.
-- Run the full checks from `CONTRIBUTING.md`. Do not weaken a lint, delete a
+- Run the full checks (cargo fmt, clippy, test). Do not weaken a lint, delete a
   test, or add an `allow` merely to make CI green without explaining why the
   underlying rule does not apply.
 - Report platform coverage honestly. Do not claim a platform was tested when

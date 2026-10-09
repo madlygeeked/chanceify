@@ -16,7 +16,6 @@ labels:
   wontfix: The exact request is explicitly ruled out by repository documentation.
 sources:
 - README.md
-- CONTRIBUTING.md
 - CHANGELOG.md
 - docs/_guide/*.md
 - docs/_reference/*.md
