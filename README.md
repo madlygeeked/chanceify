@@ -1,2 +1,2 @@
-chanceify™, <br />
+chanceify™ <br />
 music reimagined .
