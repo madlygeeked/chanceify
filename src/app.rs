@@ -12368,10 +12368,21 @@ impl App {
         }
         crate::discord::set_listen(self.settings.discord_listen_along);
         self.poll_discord_join();
+        // The swirl takes the colour the app has already worked out for the cover.
+        let swirl = if self.settings.discord_swirl && self.settings.discord_cover {
+            let cover = self
+                .now_playing()
+                .and_then(|now| now.art_url.clone().or_else(|| now.art_small.clone()));
+            self.tint_for(cover.as_deref())
+                .map(|color| crate::discord::swirl_url(color.r(), color.g(), color.b()))
+        } else {
+            None
+        };
         let style = crate::discord::Style {
             status_line: self.settings.discord_status_line,
             cover: self.settings.discord_cover,
             badge: self.settings.discord_badge,
+            swirl,
             buttons: self.settings.discord_buttons,
             links: self.settings.discord_links,
             hide_paused: self.settings.discord_hide_paused,

@@ -757,6 +757,9 @@ pub struct Settings {
     pub discord_cover: bool,
     /// Show chanceify's small badge in the corner of the cover.
     pub discord_badge: bool,
+    /// Show a swirl in the colour of the cover as the small picture on the cover.
+    #[serde(default = "yes")]
+    pub discord_swirl: bool,
     /// Show the "Listen on Spotify" and "Get chanceify" buttons.
     pub discord_buttons: bool,
     /// Make the song and the artist links to Spotify.
@@ -1148,6 +1151,7 @@ impl Default for Settings {
             discord_status_line: 0,
             discord_cover: true,
             discord_badge: true,
+            discord_swirl: true,
             discord_buttons: true,
             discord_links: true,
             discord_hide_paused: false,

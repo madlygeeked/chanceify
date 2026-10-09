@@ -1626,7 +1626,7 @@ pub(crate) fn table_layout(
     } else {
         0.0
     };
-    let heart = if compact { 0.0 } else { settings.buttons_width() };
+    let heart = if compact { 0.0 } else { columns.buttons_width() };
     let duration = if compact { 44.0 } else { 56.0 };
     let more = if compact { 0.0 } else { 36.0 };
     let mut budget = (width - number - cover - heart - duration - more - 8.0 - TITLE_MIN).max(0.0);

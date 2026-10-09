@@ -32,3 +32,5 @@ title: Settings explained
 - **Check my whole library** (Last.fm settings): checks every saved album and artist picture, a few at a time. Press it again to stop.
 - **Row menu** (six dots): drag the top strip to move it, drag the <> corner to widen it.
 - **Lyrics site busy**: chanceify asks LRCLIB again by itself up to five times.
+
+- **Discord swirl**: the small picture on the cover is a swirl in the cover's colour (Settings > Discord). The pictures are in `docs/swirl` and are served from the chanceify GitHub page, so they show once that page is switched on.

@@ -2123,8 +2123,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         }
                     });
                     ui.add_space(4.0);
-                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 7] = [
+                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 8] = [
                         ("Show the album cover", |s| &mut s.discord_cover),
+                        ("Show a swirl in the cover's colour on the cover", |s| &mut s.discord_swirl),
                         ("Show the small chanceify badge on the cover", |s| &mut s.discord_badge),
                         ("Make the song and artist links to Spotify", |s| &mut s.discord_links),
                         ("Show buttons (Listen on Spotify, Get chanceify)", |s| &mut s.discord_buttons),

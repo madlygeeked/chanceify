@@ -76,6 +76,30 @@ impl Activity {
 /// Rich Presence assets (a lower-case name, set when it was uploaded).
 pub const BADGE_KEY: &str = "chanceify";
 
+/// Where the swirl pictures live: the chanceify site, from the repository's docs folder.
+const SWIRL_BASE: &str = "https://madlygeeked.github.io/chanceify/swirl/";
+
+/// The swirl picture nearest a cover's colour: twelve hues round the wheel,
+/// and a grey one for covers with hardly any colour.
+pub fn swirl_url(red: u8, green: u8, blue: u8) -> String {
+    let (r, g, b) = (f32::from(red) / 255.0, f32::from(green) / 255.0, f32::from(blue) / 255.0);
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let delta = max - min;
+    if max < 0.12 || delta / max.max(0.001) < 0.18 {
+        return format!("{SWIRL_BASE}swirl-gray.png");
+    }
+    let hue = if max == r {
+        ((g - b) / delta).rem_euclid(6.0)
+    } else if max == g {
+        (b - r) / delta + 2.0
+    } else {
+        (r - g) / delta + 4.0
+    } * 60.0;
+    let index = ((hue / 30.0).round() as usize) % 12;
+    format!("{SWIRL_BASE}swirl-{index}.png")
+}
+
 /// How the reader wants their profile to look (Settings > Discord).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Style {
@@ -83,6 +107,8 @@ pub struct Style {
     pub status_line: u8,
     pub cover: bool,
     pub badge: bool,
+    /// A swirl picture (web address) in the cover's colour, shown small on the cover.
+    pub swirl: Option<String>,
     pub buttons: bool,
     pub links: bool,
     pub hide_paused: bool,
@@ -145,7 +171,13 @@ pub fn activity_for(
         None
     };
     let (large_image, small_image) = match cover {
-        Some(url) => (Some(url), style.badge.then(|| BADGE_KEY.to_string())),
+        Some(url) => (
+            Some(url),
+            style
+                .swirl
+                .clone()
+                .or_else(|| style.badge.then(|| BADGE_KEY.to_string())),
+        ),
         None => (style.badge.then(|| BADGE_KEY.to_string()), None),
     };
     let mut buttons: Vec<(String, String)> = Vec::new();
@@ -626,6 +658,7 @@ mod tests {
             status_line: 0,
             cover: true,
             badge: true,
+            swirl: None,
             buttons: true,
             links: true,
             hide_paused: false,
@@ -633,6 +666,15 @@ mod tests {
             listen_along: false,
             app_url: Some("https://github.com/someone/chanceify".into()),
         }
+    }
+
+    #[test]
+    fn the_swirl_follows_the_colour_of_the_cover() {
+        assert!(swirl_url(255, 0, 0).ends_with("swirl-0.png"));
+        assert!(swirl_url(0, 255, 0).ends_with("swirl-4.png"));
+        assert!(swirl_url(0, 0, 255).ends_with("swirl-8.png"));
+        assert!(swirl_url(128, 128, 128).ends_with("swirl-gray.png"));
+        assert!(swirl_url(5, 5, 5).ends_with("swirl-gray.png"));
     }
 
     #[test]
