@@ -224,7 +224,7 @@ impl App {
     pub(super) fn remove_missing_art(&mut self, artists: bool, file: &str) {
         let folder = if artists { "artists" } else { "albums" };
         // Only a plain file name from the list, never a path.
-        if file.is_empty() || file.contains(['/', '\']) {
+        if file.is_empty() || file.contains(['/', '\\']) {
             return;
         }
         let marker = self

@@ -4531,6 +4531,36 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
     let id = egui::Id::new("row-menu");
     let mut open = ctx.data(|data| data.get_temp::<(u8, egui::Pos2)>(id));
     let mut opened_now = false;
+    // Six dots in the gutter at the row's far right: click them for every
+    // setting of the row, without hunting for the right spot to right-click.
+    let grip = Rect::from_min_size(pos2(row.right() + 2.0, row.bottom() - 20.0), vec2(12.0, 18.0));
+    {
+        let response = ui.interact(grip, egui::Id::new("row-menu-grip"), Sense::click());
+        let colour = if response.hovered() || open.is_some_and(|(kind, _)| kind == 3) {
+            app.palette.text
+        } else {
+            app.palette.dim
+        };
+        for dx in [2.5, 8.5] {
+            for dy in [4.0, 9.0, 14.0] {
+                ui.painter().circle_filled(grip.min + vec2(dx, dy), 1.4, colour);
+            }
+        }
+        if response.hovered() {
+            ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if response.clicked() {
+            if open.is_some() {
+                ctx.data_mut(|data| data.remove::<(u8, egui::Pos2)>(id));
+                open = None;
+            } else {
+                let at = grip.center_top();
+                open = Some((3, at));
+                opened_now = true;
+                ctx.data_mut(|data| data.insert_temp(id, (3, at)));
+            }
+        }
+    }
     if ui.rect_contains_pointer(row)
         && ui.input(|input| input.pointer.button_clicked(egui::PointerButton::Secondary))
         && let Some(pos) = ui.input(|input| input.pointer.interact_pos())
@@ -4620,7 +4650,7 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
             && input
                 .pointer
                 .interact_pos()
-                .is_some_and(|at| !area.response.rect.contains(at))
+                .is_some_and(|at| !area.response.rect.contains(at) && !grip.contains(at))
     });
     if (outside && !opened_now) || ctx.input(|input| input.key_pressed(egui::Key::Escape)) {
         ctx.data_mut(|data| data.remove::<(u8, egui::Pos2)>(id));
