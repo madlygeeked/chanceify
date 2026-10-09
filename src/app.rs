@@ -339,6 +339,8 @@ pub struct App {
     pub guest: bool,
     /// Whether the floating Views and panels window is open.
     pub views_panel: bool,
+    /// The page should scroll to its top on the next frame.
+    pub scroll_top: bool,
     /// The recap picture window, while open.
     pub recap: Option<crate::ui::recap::Recap>,
     /// The song the pointer is over, set while rows are drawn.
@@ -1014,6 +1016,7 @@ impl App {
             offline: false,
             guest: false,
             views_panel: false,
+            scroll_top: false,
             recap: None,
             hovered_track: None,
             hover_snapshot: None,
@@ -10820,6 +10823,10 @@ impl App {
                 }
                 self.mark_settings_dirty();
             }
+            Action::ToggleBarStack => {
+                self.settings.bar_stacked = !self.settings.bar_stacked;
+                self.mark_settings_dirty();
+            }
             Action::ResetBlockNudge => {
                 self.settings.nudge_seek = 0;
                 self.settings.nudge_controls = 0;
@@ -10928,10 +10935,18 @@ impl App {
                 let folder = self.dirs.index_dir().join("lastfm-art").join("albums-missing");
                 self.open_folder(folder);
             }
-            Action::ApplyKeyPreset(which) => {
-                crate::ui::keys::apply_preset(self, which);
-                self.toast("Key preset applied. Press T to see the keys.");
-                self.actions.push(Action::SettingsChanged);
+            Action::GoToPlayingTop => {
+                self.leave_lyrics_fullscreen(ctx);
+                self.fullscreen_vis = false;
+                if let Some(page) = self.playing_from().and_then(|from| from.page) {
+                    self.open(page);
+                }
+                self.scroll_top = true;
+            }
+            Action::ToggleQueueAndLyrics => {
+                let both = self.show_queue_panel && self.show_lyrics_panel;
+                self.show_queue_panel = !both;
+                self.show_lyrics_panel = !both;
             }
             Action::OpenIndexFolder => {
                 let folder = self.dirs.index_dir();

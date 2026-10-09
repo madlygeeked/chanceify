@@ -1390,7 +1390,11 @@ pub enum Action {
     /// -1 smaller, 1 bigger, 0 back to 100%.
     AdjustZoom(i8),
     OpenMissingArtFolder,
-    ApplyKeyPreset(u8),
+    /// Leaves the full-screen views and shows the top of the playlist or
+    /// album that is playing (the Escape key).
+    GoToPlayingTop,
+    /// Opens the queue and lyrics panels together, or closes both.
+    ToggleQueueAndLyrics,
     SetSwirlTune(usize, f32),
     ResetSwirlTune,
     ToggleSwirlArtScroll,
@@ -1416,6 +1420,8 @@ pub enum Action {
     SetBlockNudge(u8, i16),
     /// Put the play controls and the volume back where their side puts them.
     ResetBlockNudge,
+    /// Puts the song bar on its own row under the controls and volume, or back.
+    ToggleBarStack,
     ToggleLyricsFlag(u8),
     /// The small lyrics panel's own option bits and line size.
     ToggleSideLyricsFlag(u8),

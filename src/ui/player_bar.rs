@@ -217,7 +217,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     // buttons, then the song-length bar, then the volume. The row grows with
     // the controls' size setting, so nothing is drawn over the picture.
     let controls_k = app.settings.controls_scale_value();
-    let strip_h = (46.0 * controls_k).clamp(46.0, 84.0);
+    let stacked = app.settings.bar_stacked;
+    let strip_h = (46.0 * controls_k).clamp(46.0, 84.0) * if stacked { 1.6 } else { 1.0 };
     let height = bar_h + foot + rise + theme::PLAYER_BAR_HEIGHT * (scale - 1.0) + strip_h;
     egui::Panel::bottom("player-bar")
         .exact_size(height.max(bar_h + foot + strip_h))
@@ -359,6 +360,19 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             ui.ctx()
                 .data_mut(|data| data.insert_temp(egui::Id::new("volume-w"), volume_slider));
             let volume_w = VOLUME_BLOCK + (volume_slider - 100.0) + 44.0 * presets.len() as f32;
+            // Stacked, the controls and volume take the upper band of the
+            // row and the song bar the lower one.
+            let band = if stacked {
+                Rect::from_min_max(row.min, pos2(row.right(), row.top() + row.height() / 1.6))
+            } else {
+                row
+            };
+            let seek_row = if stacked {
+                Rect::from_min_max(pos2(row.left(), band.bottom()), row.max)
+            } else {
+                row
+            };
+            let editing_row = row;
             let block_w = [controls_w, 0.0, volume_w];
             let order = ROW_ORDERS[(app.settings.row_order as usize).min(5)];
             let gap = 18.0;
@@ -385,8 +399,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 if anchors[*block as usize] == 0 {
                     let w = block_w[*block as usize];
                     blocks[*block as usize] = Rect::from_min_max(
-                        pos2(left_cursor, row.top()),
-                        pos2(left_cursor + w, row.bottom()),
+                        pos2(left_cursor, band.top()),
+                        pos2(left_cursor + w, band.bottom()),
                     );
                     taken.push((left_cursor, left_cursor + w));
                     left_cursor += w + gap;
@@ -397,8 +411,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     let w = block_w[*block as usize];
                     right_cursor -= w;
                     blocks[*block as usize] = Rect::from_min_max(
-                        pos2(right_cursor, row.top()),
-                        pos2(right_cursor + w, row.bottom()),
+                        pos2(right_cursor, band.top()),
+                        pos2(right_cursor + w, band.bottom()),
                     );
                     taken.push((right_cursor, right_cursor + w));
                     right_cursor -= gap;
@@ -418,8 +432,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 for block in middle {
                     let w = block_w[block as usize];
                     blocks[block as usize] = Rect::from_min_max(
-                        pos2(x, row.top()),
-                        pos2(x + w, row.bottom()),
+                        pos2(x, band.top()),
+                        pos2(x + w, band.bottom()),
                     );
                     taken.push((x, x + w));
                     x += w + gap;
@@ -428,15 +442,15 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             // The reader may have dragged the controls or the volume aside,
             // in steps of a grid; they stay inside the row and never overlap.
             let grid = 12.0_f32;
-            let editing = ui.rect_contains_pointer(row);
+            let editing = ui.rect_contains_pointer(editing_row);
             for (b, steps) in [(0usize, app.settings.nudge_controls), (2usize, app.settings.nudge_volume)] {
                 let w = block_w[b];
                 let base = blocks[b].left();
                 let x = (base + f32::from(steps) * grid).clamp(avail_left, (avail_right - w).max(avail_left));
-                blocks[b] = Rect::from_min_max(pos2(x, row.top()), pos2(x + w, row.bottom()));
+                blocks[b] = Rect::from_min_max(pos2(x, band.top()), pos2(x + w, band.bottom()));
                 if editing {
                     // A handle at the block's start: drag it along the row.
-                    let handle = Rect::from_min_size(pos2(x - 2.0, row.top() + 1.0), vec2(14.0, 12.0));
+                    let handle = Rect::from_min_size(pos2(x - 2.0, band.top() + 1.0), vec2(14.0, 12.0));
                     let drag = ui.interact(handle, egui::Id::new(("block-handle", b)), Sense::drag());
                     let color = if drag.hovered() || drag.dragged() {
                         palette.text
@@ -445,7 +459,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     };
                     for dx in [3.0, 8.0] {
                         for dy in [3.0, 6.0, 9.0] {
-                            ui.painter().circle_filled(pos2(x - 2.0 + dx, row.top() + 1.0 + dy), 1.2, color);
+                            ui.painter().circle_filled(pos2(x - 2.0 + dx, band.top() + 1.0 + dy), 1.2, color);
                         }
                     }
                     if drag.hovered() || drag.dragged() {
@@ -469,10 +483,10 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 // They touch: the volume steps aside, or else the controls.
                 let right = (blocks[0].right() + gap).min(avail_right - block_w[2]);
                 if right >= blocks[0].right() {
-                    blocks[2] = Rect::from_min_max(pos2(right, row.top()), pos2(right + block_w[2], row.bottom()));
+                    blocks[2] = Rect::from_min_max(pos2(right, band.top()), pos2(right + block_w[2], band.bottom()));
                 } else {
                     let left = (blocks[2].left() - gap - block_w[0]).max(avail_left);
-                    blocks[0] = Rect::from_min_max(pos2(left, row.top()), pos2(left + block_w[0], row.bottom()));
+                    blocks[0] = Rect::from_min_max(pos2(left, band.top()), pos2(left + block_w[0], band.bottom()));
                 }
             }
             taken = vec![
@@ -492,12 +506,13 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             if avail_right - cursor > zone.1 - zone.0 {
                 zone = (cursor, avail_right);
             }
-            let (left_cursor, right_cursor) = zone;
+            let (left_cursor, right_cursor) = if stacked { (avail_left, avail_right) } else { zone };
             let seek_rect = transport(
                 app,
                 ui,
                 now.as_ref(),
-                row,
+                seek_row,
+                band,
                 blocks[0].left(),
                 (left_cursor, right_cursor),
             );
@@ -509,8 +524,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             );
             extras(app, &mut right_ui, now.as_ref(), &presets);
             blocks[0] = Rect::from_min_max(
-                pos2(blocks[0].left(), row.top()),
-                pos2(blocks[0].left() + block_w[0], row.bottom()),
+                pos2(blocks[0].left(), band.top()),
+                pos2(blocks[0].left() + block_w[0], band.bottom()),
             );
             // For the guided tour.
             ui.ctx().data_mut(|data| {
@@ -3993,6 +4008,7 @@ fn transport(
     ui: &mut egui::Ui,
     now: Option<&NowPlaying>,
     row: Rect,
+    buttons_row: Rect,
     left: f32,
     zone: (f32, f32),
 ) -> Rect {
@@ -4012,7 +4028,7 @@ fn transport(
     // The buttons grow more gently than the bars: at full size they are
     // about half as much bigger as the song-length bar is.
     let kc = 1.0 + (k - 1.0) * 0.5;
-    let cy = row.center().y;
+    let cy = buttons_row.center().y;
     let enabled = now.is_some_and(|now| now.can_control) || app.is_connected();
     let playing = now.is_some_and(|now| now.playing);
     let loading = now.is_some_and(|now| now.loading);
@@ -4245,7 +4261,11 @@ fn transport(
     // The reader may have dragged the bar along the row (the dots over its
     // left end), in steps of a grid, inside the room it has.
     let seek_steps = app.settings.nudge_seek;
-    let slider_left = (slider_left + f32::from(seek_steps) * 12.0).clamp(min_left, max_left);
+    // Dragged right past the end of the room, the bar gets shorter instead of
+    // refusing to move, so a full-length bar can be moved too.
+    let slider_left = (slider_left + f32::from(seek_steps) * 12.0)
+        .clamp(min_left, (zone.1 - right_label - 100.0).max(min_left));
+    let slider_width = slider_width.min((zone.1 - right_label - slider_left).max(100.0));
     let joined_text = both_text(shown_position);
     let before = match mode {
         0 => Some(util::format_duration_ms(shown_position)),
@@ -4448,6 +4468,14 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
                                 &gettext(app.locale, "Put the controls and volume back"),
                             ) {
                                 app.actions.push(Action::ResetBlockNudge);
+                            }
+                            let stack_label = if app.settings.bar_stacked {
+                                "Song bar beside the controls"
+                            } else {
+                                "Song bar under the controls (stacked)"
+                            };
+                            if super::widgets::menu_item(ui, &palette, None, &gettext(app.locale, stack_label)) {
+                                app.actions.push(Action::ToggleBarStack);
                             }
                             super::widgets::menu_separator(ui, &palette);
                             bar_rows(app, ui, &palette);

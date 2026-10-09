@@ -24,14 +24,10 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
             spread: 0,
             color: palette.shadow,
         });
-    let response = egui::Modal::new(egui::Id::new("dialog"))
-        .frame(frame)
-        .backdrop_color(egui::Color32::from_black_alpha(if palette.dark {
-            150
-        } else {
-            80
-        }))
-        .show(ctx, |ui| {
+    // The shortcuts list floats instead of blocking the window, so the app
+    // can still be moved and resized while it is open.
+    let floating = matches!(dialog, Dialog::Shortcuts);
+    let body = |ui: &mut egui::Ui| {
             ui.set_width(420.0);
             match dialog {
                 Dialog::PersonalAppIntro => {
@@ -311,12 +307,6 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                         if theme::pill_button(ui, &palette, "Save as the default for everyone", false).clicked() {
                             app.actions.push(Action::SaveKeysAsDefault);
                         }
-                        theme::subtle(ui, &palette, "Try a set:");
-                        for (index, (name, _)) in super::keys::PRESETS.iter().enumerate() {
-                            if theme::pill_button(ui, &palette, name, false).clicked() {
-                                app.actions.push(Action::ApplyKeyPreset(index as u8));
-                            }
-                        }
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             if theme::pill_button(ui, &palette, &gettext(locale, "Done"), true).clicked() {
                                 app.actions.push(Action::CloseDialog);
@@ -386,10 +376,37 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     });
                 }
             }
-        });
-    app.dialog_rect = Some(response.response.rect);
-    if response.should_close() {
-        app.actions.push(Action::CloseDialog);
+    };
+    if floating {
+        let mut open = true;
+        let shown = egui::Window::new("Keyboard shortcuts")
+            .id(egui::Id::new("dialog"))
+            .open(&mut open)
+            .order(egui::Order::Foreground)
+            .frame(frame)
+            .default_pos(egui::pos2(80.0, 60.0))
+            .resizable(false)
+            .collapsible(false)
+            .show(ctx, body);
+        if let Some(shown) = shown {
+            app.dialog_rect = Some(shown.response.rect);
+        }
+        if !open {
+            app.actions.push(Action::CloseDialog);
+        }
+    } else {
+        let response = egui::Modal::new(egui::Id::new("dialog"))
+            .frame(frame)
+            .backdrop_color(egui::Color32::from_black_alpha(if palette.dark {
+                150
+            } else {
+                80
+            }))
+            .show(ctx, body);
+        app.dialog_rect = Some(response.response.rect);
+        if response.should_close() {
+            app.actions.push(Action::CloseDialog);
+        }
     }
 }
 

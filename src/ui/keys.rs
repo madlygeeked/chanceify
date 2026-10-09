@@ -92,15 +92,16 @@ pub const BINDABLE: &[Bindable] = &[
     // Panels and views.
     Bindable { id: "sidebar", label: "Show or hide the library sidebar", default: UNSET, action: || Action::ToggleSidebar },
     Bindable { id: "queue", label: "Queue and recently played", default: UNSET, action: || Action::ToggleQueuePanel },
+    Bindable { id: "queuelyrics", label: "Queue and lyrics together (again to close both)", default: Key::X, action: || Action::ToggleQueueAndLyrics },
     Bindable { id: "lyrics", label: "Lyrics side panel", default: UNSET, action: || Action::ToggleLyricsPanel },
-    Bindable { id: "visualizer", label: "Visualizer settings", default: UNSET, action: || Action::ToggleVisPanel },
+    Bindable { id: "visualizer", label: "Visualizer settings", default: Key::B, action: || Action::ToggleVisPanel },
     Bindable { id: "art", label: "Big or small album art", default: UNSET, action: || Action::ToggleArtExpanded },
     Bindable { id: "normalview", label: "Normal view (close lyrics, queue, fullscreen)", default: UNSET, action: || Action::NormalView },
     Bindable { id: "views", label: "Views and panels (all the switches)", default: Key::Z, action: || Action::ToggleViewsPanel },
     Bindable { id: "mini", label: "Mini player", default: Key::M, action: || Action::ToggleMiniPlayer },
     // Fullscreen.
-    Bindable { id: "fullscreen", label: "Full-screen visualizer", default: UNSET, action: || Action::ToggleFullscreenVis },
-    Bindable { id: "lyricsfull", label: "Full-screen lyrics", default: UNSET, action: || Action::ToggleLyricsFullscreen },
+    Bindable { id: "fullscreen", label: "Full-screen visualizer", default: Key::V, action: || Action::ToggleFullscreenVis },
+    Bindable { id: "lyricsfull", label: "Full-screen lyrics", default: Key::C, action: || Action::ToggleLyricsFullscreen },
     Bindable { id: "visshapes", label: "Visualizer on or off", default: UNSET, action: || Action::ToggleVisShapes },
     // Playback.
     Bindable { id: "playpause", label: "Play or pause", default: UNSET, action: || Action::TogglePlay },
@@ -153,90 +154,6 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "tutorial", label: "Keyboard shortcuts (this list)", default: Key::T, action: || Action::ShowDialog(Dialog::Shortcuts) },
 ];
 
-/// Ready-made sets of keys to try. Each lists the shortcuts it moves; every
-/// other shortcut goes back to its starting key (mostly none).
-pub const PRESETS: &[(&str, &[(&str, &str)])] = &[
-    (
-        "Spotify-like",
-        &[
-            ("playspace", "Space"),
-            ("next", "Shift+ArrowRight"),
-            ("previous", "Shift+ArrowLeft"),
-            ("seekback5", "ArrowLeft"),
-            ("seekfwd5", "ArrowRight"),
-            ("volup", "ArrowUp"),
-            ("voldown", "ArrowDown"),
-            ("shuffle", "S"),
-            ("repeat", "R"),
-            ("mute", "Shift+M"),
-            ("search", "Slash"),
-            ("queue", "Q"),
-            ("lyrics", "L"),
-            ("sidebar", "B"),
-            ("home", "H"),
-            ("settings", "Comma"),
-            ("lastfmlove", "K"),
-            ("fullscreen", "F"),
-        ],
-    ),
-    (
-        "Winamp-style",
-        &[
-            ("previous", "Z"),
-            ("playpause", "X"),
-            ("next", "B"),
-            ("views", "Shift+Z"),
-            ("seekback5", "ArrowLeft"),
-            ("seekfwd5", "ArrowRight"),
-            ("volup", "ArrowUp"),
-            ("voldown", "ArrowDown"),
-            ("shuffle", "S"),
-            ("repeat", "R"),
-            ("mute", "N"),
-            ("visualizer", "V"),
-            ("fullscreen", "F"),
-            ("lyrics", "L"),
-            ("queue", "Q"),
-            ("sidebar", "E"),
-            ("search", "Slash"),
-        ],
-    ),
-    (
-        "Vim-like",
-        &[
-            ("playspace", "Space"),
-            ("seekback5", "H"),
-            ("seekfwd5", "L"),
-            ("voldown", "J"),
-            ("volup", "K"),
-            ("previous", "Shift+H"),
-            ("next", "Shift+L"),
-            ("search", "Slash"),
-            ("queue", "Q"),
-            ("lyrics", "Y"),
-            ("shuffle", "S"),
-            ("repeat", "R"),
-            ("mute", "X"),
-            ("home", "G"),
-            ("settings", "Comma"),
-            ("sidebar", "B"),
-            ("fullscreen", "F"),
-            ("lastfmlove", "Shift+K"),
-        ],
-    ),
-    (
-        "Just the basics",
-        &[
-            ("playspace", "Space"),
-            ("next", "ArrowRight"),
-            ("previous", "ArrowLeft"),
-            ("volup", "ArrowUp"),
-            ("voldown", "ArrowDown"),
-            ("mute", "N"),
-        ],
-    ),
-];
-
 /// The key binds a new install starts with, baked in from
 /// `assets/default-keys.json`. Empty means "everything unset".
 const BAKED_DEFAULT_KEYS: &str = include_str!("../../assets/default-keys.json");
@@ -273,39 +190,11 @@ pub fn read_keys(text: &str) -> Option<std::collections::BTreeMap<String, String
     Some(keys)
 }
 
-/// Puts a preset's keys in place of whatever was set before. A starting key
-/// that a preset key now needs is cleared, so no two shortcuts share a key.
-pub fn apply_preset(app: &mut App, which: u8) {
-    let Some((_, entries)) = PRESETS.get(usize::from(which)) else {
-        return;
-    };
-    app.settings.key_bindings.clear();
-    let mut used: Vec<(Key, bool)> = Vec::new();
-    for (id, text) in entries.iter() {
-        if let Some(chord) = parse_chord(text) {
-            used.push(chord);
-        }
-        app.settings
-            .key_bindings
-            .insert((*id).to_string(), (*text).to_string());
-    }
-    for bindable in BINDABLE {
-        if app.settings.key_bindings.contains_key(bindable.id) || bindable.default == UNSET {
-            continue;
-        }
-        if used.contains(&(bindable.default, false)) {
-            app.settings
-                .key_bindings
-                .insert(bindable.id.to_string(), UNSET.name().to_string());
-        }
-    }
-}
-
 /// The groups the shortcuts list is shown in, in order, and which shortcut
 /// belongs in each.
 pub const CATEGORIES: &[(&str, &[&str])] = &[
     ("Views", &["views", "normalview", "mini", "fullscreen", "lyricsfull", "visshapes", "art"]),
-    ("Panels", &["sidebar", "queue", "lyrics", "visualizer", "scenes"]),
+    ("Panels", &["sidebar", "queuelyrics", "queue", "lyrics", "visualizer", "scenes"]),
     ("Playback", &["playpause", "playspace", "next", "previous", "shuffle", "repeat", "speed", "tap", "lastfmlove", "sharediscord", "likehover", "likeplaying"]),
     ("Volume", &["mute", "volup", "voldown", "volup5", "voldown5"]),
     ("Jump in the song", &["back10", "forward10", "seekback5", "seekfwd5", "seekwidth", "tenth0", "tenth1", "tenth2", "tenth3", "tenth4", "tenth5", "tenth6", "tenth7", "tenth8", "tenth9"]),
@@ -536,8 +425,10 @@ pub fn handle(app: &mut App, ctx: &egui::Context) {
             app.actions.push(Action::CloseDialog);
         } else if app.show_devices {
             app.show_devices = false;
-        } else if app.lyrics_fullscreen.is_some() {
-            app.actions.push(Action::SetLyricsFullscreen(false));
+        } else if !ctx.text_edit_focused() {
+            // Leave any full-screen view and go to the top of the playlist
+            // (or album) that is playing.
+            app.actions.push(Action::GoToPlayingTop);
         }
     }
 }
@@ -560,7 +451,7 @@ pub fn shortcuts(locale: Locale) -> Vec<(Cow<'static, str>, Cow<'static, str>)> 
             keys(platform_shortcut("Ctrl+Shift+L", "Cmd+Shift+L")),
             gettext(locale, "Report: freeze what is under the pointer"),
         ),
-        (keys("Esc"), gettext(locale, "Lyrics: leave full screen")),
+        (keys("Esc"), gettext(locale, "Leave full screen and go to the top of what is playing")),
         (
             keys("Shift+↑  /  Shift+↓"),
             gettext(locale, "Song list: extend or shrink the selection"),

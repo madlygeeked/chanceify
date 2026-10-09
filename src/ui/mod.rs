@@ -396,11 +396,15 @@ fn central(app: &mut App, ui: &mut egui::Ui) {
                 vec2(ui.available_width(), bar_height),
             );
             let page = app.page().clone();
+            let mut area = egui::ScrollArea::vertical()
+                .id_salt(("page", page.encode()))
+                .auto_shrink([false, false]);
+            if std::mem::take(&mut app.scroll_top) {
+                area = area.vertical_scroll_offset(0.0);
+            }
             let scroll = crate::autoscroll::show(
                 ui,
-                egui::ScrollArea::vertical()
-                    .id_salt(("page", page.encode()))
-                    .auto_shrink([false, false]),
+                area,
                 egui::Vec2b::new(false, true),
                 |ui| {
                     Frame::new()

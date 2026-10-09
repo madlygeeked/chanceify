@@ -633,6 +633,8 @@ pub struct Settings {
     pub nudge_volume: i16,
     /// The song bar moved along the row, in steps of 12 points.
     pub nudge_seek: i16,
+    /// The song bar on its own row under the controls and volume.
+    pub bar_stacked: bool,
     /// Show the time as "1:23 / 3:45" before the bar instead of at both ends.
     #[serde(default)]
     pub seek_time_joined: bool,
@@ -1048,6 +1050,7 @@ impl Default for Settings {
             nudge_controls: 0,
             nudge_volume: 0,
             nudge_seek: 0,
+            bar_stacked: false,
             anchor_volume: None,
             seek_time_joined: false,
             seek_time_mode: 0,
@@ -1435,7 +1438,7 @@ impl Settings {
         "swirl_scale", "swirl_tune", "swirl_warp", "swirl_waves", "theme", "theme_from_cover", "custom_bg", "custom_accent",
         "track_columns", "tracklist_compact", "vis", "vis_bar_sides", "vis_shapes",
         "vis_shapes_last", "vis_shapes_set", "volume_presets", "zoom",
-        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_text_no_outline", "vis_text_back", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode",
+        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_text_no_outline", "vis_text_back", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode",
     ];
 
     /// The shareable part of the settings, as the text of a file.
