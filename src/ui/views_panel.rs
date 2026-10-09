@@ -63,9 +63,12 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
         at.y.clamp(screen.top(), (screen.bottom() - size - 12.0).max(screen.top())),
     );
     let mut drop_at: Option<egui::Pos2> = None;
-    let mut reset = false;
+    let reset = false;
+    // Above every other layer, so nothing drawn later can sit over it and
+    // swallow the click.
     egui::Area::new(Id::new("views-corner-disc"))
-        .order(egui::Order::Foreground)
+        .order(egui::Order::Tooltip)
+        .interactable(true)
         .fixed_pos(at)
         .show(ctx, |ui| {
             let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(size + 12.0), egui::Sense::click_and_drag());
@@ -90,7 +93,7 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
             );
             response
                 .clone()
-                .on_hover_text("Views. Click to open, drag to move, double-click to put it back.");
+                .on_hover_text("Views. Click to open, drag to move.");
             if hot {
                 ui.ctx().set_cursor_icon(if response.dragged() {
                     egui::CursorIcon::Grabbing
@@ -98,13 +101,25 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
                     egui::CursorIcon::PointingHand
                 });
             }
+            // How far the pointer travelled while it was down: a press that
+            // barely moved is a click even if egui called it a drag.
+            let travel_id = Id::new("views-disc-travel");
+            let mut travel: f32 = ui.data(|data| data.get_temp(travel_id)).unwrap_or(0.0);
             if response.dragged() {
-                drop_at = Some(at + response.drag_delta());
+                travel += response.drag_delta().length();
+                if travel > 6.0 {
+                    drop_at = Some(at + response.drag_delta());
+                }
             }
-            if response.double_clicked() {
-                reset = true;
-            } else if response.clicked() || response.secondary_clicked() {
+            let small = travel <= 6.0;
+            if response.drag_stopped() || response.clicked() {
+                ui.data_mut(|data| data.insert_temp(travel_id, 0.0f32));
+            } else {
+                ui.data_mut(|data| data.insert_temp(travel_id, travel));
+            }
+            if response.secondary_clicked() || ((response.clicked() || response.drag_stopped()) && small) {
                 app.actions.push(Action::ToggleViewsPanel);
+                ui.ctx().request_repaint();
             }
         });
     if reset {
