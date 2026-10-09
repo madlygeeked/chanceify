@@ -10855,6 +10855,30 @@ impl App {
             Action::CloseExtraWindows => {
                 self.extra_vis = false;
             }
+            Action::SpotifyBar => {
+                let s = &mut self.settings;
+                s.bar_free = false;
+                s.bar_free_pos = None;
+                s.bar_stacked = false;
+                s.bar_layout = 3;
+                s.row_order = 0;
+                s.anchor_controls = Some(1);
+                s.anchor_volume = Some(2);
+                s.nudge_controls = 0;
+                s.nudge_volume = 0;
+                s.nudge_seek = 0;
+                self.mark_settings_dirty();
+            }
+            Action::SetBarFree(on) => {
+                self.settings.bar_free = on;
+                self.mark_settings_dirty();
+            }
+            Action::SetFreePos(which, pos) => {
+                let mut all = self.settings.bar_free_pos.unwrap_or([[0.0; 2]; 2]);
+                all[(which as usize).min(1)] = pos;
+                self.settings.bar_free_pos = Some(all);
+                self.mark_settings_dirty();
+            }
             Action::ToggleCalm => {
                 self.calm_mode = !self.calm_mode;
                 if self.calm_mode {

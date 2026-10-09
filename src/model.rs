@@ -1389,6 +1389,10 @@ pub enum Action {
     LibraryOnlyView,
     /// Calm mode on or off: a slow ocean, no reaction to the music.
     ToggleCalm,
+    /// The bottom bar as Spotify has it: song bar above, controls in the middle, volume right.
+    SpotifyBar,
+    SetBarFree(bool),
+    SetFreePos(u8, [f32; 2]),
     /// Opens the extra visualizer window, or closes it.
     ToggleExtraWindow,
     /// Closes every extra window.

@@ -60,3 +60,8 @@ title: Settings explained
 - Genres are gone: no Genre column, no MusicBrainz look-ups.
 - Column menu: "LIKED" replaces "LIKED HEART"; the "ADD TO PLAYLIST +" row is gone. Headings shrink to fit.
 - Settings > Discord shows whether the Discord app was found.
+
+## 0.79.0
+- The six dots (or right-click the empty bar): "Spotify layout" (song bar above, controls in the middle, volume on the right) or "My own layout" (drag the dotted handle on the controls or the volume anywhere in the bar).
+- With the big album art on, the library list always ends above the art (grid mode too).
+- The Queue and Recent tabs are as tall as the window buttons.

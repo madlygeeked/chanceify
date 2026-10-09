@@ -75,7 +75,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
             } else {
                 ((ui.available_width() - 8.0) / 2.0).max(40.0)
             };
-            let tall = super::WINDOWS_WINDOW_CONTROLS_HEIGHT - super::WINDOW_RESIZE_BORDER;
+            let tall = super::WINDOWS_WINDOW_CONTROLS_HEIGHT;
             for (value, label) in [
                 (QueueTab::Queue, gettext(app.locale, "Queue")),
                 (QueueTab::Recents, gettext(app.locale, "Recent")),

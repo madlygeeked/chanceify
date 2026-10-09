@@ -505,11 +505,29 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 let w = block_w[b];
                 let band = band_of(b as u8);
                 let base = blocks[b].left();
-                let x = (base + f32::from(steps) * grid).clamp(avail_left, (avail_right - w).max(avail_left));
-                blocks[b] = Rect::from_min_max(pos2(x, band.top()), pos2(x + w, band.bottom()));
+                let free = app.settings.bar_free;
+                // "My own layout": the controls and the volume sit wherever
+                // they were dragged, across the whole bar.
+                let (x, top) = if free {
+                    let (fx, fy) = app
+                        .settings
+                        .bar_free_pos
+                        .map(|p| p[b / 2])
+                        .map_or((blocks[b].left(), blocks[b].top()), |p| (grown.left() + p[0], row.top() + p[1]));
+                    (
+                        fx.clamp(avail_left, (avail_right - w).max(avail_left)),
+                        fy.clamp(row.top(), (row.bottom() - band.height()).max(row.top())),
+                    )
+                } else {
+                    (
+                        (base + f32::from(steps) * grid).clamp(avail_left, (avail_right - w).max(avail_left)),
+                        band.top(),
+                    )
+                };
+                blocks[b] = Rect::from_min_size(pos2(x, top), vec2(w, band.height()));
                 if editing {
                     // A handle at the block's start: drag it along the row.
-                    let handle = Rect::from_min_size(pos2(x - 2.0, band.top() + 1.0), vec2(14.0, 12.0));
+                    let handle = Rect::from_min_size(pos2(x - 2.0, top + 1.0), vec2(14.0, 12.0));
                     let drag = ui.interact(handle, egui::Id::new(("block-handle", b)), Sense::drag());
                     let color = if drag.hovered() || drag.dragged() {
                         palette.text
@@ -518,13 +536,19 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     };
                     for dx in [3.0, 8.0] {
                         for dy in [3.0, 6.0, 9.0] {
-                            ui.painter().circle_filled(pos2(x - 2.0 + dx, band.top() + 1.0 + dy), 1.2, color);
+                            ui.painter().circle_filled(pos2(x - 2.0 + dx, top + 1.0 + dy), 1.2, color);
                         }
                     }
                     if drag.hovered() || drag.dragged() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
                     }
-                    if drag.dragged() {
+                    if drag.dragged() && free {
+                        let delta = drag.drag_delta();
+                        app.actions.push(Action::SetFreePos(
+                            (b / 2) as u8,
+                            [x + delta.x - grown.left(), top + delta.y - row.top()],
+                        ));
+                    } else if drag.dragged() {
                         let key = egui::Id::new(("block-residual", b));
                         let mut residual = ui.ctx().data(|data| data.get_temp::<f32>(key)).unwrap_or(0.0);
                         residual += drag.drag_delta().x;
@@ -538,7 +562,17 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     }
                 }
             }
+            if app.settings.bar_free && app.settings.bar_free_pos.is_none() {
+                // First time in: start from where they are now.
+                for (which, b) in [(0u8, 0usize), (1u8, 2usize)] {
+                    app.actions.push(Action::SetFreePos(
+                        which,
+                        [blocks[b].left() - grown.left(), blocks[b].top() - row.top()],
+                    ));
+                }
+            }
             if layout != 2
+                && !app.settings.bar_free
                 && blocks[0].left() < blocks[2].right()
                 && blocks[2].left() < blocks[0].right()
             {
@@ -4789,6 +4823,22 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
                         // about the row at once, the layout first. The
                         // row is resized by dragging its empty space.
                         _ => {
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 6.0;
+                                let free = app.settings.bar_free;
+                                if chip(ui, &palette, "Spotify layout", !free, 130.0).clicked() {
+                                    app.actions.push(Action::SpotifyBar);
+                                }
+                                if chip(ui, &palette, "My own layout", free, 130.0).clicked() && !free {
+                                    app.actions.push(Action::SetBarFree(true));
+                                }
+                            });
+                            theme::subtle(
+                                ui,
+                                &palette,
+                                "My own layout: drag the dotted handle on the controls or the volume anywhere in the bar.",
+                            );
+                            super::widgets::menu_separator(ui, &palette);
                             layout_rows(app, ui, &palette);
                             super::widgets::menu_separator(ui, &palette);
                             arrange_strip(app, ui, &palette);

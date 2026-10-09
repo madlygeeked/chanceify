@@ -665,6 +665,12 @@ pub struct Settings {
     pub nudge_volume: i16,
     /// The song bar moved along the row, in steps of 12 points.
     pub nudge_seek: i16,
+    /// "My own layout": the controls and the volume sit where they were dragged.
+    #[serde(default)]
+    pub bar_free: bool,
+    /// Where, as offsets from the bar's top-left: controls, then volume.
+    #[serde(default)]
+    pub bar_free_pos: Option<[[f32; 2]; 2]>,
     /// The song bar on its own row under the controls and volume.
     pub bar_stacked: bool,
     /// Where the three parts of the bottom row sit: 0 side by side, 1 the
@@ -1142,6 +1148,8 @@ impl Default for Settings {
             nudge_controls: 0,
             nudge_volume: 0,
             nudge_seek: 0,
+            bar_free: false,
+            bar_free_pos: None,
             bar_stacked: false,
             bar_layout: 0,
             unavailable_confirm_one: true,
@@ -1605,7 +1613,7 @@ impl Settings {
         "swirl_scale", "swirl_tune", "swirl_warp", "swirl_waves", "theme", "theme_from_cover", "custom_bg", "custom_accent",
         "track_columns", "tracklist_compact", "vis", "vis_bar_sides", "vis_shapes",
         "vis_shapes_last", "vis_shapes_set", "volume_presets", "zoom",
-        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_sway", "vis_sway_amount", "vis_text_no_outline", "vis_text_back", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "lyrics_vis_mode", "window_opacity", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "bar_layout", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode",
+        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_sway", "vis_sway_amount", "vis_text_no_outline", "vis_text_back", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "lyrics_vis_mode", "window_opacity", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "bar_layout", "bar_free", "bar_free_pos", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode",
     ];
 
     /// The shareable part of the settings, as the text of a file.
