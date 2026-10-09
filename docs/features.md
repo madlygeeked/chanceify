@@ -13,3 +13,6 @@ title: What it does
 - **Your files stay with you.** Everything is saved in the folder beside the app.
 
 [Back](./)
+
+- The visualizer settings panel can be dragged to any size. In full-screen visualizer, bars on all four edges have the same thickness and meet cleanly in the corners.
+- Full-screen lyrics has the same play buttons and song-length bar as the normal view, in a box under the album art.

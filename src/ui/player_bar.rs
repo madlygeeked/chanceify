@@ -784,15 +784,28 @@ fn fullscreen_edge_bars(
     // the normal screen.
     let count = app.settings.player_bar_vis_bar_count().max(2);
     let gap = app.settings.player_bar_vis_gap().min(8.0);
-    let mut merged = if count <= levels.len() {
-        merge_bands(&levels, count)
-    } else {
-        spread_bands(&levels, count)
+    // Every edge has bars of the same thickness whatever the window's
+    // shape: the shorter edge gets the chosen count and the longer one as
+    // many as fit, each edge reading the whole spectrum from end to end.
+    let thickness = (rect.width().min(rect.height()) / count as f32).max(2.0);
+    let across = ((rect.width() / thickness).round() as usize).max(2);
+    let down = ((rect.height() / thickness).round() as usize).max(2);
+    let reverse = app.settings.vis_reverse;
+    let bands = |n: usize| {
+        let mut merged = if n <= levels.len() {
+            merge_bands(&levels, n)
+        } else {
+            spread_bands(&levels, n)
+        };
+        if reverse {
+            merged.reverse();
+        }
+        merged
     };
-    if app.settings.vis_reverse {
-        merged.reverse();
-    }
-    let step = rect.width() / count as f32;
+    let merged_x = bands(across);
+    let merged_y = bands(down);
+    let step_x = rect.width() / across as f32;
+    let step_y = rect.height() / down as f32;
     // Every edge's bars share one longest length: the room between the
     // window's left edge and the cover, less a margin, so no bar on any
     // side ever reaches the picture.
@@ -807,12 +820,21 @@ fn fullscreen_edge_bars(
     // colour when the gradient is switched off.
     let (low, high) = vis_gradient(app, ui, crate::settings::PlayerBarVis::Spectrum);
     let colour_at = |t: f32| low.lerp_to_gamma(high, t.clamp(0.0, 1.0)).gamma_multiply(opacity);
-    let max_down = reach;
-    for (i, level) in merged.iter().enumerate() {
-        let h = (soft_height(level * height) * max_down).max(2.0);
-        let x = rect.left() + i as f32 * step;
-        let w = (step - gap).max(1.0);
-        let colour = colour_at(i as f32 / (count - 1) as f32);
+    // Where two edges meet, the bars are cut along the corner's diagonal so
+    // the two sets never draw over each other.
+    let corner_cap = |from_corner: f32, cell: f32| (from_corner - cell * 0.5).max(2.0);
+    for (i, level) in merged_x.iter().enumerate() {
+        let mut h = (soft_height(level * height) * reach).max(2.0);
+        let x = rect.left() + i as f32 * step_x;
+        let w = (step_x - gap).max(1.0);
+        let colour = colour_at(i as f32 / (across - 1) as f32);
+        let centre = x + w * 0.5;
+        if sides & 2 != 0 {
+            h = h.min(corner_cap(centre - rect.left(), step_x));
+        }
+        if sides & 8 != 0 {
+            h = h.min(corner_cap(rect.right() - centre, step_x));
+        }
         if sides & 1 != 0 {
             painter.rect_filled(Rect::from_min_size(pos2(x, rect.top()), vec2(w, h)), 0.0, colour);
         }
@@ -824,13 +846,18 @@ fn fullscreen_edge_bars(
             );
         }
     }
-    let row_h = rect.height() / count as f32;
-    let max_right = reach;
-    for (i, level) in merged.iter().enumerate() {
-        let w = (soft_height(level * height) * max_right).max(2.0);
-        let y = rect.top() + i as f32 * row_h;
-        let thick = (row_h - gap).max(1.0);
-        let colour = colour_at(i as f32 / (count - 1) as f32);
+    for (i, level) in merged_y.iter().enumerate() {
+        let mut w = (soft_height(level * height) * reach).max(2.0);
+        let y = rect.top() + i as f32 * step_y;
+        let thick = (step_y - gap).max(1.0);
+        let colour = colour_at(i as f32 / (down - 1) as f32);
+        let centre = y + thick * 0.5;
+        if sides & 1 != 0 {
+            w = w.min(corner_cap(centre - rect.top(), step_y));
+        }
+        if sides & 4 != 0 {
+            w = w.min(corner_cap(rect.bottom() - centre, step_y));
+        }
         if sides & 2 != 0 {
             painter.rect_filled(Rect::from_min_size(pos2(rect.left(), y), vec2(w, thick)), 0.0, colour);
         }
@@ -1214,7 +1241,12 @@ fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
         // scrolls).
         let screen = ctx.content_rect();
         panel = panel
-            .resizable(false)
+            .resizable(true)
+            .default_size(vec2(
+                (screen.width() * 0.4).clamp(300.0, 460.0),
+                (screen.height() * 0.7).clamp(240.0, 640.0),
+            ))
+            .min_size(vec2(260.0, 160.0))
             .movable(true)
             .constrain(true)
             .default_pos(egui::pos2(
@@ -1223,7 +1255,11 @@ fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
             ))
             .max_size((screen.size() - vec2(20.0, 20.0)).max(vec2(260.0, 180.0)));
     } else {
-        panel = panel.resizable(false);
+        panel = panel
+            .resizable(true)
+            .default_size(vec2(360.0, (screen_h - above - 12.0).clamp(160.0, 560.0)))
+            .min_size(vec2(260.0, 160.0))
+            .max_size(vec2(900.0, (screen_h - above - 12.0).max(160.0)));
         panel = match clicked_x {
             Some(x) => panel
                 .pivot(egui::Align2::CENTER_BOTTOM)
@@ -1235,15 +1271,13 @@ fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
     let window = panel.show(ctx, |ui| {
         if fullscreen {
             egui::ScrollArea::vertical()
-                .max_height((screen_h - 40.0).max(160.0))
-                .auto_shrink([true, true])
+                .auto_shrink([false, false])
                 .show(ui, |ui| vis_menu_body(app, ui));
         } else {
             // However small the window, the panel is never taller than the
             // room above the bar: what does not fit scrolls.
             egui::ScrollArea::vertical()
-                .max_height((screen_h - above - 12.0).max(160.0))
-                .auto_shrink([true, true])
+                .auto_shrink([false, false])
                 .show(ui, |ui| vis_menu_body(app, ui));
         }
     });
@@ -4187,7 +4221,7 @@ fn fit_title(
     (galley, chosen)
 }
 
-fn transport(
+pub(super) fn transport(
     app: &mut App,
     ui: &mut egui::Ui,
     now: Option<&NowPlaying>,

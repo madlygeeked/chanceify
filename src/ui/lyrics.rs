@@ -742,11 +742,27 @@ fn big_cover(app: &mut App, ui: &mut egui::Ui, column: Rect, align: Align) {
     let title_size = if show_artist { 22.0 } else { 30.0 };
     let saved = app.is_saved(&now.uri).unwrap_or(false);
     let heart = !now.is_episode && now.uri.starts_with("spotify:track:");
+    // The title's own width, so the row can sit in the middle when the
+    // column is centred (and the heart hugs the name when it is not).
+    let heart_w = if heart { 36.0 } else { 0.0 };
+    let room = (words.width() - heart_w - 8.0).max(40.0);
+    let title_w = text
+        .painter()
+        .layout_no_wrap(now.title.clone(), theme::semibold(title_size), Color32::WHITE)
+        .size()
+        .x
+        .min(room)
+        + 4.0;
+    let lead = if align == Align::Center {
+        ((words.width() - title_w - heart_w - 8.0) / 2.0).max(0.0)
+    } else {
+        0.0
+    };
     text.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
-        let room = (words.width() - if heart { 36.0 } else { 0.0 }).max(40.0);
+        ui.add_space(lead);
         ui.allocate_ui_with_layout(
-            vec2(room, title_size + 8.0),
+            vec2(title_w, title_size + 8.0),
             Layout::left_to_right(Align::Center),
             |ui| {
                 ui.add(
@@ -1348,120 +1364,38 @@ fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, wi
     let Some(now) = app.now_playing() else {
         return;
     };
-    let dark = theme::Palette::dark();
-    let width = width.clamp(220.0, 360.0);
+    // The very same buttons and song-length bar as the bottom bar of the
+    // normal view, drawn by the same code, on a panel in the theme's colours.
+    let palette = app.palette;
+    let k = app.settings.controls_scale_value();
+    let kc = 1.0 + (k - 1.0) * 0.5;
+    let controls_w = 218.0 * kc;
+    let width = width.max(controls_w + 40.0).clamp(300.0, 460.0);
     let left = if centred { top_left.x - width / 2.0 } else { top_left.x };
-    let outer = Rect::from_min_size(pos2(left, top_left.y), vec2(width, 78.0));
-    ui.painter().rect_filled(outer, 14.0, Color32::from_black_alpha(120));
+    let buttons_h = 36.0 * kc;
+    let seek_h = 26.0 * k;
+    let outer = Rect::from_min_size(pos2(left, top_left.y), vec2(width, 10.0 + buttons_h + 4.0 + seek_h + 8.0));
+    ui.painter()
+        .rect_filled(outer, 14.0, palette.panel.gamma_multiply(0.94));
     ui.painter().rect_stroke(
         outer,
         14.0,
-        egui::Stroke::new(1.0, Color32::from_white_alpha(24)),
+        egui::Stroke::new(1.0, palette.outline),
         egui::StrokeKind::Inside,
     );
-    // The buttons, centred in the top half.
-    let buttons = Rect::from_min_size(outer.min + vec2(0.0, 6.0), vec2(width, 40.0));
-    let mut row = ui.new_child(
-        UiBuilder::new()
-            .max_rect(buttons)
-            .layout(Layout::left_to_right(Align::Center)),
+    let buttons_row = Rect::from_min_size(pos2(outer.left(), outer.top() + 10.0), vec2(width, buttons_h));
+    let seek_row = Rect::from_min_size(
+        pos2(outer.left(), buttons_row.bottom() + 4.0),
+        vec2(width, seek_h),
     );
-    row.spacing_mut().item_spacing.x = 6.0;
-    let used = 5.0 * 34.0 + 4.0 * 6.0;
-    row.add_space(((width - used) / 2.0).max(0.0));
-    let cell = |ui: &mut egui::Ui| {
-        let (rect, _) = ui.allocate_exact_size(vec2(34.0, 34.0), Sense::hover());
-        ui.new_child(
-            UiBuilder::new()
-                .max_rect(rect)
-                .layout(Layout::centered_and_justified(egui::Direction::LeftToRight)),
-        )
-    };
-    let dim = Color32::from_gray(200);
-    let mut c = cell(&mut row);
-    if theme::icon_button(
-        &mut c,
-        Icon::Shuffle,
-        16.0,
-        if now.shuffle { dark.accent } else { dim },
-        Color32::WHITE,
-        "Shuffle",
-    )
-    .clicked()
-    {
-        app.actions.push(Action::ToggleShuffle);
-    }
-    let mut c = cell(&mut row);
-    if theme::icon_button(&mut c, Icon::SkipBackFilled, 18.0, dim, Color32::WHITE, "Previous").clicked() {
-        app.actions.push(Action::Previous);
-    }
-    let mut c = cell(&mut row);
-    let play_icon = if now.playing { Icon::PauseFilled } else { Icon::PlayFilled };
-    if theme::icon_button(
-        &mut c,
-        play_icon,
-        24.0,
-        Color32::WHITE,
-        dark.accent_hover,
-        if now.playing { "Pause" } else { "Play" },
-    )
-    .clicked()
-    {
-        app.actions.push(Action::TogglePlay);
-    }
-    let mut c = cell(&mut row);
-    if theme::icon_button(&mut c, Icon::SkipForwardFilled, 18.0, dim, Color32::WHITE, "Next").clicked() {
-        app.actions.push(Action::Next);
-    }
-    let mut c = cell(&mut row);
-    let (repeat_icon, repeat_color) = match now.repeat {
-        crate::player::RepeatMode::Off => (Icon::Repeat, dim),
-        crate::player::RepeatMode::Context => (Icon::Repeat, dark.accent),
-        crate::player::RepeatMode::Track => (Icon::Repeat1, dark.accent),
-    };
-    if theme::icon_button(&mut c, repeat_icon, 16.0, repeat_color, Color32::WHITE, "Repeat").clicked() {
-        app.actions.push(Action::CycleRepeat);
-    }
-    // The progress line: click or drag to seek.
-    let track = Rect::from_min_max(
-        pos2(outer.left() + 44.0, outer.bottom() - 18.0),
-        pos2(outer.right() - 44.0, outer.bottom() - 14.0),
-    );
-    let hit = ui.interact(track.expand2(vec2(0.0, 8.0)), egui::Id::new("fs-lyrics-seek"), Sense::click_and_drag());
-    let fraction = if now.duration_ms > 0 {
-        (now.position_ms as f32 / now.duration_ms as f32).clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
-    ui.painter().rect_filled(track, 2.0, Color32::from_white_alpha(50));
-    ui.painter().rect_filled(
-        Rect::from_min_max(track.min, pos2(track.left() + track.width() * fraction, track.bottom())),
-        2.0,
-        Color32::WHITE,
-    );
-    if (hit.clicked() || hit.dragged())
-        && let Some(pos) = hit.interact_pointer_pos()
-        && now.duration_ms > 0
-    {
-        let at = ((pos.x - track.left()) / track.width()).clamp(0.0, 1.0);
-        if hit.clicked() || hit.drag_stopped() {
-            app.actions.push(Action::Seek((at * now.duration_ms as f32) as u32));
-        }
-    }
-    let clock = |ms: u32| format!("{}:{:02}", ms / 60000, (ms / 1000) % 60);
-    ui.painter().text(
-        pos2(outer.left() + 12.0, track.center().y),
-        egui::Align2::LEFT_CENTER,
-        clock(now.position_ms),
-        theme::regular(11.0),
-        dim,
-    );
-    ui.painter().text(
-        pos2(outer.right() - 12.0, track.center().y),
-        egui::Align2::RIGHT_CENTER,
-        clock(now.duration_ms),
-        theme::regular(11.0),
-        dim,
+    super::player_bar::transport(
+        app,
+        ui,
+        Some(&now),
+        seek_row,
+        buttons_row,
+        outer.center().x - controls_w / 2.0,
+        (outer.left() + 54.0, outer.right() - 14.0),
     );
     if now.playing {
         ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
