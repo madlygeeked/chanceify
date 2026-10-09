@@ -2439,6 +2439,17 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     {
                         app.actions.push(Action::OpenMissingArtFolder);
                     }
+                    let mark_label = if app.settings.missing_mark_big {
+                        "Missing-cover mark: on"
+                    } else {
+                        "Missing-cover mark: off"
+                    };
+                    if theme::soft_button(ui, &palette, None, mark_label, app.settings.missing_mark_big)
+                        .on_hover_text("Shows a yellow ! on the album art (small and big) when Last.fm has no cover for it.")
+                        .clicked()
+                    {
+                        app.actions.push(Action::ToggleMissingMarkBig);
+                    }
                     if theme::soft_button(ui, &palette, None, "?", false)
                         .on_hover_text(
                             "Covers and artist pictures that Last.fm does not have are copied into this folder as you listen. To add one to Last.fm: open that album or artist on last.fm, press \"Upload image\" (you need a free Last.fm account) and choose the file. Click the ? to open Last.fm.",

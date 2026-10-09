@@ -985,6 +985,7 @@ fn paint_expanded_art(app: &mut App, ui: &mut egui::Ui, rect: Rect) {
         Icon::Music,
         Some(app.backend.art()),
     );
+    super::player_bar::big_art_missing_mark(app, ui, rect, "sidebar");
     let art = ui.interact(rect, egui::Id::new("sidebar-art"), Sense::click());
     // The words ride on the art rather than sitting in the player bar, so
     // the bar can be as narrow as it likes and the cover keeps the width.

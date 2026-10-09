@@ -11212,6 +11212,18 @@ impl App {
                 }
                 self.mark_settings_dirty();
             }
+            Action::CycleQueueClick => {
+                self.settings.queue_click = (self.settings.queue_click + 1) % 3;
+                self.mark_settings_dirty();
+            }
+            Action::ToggleVisReverse => {
+                self.settings.vis_reverse = !self.settings.vis_reverse;
+                self.mark_settings_dirty();
+            }
+            Action::ToggleMissingMarkBig => {
+                self.settings.missing_mark_big = !self.settings.missing_mark_big;
+                self.mark_settings_dirty();
+            }
             Action::SetMiniVis(mode) => {
                 self.settings.mini_vis = Some(mode.min(3));
                 self.mark_settings_dirty();

@@ -176,8 +176,26 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             });
         return;
     }
+    // Under full-screen lyrics the bar is not drawn at all, background and
+    // controls both: the page takes the whole window and a small box under
+    // the album art holds the controls. Leaving the page brings it back.
+    if app.lyrics_fullscreen.is_some() {
+        let bottom = ui.ctx().input(|input| input.raw.screen_rect).map_or(0.0, |rect| rect.bottom());
+        ui.ctx().data_mut(|data| {
+            data.insert_temp(egui::Id::new("vis-row-h"), 0.0_f32);
+            data.insert_temp(egui::Id::new("vis-top"), bottom);
+        });
+        egui::Panel::bottom("player-bar")
+            .exact_size(0.0)
+            .resizable(false)
+            .show_separator_line(false)
+            .frame(Frame::new().fill(Color32::TRANSPARENT))
+            .show(ui, |_| {});
+        return;
+    }
     // The bar is one fixed dark colour; the cover's colour lives in the
     // visualizer, not in the bar behind it.
+    let lyrics_page = false;
     let fill = if palette.dark {
         Color32::from_rgb(0x11, 0x12, 0x13)
     } else {
@@ -219,12 +237,16 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let controls_k = app.settings.controls_scale_value();
     let layout = app.settings.bar_layout_value();
     let stacked = layout != 0;
-    let strip_h = (46.0 * controls_k).clamp(46.0, 84.0)
-        * match layout {
-            0 => 1.0,
-            2 => 2.2,
-            _ => 1.6,
-        };
+    let strip_h = if lyrics_page {
+        0.0
+    } else {
+        (46.0 * controls_k).clamp(46.0, 84.0)
+            * match layout {
+                0 => 1.0,
+                2 => 2.2,
+                _ => 1.6,
+            }
+    };
     let height = bar_h + foot + rise + theme::PLAYER_BAR_HEIGHT * (scale - 1.0) + strip_h;
     egui::Panel::bottom("player-bar")
         .exact_size(height.max(bar_h + foot + strip_h))
@@ -296,6 +318,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         - drag.drag_delta().y / theme::PLAYER_BAR_HEIGHT;
                     app.actions.push(Action::SetVisRise(rise));
                 }
+            }
+            if lyrics_page {
+                return;
             }
             // No tooltip here. It held the pointer's text over the whole
             // width of the bar.
@@ -759,11 +784,14 @@ fn fullscreen_edge_bars(
     // the normal screen.
     let count = app.settings.player_bar_vis_bar_count().max(2);
     let gap = app.settings.player_bar_vis_gap().min(8.0);
-    let merged = if count <= levels.len() {
+    let mut merged = if count <= levels.len() {
         merge_bands(&levels, count)
     } else {
         spread_bands(&levels, count)
     };
+    if app.settings.vis_reverse {
+        merged.reverse();
+    }
     let step = rect.width() / count as f32;
     // Every edge's bars share one longest length: the room between the
     // window's left edge and the cover, less a margin, so no bar on any
@@ -1058,8 +1086,12 @@ pub(super) fn visualizer_shape(
                 (spread_bands(&levels, wanted), spread_bands(&peaks, wanted))
             };
             let height = app.settings.player_bar_vis_bar_height_value();
-            let levels: Vec<f32> = levels.iter().map(|level| soft_height(level * height)).collect();
-            let peaks: Vec<f32> = peaks.iter().map(|peak| soft_height(peak * height)).collect();
+            let mut levels: Vec<f32> = levels.iter().map(|level| soft_height(level * height)).collect();
+            let mut peaks: Vec<f32> = peaks.iter().map(|peak| soft_height(peak * height)).collect();
+            if app.settings.vis_reverse {
+                levels.reverse();
+                peaks.reverse();
+            }
             spectrum(&painter, rect, &levels, &peaks, (low, high), strength, gap);
             sounding || !app.player_bar_analyser.settled()
         }
@@ -1084,7 +1116,10 @@ pub(super) fn visualizer_shape(
             // bands are spread across the bar rather than merged down to
             // it: a flow that has only the analyser's own resolution looks
             // like a bar chart with the corners filed off.
-            let flow = spread_bands(&levels, FLOW_POINTS);
+            let mut flow = spread_bands(&levels, FLOW_POINTS);
+            if app.settings.vis_reverse {
+                flow.reverse();
+            }
             flow_sheets(
                 &painter,
                 rect,
@@ -1670,6 +1705,17 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 {
                     app.actions.push(Action::ToggleVisBarsStay);
                 }
+                if chip(
+                    ui,
+                    &palette,
+                    if app.settings.vis_reverse { "Scrolls right to left" } else { "Scrolls left to right" },
+                    app.settings.vis_reverse,
+                    ui.available_width().min(290.0),
+                )
+                .clicked()
+                {
+                    app.actions.push(Action::ToggleVisReverse);
+                }
                 slider_row(
                 ui,
                 &palette,
@@ -1855,6 +1901,17 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             .clicked()
             {
                 app.actions.push(Action::ToggleVisLyrics);
+            }
+            if chip(
+                ui,
+                &palette,
+                if app.settings.vis_reverse { "Scrolls right to left" } else { "Scrolls left to right" },
+                app.settings.vis_reverse,
+                ui.available_width().min(290.0),
+            )
+            .clicked()
+            {
+                app.actions.push(Action::ToggleVisReverse);
             }
             if chip(
                 ui,
@@ -2916,6 +2973,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
         Icon::Music,
         Some(&loader),
     );
+    big_art_missing_mark(app, ui, cover, "fullscreen-vis");
     let ink = if app.swirl_art_is_light() {
         Color32::BLACK
     } else {
@@ -3735,7 +3793,7 @@ pub(super) fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, 
         });
     // Last.fm has no cover for this album: a small mark on the corner. The
     // cover is saved in the lastfm-art folder, ready to upload.
-    if app.art_missing_now && song.is_some() {
+    if app.art_missing_now && app.settings.missing_mark_big && song.is_some() {
         let badge = Rect::from_center_size(cover_rect.right_top() + vec2(-6.0, 6.0), vec2(14.0, 14.0));
         ui.painter().circle_filled(badge.center(), 7.0, palette.warning);
         ui.painter().text(
@@ -5138,4 +5196,25 @@ mod player_bar_tint_tests {
         let (low, _) = vis_colours(Color32::from_rgb(255, 240, 80), true);
         assert!(low.r() > low.b() && low.g() > low.b(), "{low:?}");
     }
+}
+
+/// The yellow "!" on the big album art when Last.fm has no cover for it.
+/// Off with the toggle in the Last.fm settings.
+pub(super) fn big_art_missing_mark(app: &App, ui: &egui::Ui, art: Rect, id: &str) {
+    if !(app.art_missing_now && app.settings.missing_mark_big && app.now_playing_item().is_some()) {
+        return;
+    }
+    let palette = app.palette;
+    let badge = Rect::from_center_size(art.right_top() + vec2(-14.0, 14.0), vec2(24.0, 24.0));
+    ui.painter().circle_filled(badge.center(), 12.0, palette.warning);
+    ui.painter().text(
+        badge.center(),
+        egui::Align2::CENTER_CENTER,
+        "!",
+        theme::bold(16.0),
+        palette.window,
+    );
+    ui.interact(badge, egui::Id::new(("big-art-missing", id)), Sense::hover()).on_hover_text(
+        "Last.fm has no cover for this album. It is saved in the lastfm-art folder, ready to upload.",
+    );
 }

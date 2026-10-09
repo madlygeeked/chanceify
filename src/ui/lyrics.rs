@@ -474,16 +474,17 @@ fn with_cover(app: &mut App, ui: &mut egui::Ui, rect: Rect, top: f32) {
         let gap = 40.0;
         // The cover grows with the room the lyrics leave, and never shrinks.
         let side = (below.width() * 0.46)
-            .min(below.height() - 90.0)
+            .min(below.height() - 180.0)
             .clamp(280.0, 760.0);
         let lyrics_width = (below.width() - side - gap).min(LYRICS_BESIDE_WIDTH);
         let _ = lyrics_width;
         let left = below.left() + below.width() * 0.02;
         let column = Rect::from_min_size(
-            pos2(left, below.center().y - (side + 90.0) / 2.0),
+            pos2(left, below.center().y - (side + 180.0) / 2.0),
             vec2(side, side + 90.0),
         );
         big_cover(app, ui, column, Align::Min);
+        controls_box(app, ui, pos2(column.left(), column.bottom() + 8.0), side, false);
         // Lyrics centred in the window when that leaves room beside the
         // cover; otherwise centred in the room that is left. Everything is
         // measured from the window, so it scales with any resolution.
@@ -502,11 +503,15 @@ fn with_cover(app: &mut App, ui: &mut egui::Ui, rect: Rect, top: f32) {
         let mut content = ui.new_child(UiBuilder::new().max_rect(lyrics));
         fullscreen_contents(app, &mut content);
     } else {
-        let side = (below.height() - 140.0)
+        let side = (below.height() - 230.0)
             .min(below.width() * 0.5)
             .clamp(200.0, 560.0);
-        let column = Rect::from_center_size(below.center(), vec2(side, side + 90.0));
+        let column = Rect::from_center_size(
+            below.center() - vec2(0.0, 45.0),
+            vec2(side, side + 90.0),
+        );
         big_cover(app, ui, column, Align::Center);
+        controls_box(app, ui, pos2(column.center().x, column.bottom() + 8.0), side, true);
         // Why there are no words, quietly, under the song, or that they
         // are still being fetched.
         let (heading, detail) = match &app.lyrics {
@@ -530,7 +535,7 @@ fn with_cover(app: &mut App, ui: &mut egui::Ui, rect: Rect, top: f32) {
             }
         };
         let heading = ui.painter().text(
-            pos2(column.center().x, column.bottom() + 8.0),
+            pos2(column.center().x, column.bottom() + 94.0),
             egui::Align2::CENTER_TOP,
             heading,
             theme::semibold(13.0),
@@ -704,6 +709,7 @@ fn big_cover(app: &mut App, ui: &mut egui::Ui, column: Rect, align: Align) {
             Some(app.backend.art()),
         );
     }
+    super::player_bar::big_art_missing_mark(app, ui, cover, "lyrics");
     // Right-click the cover to save it (not the lyrics options).
     let cover_response = ui.interact(cover, egui::Id::new("lyrics-cover-menu"), Sense::click());
     let menu_palette = theme::Palette::dark();
@@ -1301,5 +1307,132 @@ mod tests {
         }
         assert_eq!(fullscreen_content_width(47.0), 0.0);
         assert_eq!(fullscreen_content_width(2_000.0), 960.0);
+    }
+}
+
+/// The small controls box of full-screen lyrics: play, skip, shuffle and
+/// repeat, with the song's progress, under the album art. The bar along the
+/// bottom of the window is not drawn on this page.
+fn controls_box(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f32, centred: bool) {
+    let Some(now) = app.now_playing() else {
+        return;
+    };
+    let dark = theme::Palette::dark();
+    let width = width.clamp(220.0, 360.0);
+    let left = if centred { top_left.x - width / 2.0 } else { top_left.x };
+    let outer = Rect::from_min_size(pos2(left, top_left.y), vec2(width, 78.0));
+    ui.painter().rect_filled(outer, 14.0, Color32::from_black_alpha(120));
+    ui.painter().rect_stroke(
+        outer,
+        14.0,
+        egui::Stroke::new(1.0, Color32::from_white_alpha(24)),
+        egui::StrokeKind::Inside,
+    );
+    // The buttons, centred in the top half.
+    let buttons = Rect::from_min_size(outer.min + vec2(0.0, 6.0), vec2(width, 40.0));
+    let mut row = ui.new_child(
+        UiBuilder::new()
+            .max_rect(buttons)
+            .layout(Layout::left_to_right(Align::Center)),
+    );
+    row.spacing_mut().item_spacing.x = 6.0;
+    let used = 5.0 * 34.0 + 4.0 * 6.0;
+    row.add_space(((width - used) / 2.0).max(0.0));
+    let cell = |ui: &mut egui::Ui| {
+        let (rect, _) = ui.allocate_exact_size(vec2(34.0, 34.0), Sense::hover());
+        ui.new_child(
+            UiBuilder::new()
+                .max_rect(rect)
+                .layout(Layout::centered_and_justified(egui::Direction::LeftToRight)),
+        )
+    };
+    let dim = Color32::from_gray(200);
+    let mut c = cell(&mut row);
+    if theme::icon_button(
+        &mut c,
+        Icon::Shuffle,
+        16.0,
+        if now.shuffle { dark.accent } else { dim },
+        Color32::WHITE,
+        "Shuffle",
+    )
+    .clicked()
+    {
+        app.actions.push(Action::ToggleShuffle);
+    }
+    let mut c = cell(&mut row);
+    if theme::icon_button(&mut c, Icon::SkipBackFilled, 18.0, dim, Color32::WHITE, "Previous").clicked() {
+        app.actions.push(Action::Previous);
+    }
+    let mut c = cell(&mut row);
+    let play_icon = if now.playing { Icon::PauseFilled } else { Icon::PlayFilled };
+    if theme::icon_button(
+        &mut c,
+        play_icon,
+        24.0,
+        Color32::WHITE,
+        dark.accent_hover,
+        if now.playing { "Pause" } else { "Play" },
+    )
+    .clicked()
+    {
+        app.actions.push(Action::TogglePlay);
+    }
+    let mut c = cell(&mut row);
+    if theme::icon_button(&mut c, Icon::SkipForwardFilled, 18.0, dim, Color32::WHITE, "Next").clicked() {
+        app.actions.push(Action::Next);
+    }
+    let mut c = cell(&mut row);
+    let (repeat_icon, repeat_color) = match now.repeat {
+        crate::player::RepeatMode::Off => (Icon::Repeat, dim),
+        crate::player::RepeatMode::Context => (Icon::Repeat, dark.accent),
+        crate::player::RepeatMode::Track => (Icon::Repeat1, dark.accent),
+    };
+    if theme::icon_button(&mut c, repeat_icon, 16.0, repeat_color, Color32::WHITE, "Repeat").clicked() {
+        app.actions.push(Action::CycleRepeat);
+    }
+    // The progress line: click or drag to seek.
+    let track = Rect::from_min_max(
+        pos2(outer.left() + 44.0, outer.bottom() - 18.0),
+        pos2(outer.right() - 44.0, outer.bottom() - 14.0),
+    );
+    let hit = ui.interact(track.expand2(vec2(0.0, 8.0)), egui::Id::new("fs-lyrics-seek"), Sense::click_and_drag());
+    let fraction = if now.duration_ms > 0 {
+        (now.position_ms as f32 / now.duration_ms as f32).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    ui.painter().rect_filled(track, 2.0, Color32::from_white_alpha(50));
+    ui.painter().rect_filled(
+        Rect::from_min_max(track.min, pos2(track.left() + track.width() * fraction, track.bottom())),
+        2.0,
+        Color32::WHITE,
+    );
+    if (hit.clicked() || hit.dragged())
+        && let Some(pos) = hit.interact_pointer_pos()
+        && now.duration_ms > 0
+    {
+        let at = ((pos.x - track.left()) / track.width()).clamp(0.0, 1.0);
+        if hit.clicked() || hit.drag_stopped() {
+            app.actions.push(Action::Seek((at * now.duration_ms as f32) as u32));
+        }
+    }
+    let clock = |ms: u32| format!("{}:{:02}", ms / 60000, (ms / 1000) % 60);
+    ui.painter().text(
+        pos2(outer.left() + 12.0, track.center().y),
+        egui::Align2::LEFT_CENTER,
+        clock(now.position_ms),
+        theme::regular(11.0),
+        dim,
+    );
+    ui.painter().text(
+        pos2(outer.right() - 12.0, track.center().y),
+        egui::Align2::RIGHT_CENTER,
+        clock(now.duration_ms),
+        theme::regular(11.0),
+        dim,
+    );
+    if now.playing {
+        ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
     }
 }

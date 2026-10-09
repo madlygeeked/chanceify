@@ -1479,6 +1479,17 @@ pub fn context_menu_items(
 
 /// Whether a row can start playback through Spotify. Unknown availability
 /// remains playable, while local files and missing entries cannot be requested.
+/// Whether the "click to queue" modifier is held right now (Ctrl by default,
+/// Alt if chosen, never when it is switched off).
+pub(crate) fn queue_click_held(app: &App, ui: &Ui) -> bool {
+    let modifiers = ui.input(|input| input.modifiers);
+    match app.settings.queue_click {
+        0 => modifiers.command && !modifiers.shift,
+        1 => modifiers.alt && !modifiers.shift,
+        _ => false,
+    }
+}
+
 pub(crate) fn row_playable(item: &PlayableItem) -> bool {
     !item.uri().is_empty()
         && !item.uri().starts_with("spotify:local:")
@@ -1605,7 +1616,7 @@ pub(crate) fn table_layout(
     } else {
         0.0
     };
-    let heart = if compact { 0.0 } else { 36.0 };
+    let heart = if compact { 0.0 } else { settings.buttons_width() };
     let duration = if compact { 44.0 } else { 56.0 };
     let more = if compact { 0.0 } else { 36.0 };
     let mut budget = (width - number - cover - heart - duration - more - 8.0 - TITLE_MIN).max(0.0);
@@ -2419,33 +2430,67 @@ fn track_row_contents(
 
     // Heart.
     if cols.heart > 0.0 {
+        let tc = app.settings.track_columns;
         let saved = app.is_saved(row.item.uri());
-        let heart_rect = Rect::from_min_size(pos2(x, rect.top()), vec2(cols.heart, row_height));
         if row.item.is_track() {
-            let mut child = ui.new_child(
-                UiBuilder::new()
-                    .max_rect(heart_rect)
-                    .layout(Layout::centered_and_justified(egui::Direction::LeftToRight)),
-            );
-            if !hovered
-                && saved != Some(true)
-                && !child.memory(|memory| memory.has_focus(child.next_auto_id()))
-            {
-                child.set_opacity(0.0);
+            let mut slot = x;
+            if !tc.hide_plus {
+                let plus_rect = Rect::from_min_size(pos2(slot, rect.top()), vec2(36.0, row_height));
+                slot += 36.0;
+                let mut child = ui.new_child(
+                    UiBuilder::new()
+                        .max_rect(plus_rect)
+                        .layout(Layout::centered_and_justified(egui::Direction::LeftToRight)),
+                );
+                let popup_id = egui::Id::new(("row-plus", row.item.uri()));
+                if !hovered && !egui::Popup::is_id_open(ui.ctx(), popup_id) {
+                    child.set_opacity(0.0);
+                }
+                let tooltip = gettext(app.locale, "Add to playlist");
+                let response =
+                    theme::icon_button(&mut child, Icon::Plus, 16.0, palette.secondary, palette.text, &tooltip);
+                let items = vec![row.item.clone()];
+                let query_id = popup_id.with("query");
+                let mut query: String = ui.data(|d| d.get_temp(query_id)).unwrap_or_default();
+                egui::Popup::menu(&response)
+                    .id(popup_id)
+                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                    .frame(menu_frame(&palette))
+                    .show(|ui| {
+                        let field = playlist_picker(ui, app, &items, &mut query);
+                        if !field.has_focus() && query.is_empty() {
+                            field.request_focus();
+                        }
+                    });
+                ui.data_mut(|d| d.insert_temp(query_id, query));
             }
-            let (icon, color) = if saved == Some(true) {
-                (Icon::HeartFilled, palette.accent)
-            } else {
-                (Icon::Heart, palette.secondary)
-            };
-            let tooltip = if saved == Some(true) {
-                gettext(app.locale, "Remove from Liked Songs")
-            } else {
-                gettext(app.locale, "Save to Liked Songs")
-            };
-            if theme::icon_button(&mut child, icon, 16.0, color, palette.text, &tooltip).clicked() {
-                app.actions
-                    .push(Action::ToggleSaved(row.item.uri().to_string()));
+            if !tc.hide_heart {
+                let heart_rect = Rect::from_min_size(pos2(slot, rect.top()), vec2(36.0, row_height));
+                let mut child = ui.new_child(
+                    UiBuilder::new()
+                        .max_rect(heart_rect)
+                        .layout(Layout::centered_and_justified(egui::Direction::LeftToRight)),
+                );
+                if !hovered
+                    && saved != Some(true)
+                    && !child.memory(|memory| memory.has_focus(child.next_auto_id()))
+                {
+                    child.set_opacity(0.0);
+                }
+                let (icon, color) = if saved == Some(true) {
+                    (Icon::HeartFilled, palette.accent)
+                } else {
+                    (Icon::Heart, palette.secondary)
+                };
+                let tooltip = if saved == Some(true) {
+                    gettext(app.locale, "Remove from Liked Songs")
+                } else {
+                    gettext(app.locale, "Save to Liked Songs")
+                };
+                if theme::icon_button(&mut child, icon, 16.0, color, palette.text, &tooltip).clicked() {
+                    app.actions
+                        .push(Action::ToggleSaved(row.item.uri().to_string()));
+                }
             }
         }
         x += cols.heart;
@@ -2501,7 +2546,13 @@ fn track_row_contents(
     // Row interactions.
     let mut pick = None;
     let accessible_click = response.clicked() && response.interact_pointer_pos().is_none();
-    if (response.double_clicked() || accessible_click) && !unavailable {
+    let queue_mod = response.clicked() && queue_click_held(app, ui) && row_playable(row.item);
+    if queue_mod {
+        app.actions.push(Action::AddToQueue {
+            uri: row.item.uri().to_string(),
+            label: row.item.name().to_string(),
+        });
+    } else if (response.double_clicked() || accessible_click) && !unavailable {
         app.actions.push(Action::PlayFromRow {
             context: row.context.clone(),
             uri: row.item.uri().to_string(),
@@ -2539,7 +2590,9 @@ fn track_row_contents(
             let modifiers = ui.input(|input| input.modifiers);
             pick = Some(if modifiers.shift {
                 RowPick::Range
-            } else if modifiers.command {
+            } else if (app.settings.queue_click == 0 && modifiers.alt)
+                || (app.settings.queue_click != 0 && modifiers.command)
+            {
                 RowPick::Toggle
             } else {
                 RowPick::Only
@@ -3215,7 +3268,7 @@ pub fn table_header(
         &widths,
         false,
     );
-    let right_fixed = 36.0 + if columns.hide_duration { 0.0 } else { 56.0 } + 36.0 + 8.0;
+    let right_fixed = columns.buttons_width() + if columns.hide_duration { 0.0 } else { 56.0 } + 36.0 + 8.0;
     // The headings must be drawn in exactly the order `track_row` draws the
     // cells, or every heading sits one column left of its own data. The
     // order is: album, added by, date added, tempo.
@@ -3476,6 +3529,12 @@ pub fn table_header(
                         !widths.hide_duration,
                     ) {
                         widths.hide_duration = !widths.hide_duration;
+                    }
+                    if checkbox_row(ui, palette, &gettext(locale, "LIKED HEART"), !widths.hide_heart) {
+                        widths.hide_heart = !widths.hide_heart;
+                    }
+                    if checkbox_row(ui, palette, &gettext(locale, "ADD TO PLAYLIST +"), !widths.hide_plus) {
+                        widths.hide_plus = !widths.hide_plus;
                     }
                     menu_separator(ui, palette);
                     if menu_item(ui, palette, None, &gettext(locale, "RESET COLUMN WIDTHS")) {

@@ -23,3 +23,8 @@ title: Settings explained
 **Unavailable songs.** Songs Spotify removed from your playlists. You can copy or save the list, or remove them one at a time.
 
 [Back](./)
+
+- **Visualizer direction**: in the visualizer settings, "Scrolls left to right / right to left" mirrors the bars and flow.
+- **Missing-cover mark**: Last.fm settings. Shows the yellow ! on the small and big album art when Last.fm has no cover.
+- **Heart and + buttons**: right-click a column heading to hide the liked heart or the add-to-playlist + button.
+- **Full-screen lyrics** has no bottom bar; a small controls box sits under the album art.

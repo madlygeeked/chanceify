@@ -27,3 +27,5 @@ Starting keys:
 In the shortcuts list (press T) click a key to change it. Shift and Ctrl can go with any key, for example Ctrl+Up for volume up or Ctrl+Z for undo. Right-click a key to clear it.
 
 [Back](./)
+
+**Click to queue.** Ctrl+click a song (a row, or a tile on Home) to add it to the queue without opening or playing anything. In the shortcuts list (T) the "Queue a song" button switches it to Alt+click or off. While Ctrl is the queue key, Alt+click picks several rows.

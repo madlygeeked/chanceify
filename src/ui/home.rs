@@ -431,6 +431,11 @@ fn stat_tile(
     }
     if artist_clicked {
         app.actions.push(Action::Open(Page::Artist(row.artist_id.clone())));
+    } else if response.clicked() && song && !row.uri.is_empty() && super::widgets::queue_click_held(app, ui) {
+        app.actions.push(Action::AddToQueue {
+            uri: row.uri.clone(),
+            label: row.name.clone(),
+        });
     } else if response.clicked() {
         if song {
             if !row.uri.is_empty() {

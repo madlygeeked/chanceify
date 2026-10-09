@@ -93,6 +93,10 @@ pub struct TrackColumns {
     pub hide_number: bool,
     /// The length column is switched off.
     pub hide_duration: bool,
+    /// The heart (liked) button is switched off.
+    pub hide_heart: bool,
+    /// The "+" (add to a playlist) button is switched off.
+    pub hide_plus: bool,
     /// Songs as a grid of covers, whatever columns are on.
     pub grid: bool,
 }
@@ -109,12 +113,19 @@ impl Default for TrackColumns {
             genre: 0.0,
             hide_number: false,
             hide_duration: false,
+            hide_heart: false,
+            hide_plus: false,
             grid: false,
         }
     }
 }
 
 impl TrackColumns {
+    /// How wide the heart and "+" buttons are together.
+    pub fn buttons_width(&self) -> f32 {
+        36.0 * (u8::from(!self.hide_heart) + u8::from(!self.hide_plus)) as f32
+    }
+
     /// The narrowest a column may be dragged before it is treated as hidden.
     pub const MIN: f32 = 56.0;
     /// The widest, so one drag cannot swallow the song names.
@@ -861,6 +872,16 @@ pub struct Settings {
     pub mini_on_top: bool,
     /// Whether the floating mini player fades while the pointer is away.
     pub mini_fade: bool,
+    /// The click that adds a song to the queue without playing it: 0 Ctrl
+    /// (the default), 1 Alt, 2 off.
+    #[serde(default)]
+    pub queue_click: u8,
+    /// The visualizer runs from right to left instead of left to right.
+    #[serde(default)]
+    pub vis_reverse: bool,
+    /// The missing-art mark also shows on the big album art.
+    #[serde(default = "yes")]
+    pub missing_mark_big: bool,
     /// What moves behind the mini player: 0 nothing, 1 bars, 2 flow, 3
     /// swirl; never chosen means bars.
     #[serde(default)]
@@ -1173,6 +1194,9 @@ impl Default for Settings {
             mini_on_top: false,
             mini_fade: true,
             mini_vis: None,
+            queue_click: 0,
+            vis_reverse: false,
+            missing_mark_big: true,
             music_folders: Vec::new(),
             lastfm_api_key: String::new(),
             lastfm_secret: String::new(),
@@ -1238,6 +1262,10 @@ impl Default for Settings {
             proxy_password_legacy: false,
         }
     }
+}
+
+fn yes() -> bool {
+    true
 }
 
 fn default_buffer_ms() -> u32 {
@@ -1534,7 +1562,7 @@ impl Settings {
         "player_bar_vis_flow_speed", "player_bar_vis_gap", "player_bar_vis_hex",
         "player_bar_vis_rise", "player_bar_vis_scale", "queue_compact", "queue_show_artist",
         "queue_show_cover", "queue_show_icons", "queue_show_numbers", "queue_show_time",
-        "queue_width", "recents_show_artist", "recents_show_cover", "recents_show_icons", "recents_show_numbers", "vis_title_layout", "mini_queue", "mini_volume", "mini_vis", "row_order", "seek_anchor", "seek_custom_width", "seek_time_joined", "seek_time_mode",
+        "queue_width", "recents_show_artist", "recents_show_cover", "recents_show_icons", "recents_show_numbers", "vis_title_layout", "mini_queue", "mini_volume", "mini_vis", "queue_click", "vis_reverse", "missing_mark_big", "row_order", "seek_anchor", "seek_custom_width", "seek_time_joined", "seek_time_mode",
         "seek_width", "show_shortcut_hints", "sidebar_compact", "sidebar_grid", "sidebar_order",
         "sidebar_width", "swirl_art_scroll", "swirl_art_single", "swirl_art_edge", "swirl_colours_fixed", "swirl_drift", "swirl_peaks",
         "swirl_scale", "swirl_tune", "swirl_warp", "swirl_waves", "theme", "theme_from_cover", "custom_bg", "custom_accent",
@@ -3189,5 +3217,18 @@ mod session_tests {
         );
         assert!(!path.with_extension("json.tmp").exists());
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn queue_click_reverse_and_marks_have_good_defaults() {
+        let settings = Settings::default();
+        assert_eq!(settings.queue_click, 0, "Ctrl+click queues by default");
+        assert!(!settings.vis_reverse);
+        assert!(settings.missing_mark_big);
+        let columns = TrackColumns::default();
+        assert!(!columns.hide_heart && !columns.hide_plus);
+        assert_eq!(columns.buttons_width(), 72.0);
+        let one = TrackColumns { hide_heart: true, ..columns };
+        assert_eq!(one.buttons_width(), 36.0);
     }
 }

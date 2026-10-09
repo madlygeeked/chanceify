@@ -1458,6 +1458,10 @@ pub enum Action {
     ToggleMiniQueue,
     ToggleMiniVolume,
     SetMiniVis(u8),
+    /// Cycles what clicking a song with a modifier held does: queue with Ctrl, with Alt, or nothing.
+    CycleQueueClick,
+    ToggleVisReverse,
+    ToggleMissingMarkBig,
     ToggleMiniOnTop,
     ToggleMiniFade,
     /// Play song files from the Local songs page: these paths, in this
