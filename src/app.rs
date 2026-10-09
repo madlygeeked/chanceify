@@ -11186,6 +11186,7 @@ impl App {
                 );
             }
             Action::LastfmRefresh => self.lastfm.refresh(),
+            Action::LastfmPing => self.lastfm.ping(),
             Action::ToggleMiniFade => {
                 self.settings.mini_fade = !self.settings.mini_fade;
                 self.mark_settings_dirty();

@@ -2455,6 +2455,12 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     {
                         app.actions.push(Action::LastfmRefresh);
                     }
+                    if theme::soft_button(ui, &palette, None, "Test the connection", false)
+                        .on_hover_text("Asks Last.fm (through the chanceify worker) a harmless question and tells you if it answered.")
+                        .clicked()
+                    {
+                        app.actions.push(Action::LastfmPing);
+                    }
                     if theme::soft_button(ui, &palette, Some(Icon::ExternalLink), "Last.fm missing images", false)
                         .clicked()
                     {
@@ -2469,6 +2475,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         app.actions.push(Action::OpenUrl("https://www.last.fm/music".into()));
                     }
                 });
+                missing_list(ui, app, &palette, false);
+                missing_list(ui, app, &palette, true);
             }
         });
     }
@@ -2856,4 +2864,96 @@ fn note(ui: &mut egui::Ui, palette: &Palette, text: &str) {
         )
         .wrap(),
     );
+}
+
+
+/// Percent-encodes one part of a Last.fm address; Last.fm writes spaces as +.
+fn last_fm_part(text: &str) -> String {
+    let mut out = String::new();
+    for byte in text.trim().bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(byte as char),
+            b' ' => out.push('+'),
+            other => out.push_str(&format!("%{other:02X}")),
+        }
+    }
+    out
+}
+
+/// The album covers or artist pictures Last.fm lacks, as a list that opens
+/// each one's Last.fm page, where "Upload image" adds it. The names come
+/// from the files in the `-missing` folders.
+fn missing_list(ui: &mut egui::Ui, app: &mut App, palette: &Palette, artists: bool) {
+    let folder = app
+        .dirs
+        .index_dir()
+        .join("lastfm-art")
+        .join(if artists { "artists-missing" } else { "albums-missing" });
+    let cache_id = egui::Id::new(("missing-list", artists));
+    let now = ui.input(|input| input.time);
+    let cached = ui.data(|data| data.get_temp::<(f64, std::sync::Arc<Vec<String>>)>(cache_id));
+    let names = match cached {
+        Some((at, names)) if now - at < 5.0 => names,
+        _ => {
+            let mut names: Vec<String> = std::fs::read_dir(&folder)
+                .map(|entries| {
+                    entries
+                        .filter_map(Result::ok)
+                        .filter_map(|entry| {
+                            let name = entry.file_name().to_string_lossy().to_string();
+                            name.strip_suffix(".jpg").map(str::to_string)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            names.sort_by_key(|name| name.to_lowercase());
+            let names = std::sync::Arc::new(names);
+            ui.data_mut(|data| data.insert_temp(cache_id, (now, names.clone())));
+            names
+        }
+    };
+    let title = if artists {
+        format!("Missing artist pictures ({})", names.len())
+    } else {
+        format!("Missing album covers ({})", names.len())
+    };
+    egui::CollapsingHeader::new(egui::RichText::new(title).color(palette.text))
+        .id_salt(("missing-header", artists))
+        .show(ui, |ui| {
+            if names.is_empty() {
+                theme::subtle(ui, palette, "None yet. They are added as you listen.");
+                return;
+            }
+            theme::subtle(
+                ui,
+                palette,
+                "Open its Last.fm page, press Upload image, and pick the picture from the folder.",
+            );
+            egui::ScrollArea::vertical()
+                .id_salt(("missing-scroll", artists))
+                .max_height(260.0)
+                .show(ui, |ui| {
+                    for name in names.iter() {
+                        ui.horizontal(|ui| {
+                            theme::text(ui, name.as_str(), theme::regular(13.0), palette.text);
+                            let url = if artists {
+                                format!("https://www.last.fm/music/{}", last_fm_part(name))
+                            } else if let Some((artist, album)) = name.split_once(" - ") {
+                                format!(
+                                    "https://www.last.fm/music/{}/{}",
+                                    last_fm_part(artist),
+                                    last_fm_part(album)
+                                )
+                            } else {
+                                format!("https://www.last.fm/search?q={}", last_fm_part(name))
+                            };
+                            if theme::soft_button(ui, palette, Some(Icon::ExternalLink), "Open on Last.fm", false)
+                                .clicked()
+                            {
+                                app.actions.push(Action::OpenUrl(url));
+                            }
+                        });
+                    }
+                });
+        });
 }

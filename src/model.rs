@@ -1486,6 +1486,8 @@ pub enum Action {
     },
     /// Ask Last.fm for the account's numbers again.
     LastfmRefresh,
+    /// Tests the Last.fm connection and says how it went.
+    LastfmPing,
     ToggleVisBarsStay,
     /// The volume shortcut buttons.
     SetVolumePresets(Vec<u8>),

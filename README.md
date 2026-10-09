@@ -30,4 +30,4 @@ Put your own Last.fm key and secret on two lines in `lastfm-keys.txt` first
 ---
 
 Built with love by [chance](https://github.com/madlygeeked).
-Inspired by [Spotify](https://www.spotify.com), [Spotifast](https://github.com/crmne/spotifast) and [Spicetify](https://spicetify.app). Licensed AGPL-3.0, see [LICENSE](LICENSE).
+Inspired by [Spotify](https://www.spotify.com), [Spotifast](https://github.com/crmne/spotifast) and [Spicetify](https://spicetify.app). Licensed AGPL-3.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE.md).

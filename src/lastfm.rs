@@ -108,6 +108,7 @@ enum Job {
     Scrobble(Track, i64),
     Love(Track, bool),
     Refresh,
+    Ping,
     Quit,
 }
 
@@ -182,6 +183,11 @@ impl LastFm {
             user: user.to_string(),
             queue_file,
         });
+    }
+
+    /// Asks the worker (or Last.fm) a harmless question and says how it went.
+    pub fn ping(&self) {
+        self.send(Job::Ping);
     }
 
     pub fn sign_in(&self) {
@@ -440,6 +446,7 @@ impl Worker {
             }
             Job::Love(track, love) => self.love(&track, love),
             Job::Refresh => self.refresh(),
+            Job::Ping => self.ping(),
         }
     }
 
@@ -645,6 +652,24 @@ impl Worker {
                 .and_then(serde_json::Value::as_str)
                 .and_then(|text| text.parse::<u64>().ok());
             self.with_view(|view| view.scrobbles = count);
+        }
+    }
+
+    fn ping(&mut self) {
+        if !self.configured() {
+            self.notice("Last.fm has no key to use yet.");
+            return;
+        }
+        let proxied = self.key == VIA_PROXY && !PROXY_URL.is_empty();
+        let who = if proxied { "The chanceify worker" } else { "Last.fm" };
+        match self.call("auth.getToken", &[], false) {
+            Reply::Ok(_) => self.notice(format!("{who} answered. The Last.fm connection works.")),
+            Reply::Api(code, message) => self.notice(format!(
+                "{who} answered, but Last.fm said no ({code}: {message}). Check the key and secret."
+            )),
+            Reply::Network(message) => {
+                self.notice(format!("Could not reach {who} ({message}). Check your internet."))
+            }
         }
     }
 
