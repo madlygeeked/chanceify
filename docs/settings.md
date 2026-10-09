@@ -28,3 +28,7 @@ title: Settings explained
 - **Missing-cover mark**: Last.fm settings. Shows the yellow ! on the small and big album art when Last.fm has no cover.
 - **Heart and + buttons**: right-click a column heading to hide the liked heart or the add-to-playlist + button.
 - **Full-screen lyrics** has no bottom bar; a small controls box sits under the album art.
+
+- **Check my whole library** (Last.fm settings): checks every saved album and artist picture, a few at a time. Press it again to stop.
+- **Row menu** (six dots): drag the top strip to move it, drag the <> corner to widen it.
+- **Lyrics site busy**: chanceify asks LRCLIB again by itself up to five times.

@@ -433,6 +433,9 @@ pub struct App {
     art_store: crate::lastfm_art::Store,
     art_checker: crate::lastfm_art::Checker,
     art_asked: std::collections::HashSet<String>,
+    /// The Last.fm picture check is running over the whole library.
+    pub art_sweep: bool,
+    art_sweep_count: u32,
     /// The folder and file name each checked key is saved under.
     art_names: std::collections::HashMap<String, (crate::lastfm_art::Kind, String)>,
     art_exports: Vec<lastfm_art::ArtExport>,
@@ -535,6 +538,8 @@ pub struct App {
     live: live_analysis::LiveAnalysis,
     /// When the tap-tempo key was last pressed.
     taps: Vec<Instant>,
+    /// When the bass-jump key was last pressed.
+    pub jump_at: Option<Instant>,
     /// Songs in the user's playlists that can no longer be played.
     pub unavailable: crate::unavailable::Store,
     /// The scan in progress, if any.
@@ -584,6 +589,9 @@ pub struct App {
     pub softened_covers: crate::images::SoftenedCovers,
     /// The track the lyrics below are for.
     pub lyrics_uri: Option<String>,
+    /// When to ask for lyrics again after the lyrics site was busy, and how many tries so far.
+    pub lyrics_retry_at: Option<std::time::Instant>,
+    pub lyrics_tries: u8,
     /// `Loaded(None)` when no lyrics are available.
     pub lyrics: Loadable<Option<crate::lyrics::Lyrics>>,
     /// Whether the panel follows the current line. Manual scrolling disables
@@ -1085,6 +1093,8 @@ impl App {
             art_store: crate::lastfm_art::Store::load(&art_store_path),
             art_checker: crate::lastfm_art::Checker::default(),
             art_asked: std::collections::HashSet::new(),
+            art_sweep: false,
+            art_sweep_count: 0,
             art_names: std::collections::HashMap::new(),
             art_exports: Vec::new(),
             art_seen_for: None,
@@ -1144,6 +1154,7 @@ impl App {
             beat_for: None,
             live: live_analysis::LiveAnalysis::default(),
             taps: Vec::new(),
+            jump_at: None,
             unavailable: crate::unavailable::Store::load(&dirs_cache_unavailable),
             unavailable_scan: None,
             optimistic_user,
@@ -1179,6 +1190,8 @@ impl App {
             lyrics_backdrop: Default::default(),
             softened_covers: Default::default(),
             lyrics_uri: None,
+            lyrics_retry_at: None,
+            lyrics_tries: 0,
             lyrics: Loadable::NotLoaded,
             lyrics_following: true,
             lyrics_line_shown: None,
@@ -2615,6 +2628,7 @@ impl App {
 
     /// One press of the tap-tempo key. Four or more taps in a rhythm set the
     /// playing song's tempo, replacing whatever was found for it.
+    #[allow(dead_code)]
     fn tap_tempo(&mut self) {
         let now = Instant::now();
         if self
@@ -2838,8 +2852,30 @@ impl App {
                 Event::Lyrics { uri, result } => {
                     if self.lyrics_uri.as_deref() == Some(uri.as_str()) {
                         self.lyrics = match result {
-                            Ok(found) => Loadable::Loaded(found),
-                            Err(error) => Loadable::Failed(error),
+                            Ok(found) => {
+                                self.lyrics_tries = 0;
+                                self.lyrics_retry_at = None;
+                                Loadable::Loaded(found)
+                            }
+                            Err(error) => {
+                                log::warn!("lyrics: {error}");
+                                // The free lyrics site is often busy for a
+                                // minute. Ask again by itself a few times.
+                                if self.lyrics_tries < 5 {
+                                    self.lyrics_tries += 1;
+                                    self.lyrics_retry_at = Some(
+                                        std::time::Instant::now()
+                                            + std::time::Duration::from_secs(8 * u64::from(self.lyrics_tries)),
+                                    );
+                                    Loadable::Failed(
+                                        "the lyrics site (LRCLIB) is busy. chanceify will try again by itself.".to_string(),
+                                    )
+                                } else {
+                                    Loadable::Failed(format!(
+                                        "the lyrics site (LRCLIB) is not answering. Press Try again later. ({error})"
+                                    ))
+                                }
+                            }
                         };
                     }
                 }
@@ -3753,6 +3789,10 @@ impl App {
         {
             return;
         }
+        if self.lyrics_uri.as_deref() != Some(now.uri.as_str()) {
+            self.lyrics_tries = 0;
+        }
+        self.lyrics_retry_at = None;
         self.lyrics_uri = Some(now.uri.clone());
         self.lyrics_following = true;
         self.lyrics_line_shown = None;
@@ -3875,6 +3915,15 @@ impl App {
     }
 
     fn tick(&mut self, ctx: &egui::Context) {
+        if self
+            .lyrics_retry_at
+            .is_some_and(|at| std::time::Instant::now() >= at)
+            && matches!(self.lyrics, Loadable::Failed(_))
+        {
+            self.request_lyrics();
+        } else if let Some(at) = self.lyrics_retry_at {
+            ctx.request_repaint_after(at.saturating_duration_since(std::time::Instant::now()).max(std::time::Duration::from_millis(500)));
+        }
         self.poll_deck();
         self.poll_folder_pick();
         self.poll_files_pick();
@@ -10748,7 +10797,7 @@ impl App {
                 self.mark_settings_dirty();
             }
             Action::ToggleVisPanel => self.vis_panel = !self.vis_panel,
-            Action::TapTempo => self.tap_tempo(),
+            Action::TapTempo => self.jump_at = Some(Instant::now()),
             Action::StartTour => self.tour_step = Some(0),
             Action::SavePlaylistToIndex(uri) => {
                 let id = uri.rsplit(':').next().unwrap_or("").to_string();
@@ -11211,6 +11260,15 @@ impl App {
                     )));
                 }
                 self.mark_settings_dirty();
+            }
+            Action::ToggleArtSweep => {
+                self.art_sweep = !self.art_sweep;
+                self.art_sweep_count = 0;
+                self.toast(if self.art_sweep {
+                    "Checking your library's pictures on Last.fm, a few at a time"
+                } else {
+                    "Stopped checking pictures"
+                });
             }
             Action::CycleQueueClick => {
                 self.settings.queue_click = (self.settings.queue_click + 1) % 3;

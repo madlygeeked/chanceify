@@ -29,3 +29,5 @@ In the shortcuts list (press T) click a key to change it. Shift and Ctrl can go 
 [Back](./)
 
 **Click to queue.** Ctrl+click a song (a row, or a tile on Home) to add it to the queue without opening or playing anything. In the shortcuts list (T) the "Queue a song" button switches it to Alt+click or off. While Ctrl is the queue key, Alt+click picks several rows.
+
+**Play next.** Shift+Ctrl+click (or Shift+Alt+click) a song row puts it at the top of the queue. The "Tap tempo" key is now "Bass jump": press it on the beat and the screen flashes and covers that bounce to the bass jump.

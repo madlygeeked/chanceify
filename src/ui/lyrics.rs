@@ -1314,6 +1314,37 @@ mod tests {
 /// repeat, with the song's progress, under the album art. The bar along the
 /// bottom of the window is not drawn on this page.
 fn controls_box(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f32, centred: bool) {
+    // Fades out a few seconds after the mouse stops, so the lyrics stay
+    // clean. Any movement, or a paused song, brings it back.
+    let ctx = ui.ctx().clone();
+    let id = egui::Id::new("fs-lyrics-box-moved");
+    let now_t = ctx.input(|input| input.time);
+    let moved = ctx.input(|input| input.pointer.delta() != egui::Vec2::ZERO || input.pointer.any_down());
+    let mut last: f64 = ctx.data(|data| data.get_temp(id)).unwrap_or(now_t);
+    if moved {
+        last = now_t;
+    }
+    ctx.data_mut(|data| data.insert_temp(id, last));
+    let paused = !app.now_playing().is_some_and(|now| now.playing);
+    let idle = now_t - last;
+    let target = if paused || idle < 3.0 { 1.0 } else { 0.0 };
+    let fade = ctx.animate_value_with_time(id.with("fade"), target, 0.6);
+    if fade <= 0.01 {
+        ctx.request_repaint_after(std::time::Duration::from_millis(300));
+        return;
+    }
+    let old = ui.opacity();
+    ui.set_opacity(old * fade);
+    controls_box_inner(app, ui, top_left, width, centred);
+    ui.set_opacity(old);
+    if target > 0.5 && !paused {
+        ctx.request_repaint_after(std::time::Duration::from_millis(500));
+    } else if fade > 0.01 {
+        ctx.request_repaint();
+    }
+}
+
+fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f32, centred: bool) {
     let Some(now) = app.now_playing() else {
         return;
     };

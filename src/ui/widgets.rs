@@ -1490,6 +1490,16 @@ pub(crate) fn queue_click_held(app: &App, ui: &Ui) -> bool {
     }
 }
 
+/// The queue modifier plus Shift: put the song at the top of the queue.
+pub(crate) fn play_next_held(app: &App, ui: &Ui) -> bool {
+    let modifiers = ui.input(|input| input.modifiers);
+    match app.settings.queue_click {
+        0 => modifiers.command && modifiers.shift,
+        1 => modifiers.alt && modifiers.shift,
+        _ => false,
+    }
+}
+
 pub(crate) fn row_playable(item: &PlayableItem) -> bool {
     !item.uri().is_empty()
         && !item.uri().starts_with("spotify:local:")
@@ -2547,7 +2557,14 @@ fn track_row_contents(
     let mut pick = None;
     let accessible_click = response.clicked() && response.interact_pointer_pos().is_none();
     let queue_mod = response.clicked() && queue_click_held(app, ui) && row_playable(row.item);
-    if queue_mod {
+    let next_mod = response.clicked() && play_next_held(app, ui) && row_playable(row.item);
+    if next_mod {
+        app.actions.push(Action::InsertInQueue {
+            items: vec![row.item.clone()],
+            position: 0,
+        });
+        app.toast(format!("Plays next: {}", row.item.name()));
+    } else if queue_mod {
         app.actions.push(Action::AddToQueue {
             uri: row.item.uri().to_string(),
             label: row.item.name().to_string(),

@@ -104,6 +104,14 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         return;
     }
     app.window_alpha = 1.0;
+    // The bass-jump key: a short flash of the accent over the whole window.
+    let jump = app.jump_level();
+    if jump > 0.0 {
+        let screen = ctx.content_rect();
+        ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("bass-jump")))
+            .rect_filled(screen, 0.0, app.palette.accent.gamma_multiply(0.22 * jump));
+        ctx.request_repaint();
+    }
     player_bar::show(app, ui);
     if app.lyrics_fullscreen.is_some() {
         lyrics::fullscreen(app, ui);

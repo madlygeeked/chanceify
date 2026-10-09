@@ -129,7 +129,7 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "lastfmlove", label: "Love the song on Last.fm", default: UNSET, action: || Action::LastfmLove },
     Bindable { id: "likehover", label: "Like the song under the pointer", default: UNSET, action: || Action::LikeHovered },
     Bindable { id: "likeplaying", label: "Like the playing song", default: UNSET, action: || Action::LikePlaying },
-    Bindable { id: "tap", label: "Tap tempo", default: UNSET, action: || Action::TapTempo },
+    Bindable { id: "tap", label: "Bass jump", default: UNSET, action: || Action::TapTempo },
     Bindable { id: "next", label: "Next song", default: UNSET, action: || Action::Next },
     Bindable { id: "previous", label: "Previous song", default: UNSET, action: || Action::Previous },
     Bindable { id: "volup", label: "Volume up", default: UNSET, action: || Action::VolumeBy(5) },

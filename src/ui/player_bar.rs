@@ -1344,6 +1344,8 @@ fn audio_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 app.actions.push(Action::SetSpeed(speed));
             }
             super::widgets::menu_separator(ui, &palette);
+            // Scenes are off: the menu is the speed and the equalizer.
+            if false {
             let scenes_collapse = egui::CollapsingHeader::new(gettext(app.locale, "Scenes")).default_open(true).show(ui, |ui| {
                 // Built-in scenes (minus any removed) and the reader's own.
                 // Right-click one to remove it.
@@ -1422,6 +1424,7 @@ fn audio_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     save_row(ui, app, &palette, true);
                     share_rows(ui, app, &palette);
                 });
+            }
             let own_match = app
                 .settings
                 .custom_eqs
@@ -4653,6 +4656,16 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
     let screen_h = ctx
         .input(|input| input.raw.screen_rect)
         .map_or(900.0, |rect| rect.height());
+    // The menu can be dragged by its top strip and widened with the corner
+    // at the strip's right end. Both are remembered while it is open.
+    let width_id = id.with("width");
+    let default_width = if kind == 2 { 340.0 } else { 290.0 };
+    let menu_width = ctx
+        .data(|data| data.get_temp::<f32>(width_id))
+        .unwrap_or(default_width)
+        .clamp(240.0, 640.0);
+    let mut moved = Vec2::ZERO;
+    let mut widened = 0.0_f32;
     let area = egui::Area::new(id.with("area"))
         .order(egui::Order::Foreground)
         .pivot(egui::Align2::CENTER_BOTTOM)
@@ -4660,8 +4673,40 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
         .constrain(true)
         .show(&ctx, |ui| {
             super::widgets::menu_frame(&palette).show(ui, |ui| {
-                ui.set_width(if kind == 2 { 340.0 } else { 290.0 });
+                ui.set_width(menu_width);
                 let _ = screen_h;
+                {
+                    let strip_w = ui.available_width();
+                    let (strip, _) = ui.allocate_exact_size(vec2(strip_w, 12.0), Sense::hover());
+                    let grab = Rect::from_min_max(strip.min, pos2(strip.right() - 22.0, strip.bottom()));
+                    let corner = Rect::from_min_max(pos2(strip.right() - 20.0, strip.top()), strip.max);
+                    let mover = ui.interact(grab, id.with("move"), Sense::drag());
+                    let sizer = ui.interact(corner, id.with("size"), Sense::drag());
+                    if mover.hovered() || mover.dragged() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+                    }
+                    if sizer.hovered() || sizer.dragged() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+                    }
+                    if mover.dragged() {
+                        moved = mover.drag_delta();
+                    }
+                    if sizer.dragged() {
+                        widened = sizer.drag_delta().x;
+                    }
+                    ui.painter().rect_filled(
+                        Rect::from_center_size(grab.center(), vec2(40.0, 3.0)),
+                        2.0,
+                        palette.dim,
+                    );
+                    ui.painter().text(
+                        corner.center(),
+                        egui::Align2::CENTER_CENTER,
+                        "<>",
+                        theme::regular(11.0),
+                        palette.dim,
+                    );
+                }
                 (|ui: &mut egui::Ui| match kind {
                         1 => bar_rows(app, ui, &palette),
                         2 => audio_menu_body(app, ui),
@@ -4708,6 +4753,12 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
                     })(ui);
             });
         });
+    if moved != Vec2::ZERO {
+        ctx.data_mut(|data| data.insert_temp(id, (kind, pos + moved)));
+    }
+    if widened != 0.0 {
+        ctx.data_mut(|data| data.insert_temp(width_id, (menu_width + widened * 2.0).clamp(240.0, 640.0)));
+    }
     let outside = ctx.input(|input| {
         input.pointer.any_pressed()
             && input
@@ -4719,6 +4770,7 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
         ctx.data_mut(|data| data.remove::<(u8, egui::Pos2)>(id));
     }
 }
+
 
 /// The three groups of the row as three tiles, in the order they sit in the
 /// row. Drag a tile along the strip to move that group.

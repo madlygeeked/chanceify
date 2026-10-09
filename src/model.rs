@@ -1460,6 +1460,8 @@ pub enum Action {
     SetMiniVis(u8),
     /// Cycles what clicking a song with a modifier held does: queue with Ctrl, with Alt, or nothing.
     CycleQueueClick,
+    /// Checks Last.fm for the picture of every album and artist in the library, a few at a time.
+    ToggleArtSweep,
     ToggleVisReverse,
     ToggleMissingMarkBig,
     ToggleMiniOnTop,

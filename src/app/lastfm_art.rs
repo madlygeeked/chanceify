@@ -91,6 +91,49 @@ impl App {
                 self.queue_art(&api_key, Kind::Artist, key, file, None, artist_id, &artist, "", &root);
             }
         }
+        // The library sweep: one album (and its artist) at a time, never
+        // more than a few waiting, so Last.fm is asked gently.
+        if self.art_sweep && self.art_sweep_count as usize > self.library.albums.items.len() * 3 + 10 {
+            // Last.fm is not answering; stop rather than ask forever.
+            self.art_sweep = false;
+            self.toast("Last.fm is not answering. Try the library check again later.");
+        }
+        if self.art_sweep && self.art_exports.len() < 4 {
+            let root = self.art_root();
+            let next = self.library.albums.items.iter().find_map(|saved| {
+                let album = &saved.album;
+                let artist = album.artists.first()?;
+                if album.name.is_empty() || artist.name.is_empty() {
+                    return None;
+                }
+                let key = lastfm_art::album_key(&artist.name, &album.name);
+                (!self.art_asked.contains(&key)).then(|| {
+                    (
+                        artist.name.clone(),
+                        artist.id.clone(),
+                        album.name.clone(),
+                        album.images.first().map(|image| image.url.clone()),
+                    )
+                })
+            });
+            match next {
+                Some((artist, artist_id, album, cover)) => {
+                    self.art_sweep_count += 1;
+                    let key = lastfm_art::album_key(&artist, &album);
+                    let file = lastfm_art::file_name(Kind::Album, &artist, &album);
+                    self.queue_art(&api_key, Kind::Album, key, file, cover, None, &artist, &album, &root);
+                    let key = lastfm_art::artist_key(&artist);
+                    let file = lastfm_art::file_name(Kind::Artist, &artist, "");
+                    self.queue_art(&api_key, Kind::Artist, key, file, None, artist_id, &artist, "", &root);
+                }
+                None => {
+                    self.art_sweep = false;
+                    let count = self.art_sweep_count;
+                    self.toast(format!("Checked {count} albums from your library"));
+                }
+            }
+            ctx.request_repaint_after(Duration::from_millis(400));
+        }
         // Answers from Last.fm.
         let answers = self.art_checker.take();
         if !answers.is_empty() {

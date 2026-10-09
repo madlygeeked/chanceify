@@ -2439,6 +2439,13 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     {
                         app.actions.push(Action::OpenMissingArtFolder);
                     }
+                    let sweep_label = if app.art_sweep { "Stop checking my library" } else { "Check my whole library" };
+                    if theme::soft_button(ui, &palette, None, sweep_label, app.art_sweep)
+                        .on_hover_text("Asks Last.fm about the picture of every album and artist you have saved, a few at a time. The ones it lacks go in the missing lists.")
+                        .clicked()
+                    {
+                        app.actions.push(Action::ToggleArtSweep);
+                    }
                     let mark_label = if app.settings.missing_mark_big {
                         "Missing-cover mark: on"
                     } else {

@@ -20,6 +20,18 @@ impl App {
     /// How strong the bass of what is playing is right now, 0 to 1 (0 when
     /// nothing is playing). Read from the same tap the visualizers use.
     pub fn music_bass_level(&self) -> f32 {
+        self.music_bass_level_raw().max(self.jump_level())
+    }
+
+    /// The press of the bass-jump key: 1 at the press, falling to 0 in a
+    /// quarter of a second.
+    pub fn jump_level(&self) -> f32 {
+        self.jump_at.map_or(0.0, |at| {
+            (1.0 - at.elapsed().as_secs_f32() / 0.28).clamp(0.0, 1.0)
+        })
+    }
+
+    fn music_bass_level_raw(&self) -> f32 {
         if !self.now_playing().is_some_and(|now| now.playing) {
             return 0.0;
         }
