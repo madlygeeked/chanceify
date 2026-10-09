@@ -88,6 +88,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     if app.calm_mode {
         calm::show(app, ui);
         keys::handle(app, ctx);
+        views_panel::show(app, ctx);
         toasts(app, ctx, 20.0);
         return;
     }
@@ -121,7 +122,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     if jump > 0.0 {
         let screen = ctx.content_rect();
         ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("bass-jump")))
-            .rect_filled(screen, 0.0, app.palette.accent.gamma_multiply(0.22 * jump));
+            .rect_filled(screen, 0.0, app.cover_colour().unwrap_or(app.palette.accent).gamma_multiply(0.22 * jump));
         ctx.request_repaint();
     }
     player_bar::show(app, ui);

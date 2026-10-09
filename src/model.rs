@@ -1157,6 +1157,10 @@ pub enum Action {
     /// Shuffle a loaded playlist so neighbouring songs have similar tempos.
     SmartShufflePlay(String),
     TogglePlay,
+    /// Plays if paused; does nothing if already playing.
+    PlayOnly,
+    /// Pauses if playing; does nothing if already paused.
+    PauseOnly,
     Next,
     Previous,
     Seek(u32),

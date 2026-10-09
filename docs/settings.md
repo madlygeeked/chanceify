@@ -65,3 +65,13 @@ title: Settings explained
 - The six dots (or right-click the empty bar): "Spotify layout" (song bar above, controls in the middle, volume on the right) or "My own layout" (drag the dotted handle on the controls or the volume anywhere in the bar).
 - With the big album art on, the library list always ends above the art (grid mode too).
 - The Queue and Recent tabs are as tall as the window buttons.
+
+## 0.80.0
+- The disc is always on screen, on its own round back. Click it for Views, drag it anywhere, double-click to put it back. The sidebar no longer has a second disc.
+- Right-click the laptop (Local songs) to open your Last.fm profile.
+- Visualizer settings: Bars, Flow and Swirl each have their own column with the switch on top. Colour, Title and Full-screen lyrics sit in a second row.
+- Last.fm: Test connection, Refresh numbers and Love the playing song are gone from Settings. Numbers refresh by themselves every 10 songs. The missing lists show about 20 rows.
+- Right-click any song, cover or name: Open in Last.fm at the bottom.
+- Songs: no three dots (right-click instead). No heart or "+" while LIKED is off.
+- Keys: Ctrl+Z undoes a removal (fixed). "Close to the tray". New Play and Pause keys beside Play or pause. The speed-scene key is gone. Bass jump shakes the screen and flashes in the cover's colour.
+- My view also saves the zoom and the window size.

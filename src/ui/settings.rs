@@ -2408,22 +2408,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 );
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
-                    if theme::soft_button(ui, &palette, Some(Icon::Heart), "Love the playing song", false)
-                        .clicked()
-                    {
-                        app.actions.push(Action::LastfmLove);
-                    }
-                    if theme::soft_button(ui, &palette, Some(Icon::Refresh), "Refresh numbers", false)
-                        .clicked()
-                    {
-                        app.actions.push(Action::LastfmRefresh);
-                    }
-                    if theme::soft_button(ui, &palette, None, "Test the connection", false)
-                        .on_hover_text("Asks Last.fm (through the chanceify worker) a harmless question and tells you if it answered.")
-                        .clicked()
-                    {
-                        app.actions.push(Action::LastfmPing);
-                    }
                     if theme::soft_button(ui, &palette, Some(Icon::ExternalLink), "Last.fm missing images", false)
                         .clicked()
                     {
@@ -2840,7 +2824,7 @@ fn note(ui: &mut egui::Ui, palette: &Palette, text: &str) {
 
 
 /// Percent-encodes one part of a Last.fm address; Last.fm writes spaces as +.
-fn last_fm_part(text: &str) -> String {
+pub(crate) fn last_fm_part(text: &str) -> String {
     let mut out = String::new();
     for byte in text.trim().bytes() {
         match byte {
@@ -2908,7 +2892,7 @@ fn missing_lists(ui: &mut egui::Ui, app: &mut App, palette: &Palette) {
             }
             egui::ScrollArea::vertical()
                 .id_salt(("missing-scroll", artists))
-                .max_height((ui.ctx().content_rect().height() * 0.5).max(260.0))
+                .max_height((ui.ctx().content_rect().height() * 0.8).max(560.0))
                 .auto_shrink([false, true])
                 .show(ui, |ui| {
                     for name in names.iter() {

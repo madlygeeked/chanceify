@@ -123,7 +123,12 @@ impl Default for TrackColumns {
 impl TrackColumns {
     /// How wide the heart and "+" buttons are together.
     pub fn buttons_width(&self) -> f32 {
-        36.0 * (u8::from(!self.hide_heart) + u8::from(!self.hide_plus)) as f32
+        // The "+" goes with the heart: no liked column, no buttons.
+        if self.hide_heart {
+            0.0
+        } else {
+            36.0 * (1 + u8::from(!self.hide_plus)) as f32
+        }
     }
 
     /// The narrowest a column may be dragged before it is treated as hidden.
@@ -504,6 +509,12 @@ pub struct MyView {
     pub lyrics_panel: bool,
     pub shapes: u8,
     pub art_expanded: bool,
+    /// The interface zoom when it was saved; 0 means not saved.
+    #[serde(default)]
+    pub zoom: f32,
+    /// The window's inner size when it was saved.
+    #[serde(default)]
+    pub window: Option<[f32; 2]>,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -3274,6 +3285,6 @@ mod session_tests {
         assert!(!columns.hide_heart && !columns.hide_plus);
         assert_eq!(columns.buttons_width(), 72.0);
         let one = TrackColumns { hide_heart: true, ..columns };
-        assert_eq!(one.buttons_width(), 36.0);
+        assert_eq!(one.buttons_width(), 0.0);
     }
 }

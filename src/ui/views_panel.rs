@@ -47,9 +47,6 @@ pub fn zoom_row(ui: &mut egui::Ui, app: &mut App, palette: &Palette) {
 pub fn corner_disc(app: &mut App, ctx: &Context) {
     let full = app.fullscreen_vis || app.lyrics_fullscreen.is_some();
     let moved = app.settings.views_disc;
-    if moved.is_none() && !full && !app.mini_active && app.settings.sidebar_visible {
-        return;
-    }
     let palette = dark_palette(app);
     let screen = ctx.content_rect();
     let size = if app.mini_active { 16.0 } else { 22.0 };
@@ -73,6 +70,17 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
         .show(ctx, |ui| {
             let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(size + 12.0), egui::Sense::click_and_drag());
             let hot = response.hovered() || response.dragged();
+            // A round dark back, so the disc reads over any picture.
+            ui.painter().circle_filled(
+                rect.center(),
+                (size + 12.0) / 2.0,
+                Color32::from_black_alpha(if hot { 190 } else { 140 }),
+            );
+            ui.painter().circle_stroke(
+                rect.center(),
+                (size + 12.0) / 2.0,
+                Stroke::new(1.0, Color32::from_white_alpha(if hot { 90 } else { 40 })),
+            );
             theme::paint_icon(
                 ui,
                 Icon::Disc,

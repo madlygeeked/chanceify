@@ -118,7 +118,9 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "lyricsfull", label: "Full-screen lyrics", default: Key::C, action: || Action::ToggleLyricsFullscreen },
     Bindable { id: "visshapes", label: "Visualizer", default: UNSET, action: || Action::ToggleVisShapes },
     // Playback.
-    Bindable { id: "playpause", label: "Play", default: UNSET, action: || Action::TogglePlay },
+    Bindable { id: "playpause", label: "Play or pause", default: UNSET, action: || Action::TogglePlay },
+    Bindable { id: "playonly", label: "Play (only plays)", default: UNSET, action: || Action::PlayOnly },
+    Bindable { id: "pauseonly", label: "Pause (only pauses)", default: UNSET, action: || Action::PauseOnly },
     Bindable { id: "shuffle", label: "Shuffle", default: UNSET, action: || Action::ToggleShuffle },
     Bindable { id: "repeat", label: "Repeat", default: UNSET, action: || Action::CycleRepeat },
     Bindable { id: "mute", label: "Mute", default: UNSET, action: || Action::ToggleMute },
@@ -140,7 +142,6 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "previous", label: "Previous song", default: UNSET, action: || Action::Previous },
     Bindable { id: "volup", label: "Volume up", default: UNSET, action: || Action::VolumeBy(5) },
     Bindable { id: "voldown", label: "Volume down", default: UNSET, action: || Action::VolumeBy(-5) },
-    Bindable { id: "speed", label: "Cycle speed scene", default: UNSET, action: || Action::CycleSpeedPreset },
     Bindable { id: "scenes", label: "Scenes panel", default: UNSET, action: || Action::ToggleSceneBrowser },
     // Going places.
     Bindable { id: "search", label: "Search", default: UNSET, action: || Action::FocusSearch },
@@ -168,8 +169,7 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "tenth8", label: "Jump to 80% of the song", default: UNSET, action: || Action::SeekToPercent(80) },
     Bindable { id: "tenth9", label: "Jump to 90% of the song", default: UNSET, action: || Action::SeekToPercent(90) },
     // Window.
-    Bindable { id: "closewindow", label: "Close the window", default: UNSET, action: || Action::CloseWindow },
-    Bindable { id: "undo", label: "Undo a removal", default: UNSET, action: || Action::UndoRemoval },
+    Bindable { id: "closewindow", label: "Close to the tray", default: UNSET, action: || Action::CloseWindow },
     // Other.
     Bindable { id: "tutorial", label: "Shortcuts", default: Key::T, action: || Action::ShowDialog(Dialog::Shortcuts) },
 ];
@@ -215,11 +215,10 @@ pub fn read_keys(text: &str) -> Option<std::collections::BTreeMap<String, String
 pub const CATEGORIES: &[(&str, &[&str])] = &[
     ("Views", &["views", "defaultview", "calmmode", "extrawindow", "closeextras", "normalview", "mini", "fullscreen", "lyricsfull", "visshapes", "art", "closewindow"]),
     ("Panels", &["sidebar", "queuelyrics", "queue", "lyrics", "visualizer", "scenes"]),
-    ("Playback", &["playpause", "playspace", "next", "previous", "shuffle", "repeat", "speed", "tap", "lastfmlove", "sharediscord", "queuehover", "queuehovertop", "likehover", "likeplaying"]),
+    ("Playback", &["playpause", "playspace", "playonly", "pauseonly", "next", "previous", "shuffle", "repeat", "tap", "lastfmlove", "sharediscord", "queuehover", "queuehovertop", "likehover", "likeplaying"]),
     ("Volume", &["mute", "volup", "voldown", "volup5", "voldown5"]),
     ("Jump in the song", &["back10", "forward10", "seekback5", "seekfwd5", "seekwidth", "tenth0", "tenth1", "tenth2", "tenth3", "tenth4", "tenth5", "tenth6", "tenth7", "tenth8", "tenth9"]),
     ("Going places", &["search", "home", "liked", "settings", "pageback", "pageforward", "artistpage", "albumpage", "tutorial"]),
-    ("Song lists", &["undo"]),
 ];
 
 /// The id of the shortcut waiting for its new key, if any.
@@ -412,6 +411,10 @@ pub fn handle(app: &mut App, ctx: &egui::Context) {
         // The only key that is not the reader's to move. Everything else,
         // even Ctrl+W, is a shortcut they bind in the keys list.
         key(Modifiers::COMMAND, Key::Q, Action::Quit);
+        // Ctrl+Z takes back the last removal. Fixed, like Quit.
+        if !editing_text {
+            key(Modifiers::COMMAND, Key::Z, Action::UndoRemoval);
+        }
     });
     // The shortcuts the reader chose. Shift ones come first in the list.
     // A text field keeps its letters; anything else, even a focused song
@@ -550,7 +553,7 @@ pub fn shortcuts(locale: Locale) -> Vec<(Cow<'static, str>, Cow<'static, str>)> 
         ),
         (
             keys(platform_shortcut("Ctrl+W", "Cmd+W")),
-            gettext(locale, "Close the window"),
+            gettext(locale, "Close to the tray"),
         ),
         (keys(QUIT_SHORTCUT), gettext(locale, "Quit")),
     ]

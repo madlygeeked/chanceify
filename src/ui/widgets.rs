@@ -1347,6 +1347,24 @@ pub fn item_menu(
     ) {
         app.actions.push(Action::OpenInSpotify(uri));
     }
+    // The very bottom: the same song on Last.fm.
+    if let PlayableItem::Track(track) = item {
+        let artist = track.artists.first().map(|artist| artist.name.clone()).unwrap_or_default();
+        if !artist.is_empty()
+            && menu_item(
+                ui,
+                &palette,
+                Some(Icon::ExternalLink),
+                &gettext(locale, "Open in Last.fm"),
+            )
+        {
+            app.actions.push(Action::OpenUrl(format!(
+                "https://www.last.fm/music/{}/_/{}",
+                super::settings::last_fm_part(&artist),
+                super::settings::last_fm_part(&track.name)
+            )));
+        }
+    }
 }
 
 /// Menu for a context (playlist, album, artist, show).
@@ -1474,6 +1492,22 @@ pub fn context_menu_items(
         &gettext(locale, "Open in Spotify"),
     ) {
         app.actions.push(Action::OpenInSpotify(uri.to_string()));
+    }
+    if matches!(kind, "artist" | "album")
+        && !name.is_empty()
+        && menu_item(
+            ui,
+            &palette,
+            Some(Icon::ExternalLink),
+            &gettext(locale, "Open in Last.fm"),
+        )
+    {
+        let url = if kind == "artist" {
+            format!("https://www.last.fm/music/{}", super::settings::last_fm_part(name))
+        } else {
+            format!("https://www.last.fm/search?q={}", super::settings::last_fm_part(name))
+        };
+        app.actions.push(Action::OpenUrl(url));
     }
 }
 
@@ -1628,7 +1662,8 @@ pub(crate) fn table_layout(
     };
     let heart = if compact { 0.0 } else { columns.buttons_width() };
     let duration = if compact { 44.0 } else { 56.0 };
-    let more = if compact { 0.0 } else { 36.0 };
+    // The three dots are gone: right-click a song instead.
+    let more = 0.0;
     use crate::model::SortColumn as Sc;
     let fixed = number + cover + heart + duration + more + 8.0;
     // In the order they are kept when the room runs short: tempo first,
@@ -1869,7 +1904,12 @@ fn track_row_contents(
             .current_track_uri()
             .is_some_and(|uri| uri == row.item.uri());
     let playing = is_current && app.believed_playing();
-    let hovered = ui.rect_contains_pointer(rect) || response.has_focus();
+    // Over the row's own layer counts too, so a button or heart on the row
+    // never makes the play icon blink out.
+    let over_row = ui
+        .input(|input| input.pointer.hover_pos())
+        .is_some_and(|at| rect.contains(at) && ui.ctx().layer_id_at(at) == Some(ui.layer_id()));
+    let hovered = ui.rect_contains_pointer(rect) || over_row || response.has_focus();
     // Remembered for the "like the song under the pointer" key.
     if ui.rect_contains_pointer(rect) && row.item.is_track() {
         app.hovered_track = Some(row.item.uri().to_string());
@@ -2468,7 +2508,7 @@ fn track_row_contents(
         let saved = app.is_saved(row.item.uri());
         if row.item.is_track() {
             let mut slot = x;
-            if !tc.hide_plus {
+            if !tc.hide_plus && !tc.hide_heart {
                 let plus_rect = Rect::from_min_size(pos2(slot, rect.top()), vec2(36.0, row_height));
                 slot += 36.0;
                 let mut child = ui.new_child(
@@ -3319,7 +3359,7 @@ pub fn table_header(
         &widths,
         false,
     );
-    let right_fixed = columns.buttons_width() + if columns.hide_duration { 0.0 } else { 56.0 } + 36.0 + 8.0;
+    let right_fixed = columns.buttons_width() + if columns.hide_duration { 0.0 } else { 56.0 } + 8.0;
     // The headings must be drawn in exactly the order `track_row` draws the
     // cells, or every heading sits one column left of its own data. The
     // order is: album, added by, date added, tempo.
@@ -3411,7 +3451,7 @@ pub fn table_header(
     }
     if !columns.hide_duration {
     let clock = Rect::from_center_size(
-        pos2(rect.right() - 36.0 - 56.0 / 2.0 - 6.0, rect.center().y),
+        pos2(rect.right() - 56.0 / 2.0 - 6.0, rect.center().y),
         Vec2::splat(15.0),
     );
     let duration_active = sort.and_then(|sort| sort.direction(SortColumn::Duration));

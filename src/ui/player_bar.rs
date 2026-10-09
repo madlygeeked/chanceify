@@ -1738,8 +1738,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             let screen_w = ui.ctx().content_rect().width();
             // Two columns from a modest width when the swirl's column is
             // not open, so the panel is shorter and fits one screen.
-            let columns_fit = screen_w >= 1000.0
-                || (screen_w >= 700.0 && shapes & crate::settings::Settings::SHAPE_SWIRL == 0);
+            let columns_fit = screen_w >= 1000.0;
             let col_w = if columns_fit {
                 300.0
             } else {
@@ -1749,30 +1748,13 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             ui.spacing_mut().item_spacing.x = 18.0;
             ui.vertical(|ui| {
             ui.set_width(col_w);
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 6.0;
-                let width = ((ui.available_width() - 12.0) / 3.0).floor().max(80.0);
-                for (bit, kind, label) in [
-                    (crate::settings::Settings::SHAPE_BARS, ShapeIcon::Bars, "Bars"),
-                    (crate::settings::Settings::SHAPE_FLOW, ShapeIcon::Flow, "Flow"),
-                    (crate::settings::Settings::SHAPE_SWIRL, ShapeIcon::Swirl, "Swirl"),
-                ] {
-                    if shape_button(
-                        ui,
-                        &palette,
-                        kind,
-                        &gettext(app.locale, label),
-                        shapes & bit != 0,
-                        width,
-                    )
-                    .clicked()
-                    {
-                        app.actions.push(Action::ToggleVisShape(bit));
-                    }
+            {
+                let on = shapes & crate::settings::Settings::SHAPE_BARS != 0;
+                if shape_button(ui, &palette, ShapeIcon::Bars, &gettext(app.locale, "Bars"), on, col_w).clicked() {
+                    app.actions.push(Action::ToggleVisShape(crate::settings::Settings::SHAPE_BARS));
                 }
-            });
-            ui.add_space(2.0);
-
+                ui.add_space(2.0);
+            }
             // Only the settings of the shapes that are on.
             crate::crash::stage("menu: bars column");
             if shapes & crate::settings::Settings::SHAPE_BARS != 0 {
@@ -1850,7 +1832,13 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             });
             ui.vertical(|ui| {
             ui.set_width(col_w);
-            crate::crash::stage("menu: flow and colour column");
+            {
+                let on = shapes & crate::settings::Settings::SHAPE_FLOW != 0;
+                if shape_button(ui, &palette, ShapeIcon::Flow, &gettext(app.locale, "Flow"), on, col_w).clicked() {
+                    app.actions.push(Action::ToggleVisShape(crate::settings::Settings::SHAPE_FLOW));
+                }
+                ui.add_space(2.0);
+            }
             if shapes & crate::settings::Settings::SHAPE_FLOW != 0 {
                 super::widgets::menu_separator(ui, &palette);
 
@@ -1904,7 +1892,132 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     |value| app.actions.push(Action::SetFlowOffset(value)),
                 );
             }
+            });
+            ui.vertical(|ui| {
+            ui.set_width(col_w);
+            {
+                let on = shapes & crate::settings::Settings::SHAPE_SWIRL != 0;
+                if shape_button(ui, &palette, ShapeIcon::Swirl, &gettext(app.locale, "Swirl"), on, col_w).clicked() {
+                    app.actions.push(Action::ToggleVisShape(crate::settings::Settings::SHAPE_SWIRL));
+                }
+                ui.add_space(2.0);
+            }
+            if shapes & crate::settings::Settings::SHAPE_SWIRL != 0 {
+                crate::crash::stage("menu: swirl column");
+                super::widgets::menu_separator(ui, &palette);
+                let art_scroll = app.settings.swirl_art_scroll;
+                if chip(
+                    ui,
+                    &palette,
+                    &gettext(app.locale, "Scrolling album art instead of waves"),
+                    art_scroll,
+                    ui.available_width().min(290.0),
+                )
+                .clicked()
+                {
+                    app.actions.push(Action::ToggleSwirlArtScroll);
+                }
+                if art_scroll
+                    && chip(
+                        ui,
+                        &palette,
+                        &gettext(app.locale, "One cover, not mirrored"),
+                        app.settings.swirl_art_single,
+                        ui.available_width().min(290.0),
+                    )
+                    .clicked()
+                {
+                    app.actions.push(Action::ToggleSwirlArtSingle);
+                }
+                if art_scroll {
+                    slider_row(
+                        ui,
+                        &palette,
+                        &gettext(app.locale, "Soft edges between covers"),
+                        0.0..=100.0,
+                        app.settings.swirl_art_edge_value(),
+                        |value| app.actions.push(Action::SetSwirlArtEdge(value)),
+                    );
+                }
+                theme::subtle(ui, &palette, &gettext(app.locale, "MOVES WITH"));
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 6.0;
+                    for (value, name) in [(0u8, "Loudness"), (1, "Bass"), (2, "Beat"), (3, "Nothing")] {
+                        if chip(
+                            ui,
+                            &palette,
+                            &gettext(app.locale, name),
+                            app.settings.swirl_react_mode.min(3) == value,
+                            66.0,
+                        )
+                        .clicked()
+                        {
+                            app.actions.push(Action::SetSwirlReact(value));
+                        }
+                    }
+                });
+                if !art_scroll {
+                    let active = (0..crate::settings::Settings::SWIRL_PRESETS.len())
+                        .find(|index| app.settings.swirl_preset_active(*index));
+                    let names: Vec<&str> = crate::settings::Settings::SWIRL_PRESETS
+                        .iter()
+                        .map(|(name, _)| *name)
+                        .collect();
+                    // All the looks sit open, one click each: no dropdown to
+                    // open first.
+                    if let Some(index) = open_choices(
+                        ui,
+                        &palette,
+                        &gettext(app.locale, "LOOK"),
+                        &names,
+                        active,
+                    ) {
+                        app.actions.push(Action::SetSwirlPreset(index));
+                    }
+                }
+                for (index, (label, low, high, _)) in
+                    crate::settings::Settings::SWIRL_TUNE.iter().enumerate()
+                {
+                    // Scrolling art only has a speed; the ripple, blur and
+                    // colour sliders are for the waves.
+                    if art_scroll && index != 8 {
+                        continue;
+                    }
+                    slider_row(
+                        ui,
+                        &palette,
+                        &gettext(app.locale, label),
+                        *low..=*high,
+                        app.settings.swirl_tune_value(index),
+                        |value| app.actions.push(Action::SetSwirlTune(index, value)),
+                    );
+                }
+                slider_row(
+                    ui,
+                    &palette,
+                    &gettext(app.locale, "Colour drift speed"),
+                    0.2..=4.0,
+                    (9.0 / app.settings.swirl_drift_secs()) as f32,
+                    |value| app.actions.push(Action::SetSwirlDrift(value)),
+                );
+                if super::widgets::menu_item(ui, &palette, None, &gettext(app.locale, "Reset swirl")) {
+                    app.actions.push(Action::ResetSwirlTune);
+                }
+            }
+            });
+            };
+            if columns_fit {
+                ui.horizontal_top(|ui| columns(ui));
+            } else {
+                ui.vertical(|ui| columns(ui));
+            }
             super::widgets::menu_separator(ui, &palette);
+            // The settings every shape shares, then the title, then the lyrics.
+            let mut shared = |ui: &mut egui::Ui| {
+            ui.spacing_mut().item_spacing.x = 18.0;
+            ui.vertical(|ui| {
+            ui.set_width(col_w);
+            theme::subtle(ui, &palette, &gettext(app.locale, "COLOUR (ALL SHAPES)"));
             if chip(
                 ui,
                 &palette,
@@ -1979,31 +2092,10 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     }
                 });
             }
-            super::widgets::menu_separator(ui, &palette);
-            crate::crash::stage("menu: full-screen options");
-            theme::subtle(ui, &palette, &gettext(app.locale, "FULL-SCREEN VISUALIZER"));
-            if chip(
-                ui,
-                &palette,
-                "Show lyrics over it",
-                app.settings.vis_lyrics,
-                ui.available_width().min(290.0),
-            )
-            .clicked()
-            {
-                app.actions.push(Action::ToggleVisLyrics);
-            }
-            if chip(
-                ui,
-                &palette,
-                if app.settings.vis_reverse { "Scrolls right to left" } else { "Scrolls left to right" },
-                app.settings.vis_reverse,
-                ui.available_width().min(290.0),
-            )
-            .clicked()
-            {
-                app.actions.push(Action::ToggleVisReverse);
-            }
+            });
+            ui.vertical(|ui| {
+            ui.set_width(col_w);
+            theme::subtle(ui, &palette, &gettext(app.locale, "TITLE"));
             if chip(
                 ui,
                 &palette,
@@ -2113,6 +2205,21 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 }
                 crate::crash::stage("menu: after title font");
             }
+            });
+            ui.vertical(|ui| {
+            ui.set_width(col_w);
+            theme::subtle(ui, &palette, &gettext(app.locale, "FULL-SCREEN LYRICS"));
+            if chip(
+                ui,
+                &palette,
+                "Show lyrics over it",
+                app.settings.vis_lyrics,
+                ui.available_width().min(290.0),
+            )
+            .clicked()
+            {
+                app.actions.push(Action::ToggleVisLyrics);
+            }
             if chip(
                 ui,
                 &palette,
@@ -2124,118 +2231,12 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             {
                 app.actions.push(Action::ToggleVisLyricsBack);
             }
-            crate::crash::stage("menu: middle column done");
             });
-            if shapes & crate::settings::Settings::SHAPE_SWIRL != 0 {
-            ui.vertical(|ui| {
-            ui.set_width(col_w);
-                crate::crash::stage("menu: swirl column");
-                super::widgets::menu_separator(ui, &palette);
-                let art_scroll = app.settings.swirl_art_scroll;
-                if chip(
-                    ui,
-                    &palette,
-                    &gettext(app.locale, "Scrolling album art instead of waves"),
-                    art_scroll,
-                    ui.available_width().min(290.0),
-                )
-                .clicked()
-                {
-                    app.actions.push(Action::ToggleSwirlArtScroll);
-                }
-                if art_scroll
-                    && chip(
-                        ui,
-                        &palette,
-                        &gettext(app.locale, "One cover, not mirrored"),
-                        app.settings.swirl_art_single,
-                        ui.available_width().min(290.0),
-                    )
-                    .clicked()
-                {
-                    app.actions.push(Action::ToggleSwirlArtSingle);
-                }
-                if art_scroll {
-                    slider_row(
-                        ui,
-                        &palette,
-                        &gettext(app.locale, "Soft edges between covers"),
-                        0.0..=100.0,
-                        app.settings.swirl_art_edge_value(),
-                        |value| app.actions.push(Action::SetSwirlArtEdge(value)),
-                    );
-                }
-                theme::subtle(ui, &palette, &gettext(app.locale, "MOVES WITH"));
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 6.0;
-                    for (value, name) in [(0u8, "Loudness"), (1, "Bass"), (2, "Beat"), (3, "Nothing")] {
-                        if chip(
-                            ui,
-                            &palette,
-                            &gettext(app.locale, name),
-                            app.settings.swirl_react_mode.min(3) == value,
-                            66.0,
-                        )
-                        .clicked()
-                        {
-                            app.actions.push(Action::SetSwirlReact(value));
-                        }
-                    }
-                });
-                if !art_scroll {
-                    let active = (0..crate::settings::Settings::SWIRL_PRESETS.len())
-                        .find(|index| app.settings.swirl_preset_active(*index));
-                    let names: Vec<&str> = crate::settings::Settings::SWIRL_PRESETS
-                        .iter()
-                        .map(|(name, _)| *name)
-                        .collect();
-                    // All the looks sit open, one click each: no dropdown to
-                    // open first.
-                    if let Some(index) = open_choices(
-                        ui,
-                        &palette,
-                        &gettext(app.locale, "LOOK"),
-                        &names,
-                        active,
-                    ) {
-                        app.actions.push(Action::SetSwirlPreset(index));
-                    }
-                }
-                for (index, (label, low, high, _)) in
-                    crate::settings::Settings::SWIRL_TUNE.iter().enumerate()
-                {
-                    // Scrolling art only has a speed; the ripple, blur and
-                    // colour sliders are for the waves.
-                    if art_scroll && index != 8 {
-                        continue;
-                    }
-                    slider_row(
-                        ui,
-                        &palette,
-                        &gettext(app.locale, label),
-                        *low..=*high,
-                        app.settings.swirl_tune_value(index),
-                        |value| app.actions.push(Action::SetSwirlTune(index, value)),
-                    );
-                }
-                slider_row(
-                    ui,
-                    &palette,
-                    &gettext(app.locale, "Colour drift speed"),
-                    0.2..=4.0,
-                    (9.0 / app.settings.swirl_drift_secs()) as f32,
-                    |value| app.actions.push(Action::SetSwirlDrift(value)),
-                );
-                if super::widgets::menu_item(ui, &palette, None, &gettext(app.locale, "Reset swirl")) {
-                    app.actions.push(Action::ResetSwirlTune);
-                }
-            });
-            }
             };
             if columns_fit {
-                ui.horizontal_top(|ui| columns(ui));
+                ui.horizontal_top(|ui| shared(ui));
             } else {
-                ui.vertical(|ui| columns(ui));
+                ui.vertical(|ui| shared(ui));
             }
         }
     }

@@ -347,6 +347,8 @@ pub struct App {
     pub hovered_track: Option<String>,
     /// Calm mode is showing.
     pub calm_mode: bool,
+    /// Songs played this run, for refreshing the Last.fm numbers every 10.
+    lastfm_song_count: u32,
     /// The extra visualizer window is open.
     pub extra_vis: bool,
     pub extra_vis_since: Option<std::time::Instant>,
@@ -1044,6 +1046,7 @@ impl App {
             recap: None,
             hovered_track: None,
             calm_mode: false,
+            lastfm_song_count: 0,
             extra_vis: false,
             extra_vis_since: None,
             theme_preview: None,
@@ -2047,6 +2050,13 @@ impl App {
     }
 
     /// The colour to tint the interface with, from the playing art.
+    /// The playing cover's colour, whatever the accent-from-artwork setting says.
+    pub fn cover_colour(&self) -> Option<Color32> {
+        let now = self.now_playing()?;
+        let url = now.art_small.or(now.art_url)?;
+        self.accents.get(&url).copied()
+    }
+
     pub fn now_playing_tint(&self) -> Option<Color32> {
         if !self.settings.accent_from_art {
             return None;
@@ -3581,6 +3591,10 @@ impl App {
         let Some(now) = self.now_playing_live() else {
             return;
         };
+        self.lastfm_song_count = self.lastfm_song_count.wrapping_add(1);
+        if self.lastfm_song_count % 10 == 0 && !self.settings.lastfm_user.is_empty() {
+            self.actions.push(Action::LastfmRefresh);
+        }
         // A song from a file has no queue, no saved state and no Spotify id.
         if crate::file_deck::is_file_uri(&now.uri) {
             return;
@@ -9974,6 +9988,16 @@ impl App {
                 self.play_request(PlayRequest::context(uri), true);
             }
             Action::TogglePlay => self.toggle_play(),
+            Action::PlayOnly => {
+                if !self.now_playing().is_some_and(|now| now.playing) {
+                    self.toggle_play();
+                }
+            }
+            Action::PauseOnly => {
+                if self.now_playing().is_some_and(|now| now.playing) {
+                    self.toggle_play();
+                }
+            }
             Action::Next if self.deck_active() => {
                 self.deck_control(|deck| deck.next());
             }
@@ -10816,6 +10840,10 @@ impl App {
                     lyrics_panel: self.show_lyrics_panel,
                     shapes: self.settings.vis_shapes_value(),
                     art_expanded: self.settings.art_expanded,
+                    zoom: self.settings.zoom,
+                    window: ctx
+                        .input(|input| input.viewport().inner_rect)
+                        .map(|rect| [rect.width(), rect.height()]),
                 });
                 self.mark_settings_dirty();
                 self.toast("Saved your view");
@@ -10828,6 +10856,17 @@ impl App {
                     self.show_queue_panel = view.queue;
                     self.show_lyrics_panel = view.lyrics_panel;
                     self.settings.art_expanded = view.art_expanded;
+                    if view.zoom.is_finite() && view.zoom > 0.0 {
+                        self.settings.zoom = view.zoom;
+                    }
+                    if let Some([w, h]) = view.window
+                        && w >= 300.0
+                        && h >= 260.0
+                        && !self.mini_active
+                        && !ctx.input(|input| input.viewport().maximized.unwrap_or(false))
+                    {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(w, h)));
+                    }
                     let flip = self.settings.vis_shapes_value() ^ view.shapes;
                     for bit in [1u8, 2, 4] {
                         if flip & bit != 0 {
@@ -12651,6 +12690,19 @@ impl App {
             crate::ui::winamp::show(self, ui);
         } else {
             crate::ui::show(self, ui);
+        }
+        // The bass jump: everything drawn this frame shakes for a moment.
+        let jump = self.jump_level();
+        if jump > 0.0 {
+            let t = ctx.input(|input| input.time) as f32;
+            let amp = 7.0 * jump;
+            let shift = egui::vec2((t * 95.0).sin() * amp, (t * 71.0).cos() * amp * 0.7);
+            let transform = egui::emath::TSTransform::from_translation(shift);
+            let layers: Vec<egui::LayerId> = ctx.memory(|memory| memory.layer_ids().collect());
+            for layer in layers {
+                ctx.transform_layer_shapes(layer, transform);
+            }
+            ctx.request_repaint();
         }
         self.apply_actions(ctx);
         let autoscroll = self.autoscroll.finish(
