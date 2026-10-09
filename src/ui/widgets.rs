@@ -4212,6 +4212,24 @@ pub fn text_edit(ui: &mut Ui, locale: Locale, edit: egui::TextEdit<'_>) -> egui:
 }
 
 /// A text field with a leading search icon.
+/// A field in the window's top strip: dragging it (before it has focus)
+/// moves the borderless window, a plain click steps into it, and once it has
+/// focus dragging selects text, double-click picks a word.
+pub fn drag_window_from_field(ui: &mut Ui, response: &egui::Response, key: &str) {
+    if !response.has_focus()
+        && crate::window::custom_titlebar()
+        && cfg!(any(target_os = "macos", windows))
+    {
+        let grab = ui.interact(response.rect, egui::Id::new(("field-window-drag", key)), Sense::click_and_drag());
+        if grab.drag_started_by(egui::PointerButton::Primary) {
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
+        }
+        if grab.clicked() || grab.double_clicked() {
+            response.request_focus();
+        }
+    }
+}
+
 pub fn search_field(
     ui: &mut Ui,
     palette: &Palette,

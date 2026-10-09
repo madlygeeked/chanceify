@@ -297,6 +297,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     app.actions.push(Action::Forward);
                 }
             }
+            // The Views disc: always here, left of the playing-from cover.
+            super::views_panel::topbar_disc(ui, app);
+            ui.add_space(6.0);
             // The cover of the playlist that is playing, left of the search
             // field: a glance says where the music is coming from, and a
             // click goes there.
@@ -429,7 +432,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
                 }
                 // A plain click (no drag) steps into the field.
-                if grab.clicked() {
+                if grab.clicked() || grab.double_clicked() {
                     response.request_focus();
                 }
             }

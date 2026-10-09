@@ -339,6 +339,8 @@ pub struct App {
     pub guest: bool,
     /// Whether the floating Views and panels window is open.
     pub views_panel: bool,
+    /// The bug test checklist window.
+    pub show_bug_guide: bool,
     /// The page should scroll to its top on the next frame.
     pub scroll_top: bool,
     /// The recap picture window, while open.
@@ -1042,6 +1044,7 @@ impl App {
             offline: false,
             guest: false,
             views_panel: false,
+            show_bug_guide: false,
             scroll_top: false,
             recap: None,
             hovered_track: None,

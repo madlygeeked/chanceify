@@ -44,6 +44,44 @@ pub fn zoom_row(ui: &mut egui::Ui, app: &mut App, palette: &Palette) {
 /// The Views disc: a small disc the mouse can drag anywhere and click to open
 /// the Views panel, on every screen. Until it has been moved, it stays out of
 /// the way where the sidebar has its own disc.
+/// How much of the disc shows: all of it while the pointer is near (or the
+/// panel is open), `floor` of it after a few seconds away.
+fn idle_dim(ctx: &Context, panel_open: bool, floor: f32, over: bool) -> f32 {
+    let seen_id = Id::new("views-disc-seen");
+    let now_t = ctx.input(|input| input.time);
+    if over {
+        ctx.data_mut(|data| data.insert_temp(seen_id, now_t));
+    }
+    let last_seen: f64 = ctx.data(|data| data.get_temp(seen_id)).unwrap_or(now_t);
+    let calm = !panel_open && now_t - last_seen > 2.5;
+    let dim = ctx.animate_value_with_time(seen_id.with("dim"), if calm { floor.clamp(0.05, 1.0) } else { 1.0 }, 0.5);
+    if !calm && !panel_open {
+        ctx.request_repaint_after(std::time::Duration::from_millis(500));
+    }
+    dim
+}
+
+/// The disc as a fixed button in the top bar, left of the playing-from
+/// cover: a click opens or closes the panel.
+pub fn topbar_disc(ui: &mut egui::Ui, app: &mut App) {
+    let palette = dark_palette(app);
+    let size = 32.0;
+    let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(size), egui::Sense::click());
+    let over = response.hovered();
+    let dim = idle_dim(ui.ctx(), app.views_panel, app.settings.disc_dim, over);
+    ui.set_opacity(dim);
+    ui.painter().circle_filled(rect.center(), size / 2.0, Color32::from_black_alpha(if over { 190 } else { 140 }));
+    ui.painter().circle_stroke(rect.center(), size / 2.0, Stroke::new(1.0, Color32::from_white_alpha(if over { 90 } else { 40 })));
+    theme::paint_icon(ui, Icon::Disc, rect, 20.0, if over { palette.text } else { Color32::from_white_alpha(150) });
+    ui.set_opacity(1.0);
+    if over {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    if response.clicked() || response.secondary_clicked() {
+        app.actions.push(Action::ToggleViewsPanel);
+    }
+}
+
 pub fn corner_disc(app: &mut App, ctx: &Context) {
     let full = app.fullscreen_vis || app.lyrics_fullscreen.is_some();
     let moved = app.settings.views_disc;
@@ -68,8 +106,7 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
     // The press, the move and the release are read straight from the pointer,
     // so no other layer can ever swallow a click on the disc.
     let grab_id = Id::new("views-disc-grab");
-    let seen_id = Id::new("views-disc-seen");
-    let (pos, pressed, down, released, right_released, now_t) = ctx.input(|input| {
+    let (pos, pressed, down, released, right_released, _now_t) = ctx.input(|input| {
         (
             input.pointer.interact_pos(),
             input.pointer.primary_pressed(),
@@ -106,16 +143,7 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
     }
     ctx.data_mut(|data| data.insert_temp(grab_id, grab));
     let over = pos.is_some_and(|p| hit.contains(p)) || grab.is_some();
-    if over {
-        ctx.data_mut(|data| data.insert_temp(seen_id, now_t));
-    }
-    let last_seen: f64 = ctx.data(|data| data.get_temp(seen_id)).unwrap_or(now_t);
-    let calm = !app.views_panel && grab.is_none() && now_t - last_seen > 2.5;
-    let floor = app.settings.disc_dim.clamp(0.05, 1.0);
-    let dim = ctx.animate_value_with_time(seen_id.with("dim"), if calm { floor } else { 1.0 }, 0.5);
-    if !calm && !app.views_panel {
-        ctx.request_repaint_after(std::time::Duration::from_millis(500));
-    }
+    let dim = idle_dim(ctx, app.views_panel, app.settings.disc_dim, over || grab.is_some());
     if toggle {
         app.actions.push(Action::ToggleViewsPanel);
         ctx.request_repaint();
@@ -146,7 +174,7 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
                 size,
                 if hot { palette.text } else { Color32::from_white_alpha(if app.mini_active { 110 } else { 150 }) },
             );
-            response.on_hover_text("Views. Click to open, drag to move.");
+            let _ = response;
             if hot {
                 ui.ctx().set_cursor_icon(if grab.is_some_and(|g| g.2) {
                     egui::CursorIcon::Grabbing
@@ -254,7 +282,10 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
 }
 
 pub fn show(app: &mut App, ctx: &Context) {
-    corner_disc(app, ctx);
+    let has_topbar = !(app.fullscreen_vis || app.lyrics_fullscreen.is_some() || app.mini_active || app.calm_mode);
+    if !has_topbar {
+        corner_disc(app, ctx);
+    }
     floating_controls(app, ctx);
     if !app.views_panel {
         return;
@@ -273,7 +304,7 @@ pub fn show(app: &mut App, ctx: &Context) {
         });
     let mut close = false;
     egui::Window::new("Views")
-        .id(Id::new("views-panel"))
+        .id(Id::new("views-panel-v2"))
         .title_bar(false)
         .order(egui::Order::Foreground)
         .frame(frame)
@@ -281,7 +312,7 @@ pub fn show(app: &mut App, ctx: &Context) {
         .default_width(320.0)
         .min_width(240.0)
         .resizable(true)
-        .collapsible(true)
+        .collapsible(false)
         .show(ctx, |ui| {
             ui.visuals_mut().override_text_color = Some(palette.text);
             egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui| {
@@ -386,6 +417,9 @@ pub fn show(app: &mut App, ctx: &Context) {
                     if theme::soft_button(ui, &palette, None, "Default controls", false).clicked() {
                         app.actions.push(Action::ResetBlockNudge);
                     }
+                    if theme::soft_button(ui, &palette, Some(Icon::Info), "Bug test guide", false).clicked() {
+                        app.show_bug_guide = !app.show_bug_guide;
+                    }
                     if theme::soft_button(ui, &palette, Some(Icon::Info), "Shortcuts", false).clicked() {
                         app.actions.push(Action::ShowDialog(crate::model::Dialog::Shortcuts));
                     }
@@ -394,5 +428,35 @@ pub fn show(app: &mut App, ctx: &Context) {
         });
     if close {
         app.actions.push(Action::ToggleViewsPanel);
+    }
+    bug_guide(app, ctx);
+}
+
+/// The bug test checklist, in a window of its own.
+fn bug_guide(app: &mut App, ctx: &Context) {
+    if !app.show_bug_guide {
+        return;
+    }
+    let mut open = true;
+    egui::Window::new("How to bug test chanceify")
+        .id(Id::new("bug-guide"))
+        .open(&mut open)
+        .default_width(480.0)
+        .default_height(420.0)
+        .resizable(true)
+        .show(ctx, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                for line in include_str!("../../docs/BUG_TEST_GUIDE.md").lines() {
+                    let line = line.trim_start_matches('#').trim();
+                    if line.is_empty() {
+                        ui.add_space(4.0);
+                    } else {
+                        ui.label(line);
+                    }
+                }
+            });
+        });
+    if !open {
+        app.show_bug_guide = false;
     }
 }

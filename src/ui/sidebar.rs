@@ -1308,7 +1308,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
         if wide {
             ui.add_space(6.0);
             let room = (ui.available_width() - 6.0).max(60.0);
-            super::widgets::search_field(
+            let filter_response = super::widgets::search_field(
                 ui,
                 &palette,
                 locale,
@@ -1317,6 +1317,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                 "Filter",
                 room,
             );
+            super::widgets::drag_window_from_field(ui, &filter_response, "library-filter");
         }
     });
     if !wide {
@@ -1324,7 +1325,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
         ui.horizontal(|ui| {
             ui.add_space(2.0);
             let room = (ui.available_width() - 6.0).max(40.0);
-            super::widgets::search_field(
+            let filter_response = super::widgets::search_field(
                 ui,
                 &palette,
                 locale,
@@ -1333,6 +1334,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                 "Filter",
                 room,
             );
+            super::widgets::drag_window_from_field(ui, &filter_response, "library-filter");
         });
     }
     // No Search row: the search field in the top bar, beside the back and

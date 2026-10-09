@@ -498,13 +498,8 @@ pub fn titlebar_drag(ui: &mut egui::Ui, rect: egui::Rect) {
         ui.id().with("titlebar-drag"),
         egui::Sense::click_and_drag(),
     );
-    if crate::window::custom_titlebar() && response.double_clicked() {
-        let maximized = ui
-            .ctx()
-            .input(|input| input.viewport().maximized.unwrap_or(false));
-        ui.ctx()
-            .send_viewport_cmd(egui::ViewportCommand::Maximized(!maximized));
-    } else if (crate::window::custom_titlebar() && response.drag_started())
+    // Only the maximize button maximizes: a double-click here does nothing.
+    if (crate::window::custom_titlebar() && response.drag_started())
         || (cfg!(target_os = "macos")
             && response.is_pointer_button_down_on()
             && ui.input(|input| input.pointer.primary_pressed())
