@@ -838,6 +838,8 @@ pub struct Settings {
     pub vis_presets: Vec<VisPreset>,
     /// Where the reader dragged the Views disc to, in points from the window's top left.
     pub views_disc: Option<[f32; 2]>,
+    /// How much of the Views disc shows when the pointer has been away (0.2 = a fifth).
+    pub disc_dim: f32,
     /// The pop-out controls: [x, y, width]. None = not shown.
     pub float_controls: Option<[f32; 3]>,
     /// Hovering a theme in the list shows it for the moment.
@@ -1247,6 +1249,7 @@ impl Default for Settings {
             discord_swirl: true,
             my_view: None,
             views_disc: None,
+            disc_dim: 0.2,
             float_controls: None,
             theme_point_preview: false,
             discord_playlist: false,

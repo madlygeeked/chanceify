@@ -64,31 +64,70 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
     );
     let mut drop_at: Option<egui::Pos2> = None;
     let reset = false;
-    // Above every other layer, so nothing drawn later can sit over it and
-    // swallow the click.
+    let hit = egui::Rect::from_min_size(at, egui::Vec2::splat(size + 12.0));
+    // The press, the move and the release are read straight from the pointer,
+    // so no other layer can ever swallow a click on the disc.
+    let grab_id = Id::new("views-disc-grab");
+    let seen_id = Id::new("views-disc-seen");
+    let (pos, pressed, down, released, right_released, now_t) = ctx.input(|input| {
+        (
+            input.pointer.interact_pos(),
+            input.pointer.primary_pressed(),
+            input.pointer.primary_down(),
+            input.pointer.primary_released(),
+            input.pointer.button_released(egui::PointerButton::Secondary),
+            input.time,
+        )
+    });
+    // (where the press started, offset inside the disc, travelled far enough to be a drag)
+    let mut grab: Option<(egui::Pos2, egui::Vec2, bool)> = ctx
+        .data(|data| data.get_temp::<Option<(egui::Pos2, egui::Vec2, bool)>>(grab_id))
+        .flatten();
+    let mut toggle = false;
+    if pressed && let Some(p) = pos.filter(|p| hit.contains(*p)) {
+        grab = Some((p, p - at, false));
+    }
+    if let Some((start, offset, moved)) = grab {
+        if let Some(p) = pos {
+            if down && (moved || (p - start).length() > 6.0) {
+                grab = Some((start, offset, true));
+                drop_at = Some(p - offset);
+            }
+        }
+        if released || !down && !pressed {
+            if !moved && released && pos.is_some_and(|p| hit.expand(6.0).contains(p)) {
+                toggle = true;
+            }
+            grab = None;
+        }
+    }
+    if right_released && pos.is_some_and(|p| hit.contains(p)) {
+        toggle = true;
+    }
+    ctx.data_mut(|data| data.insert_temp(grab_id, grab));
+    let over = pos.is_some_and(|p| hit.contains(p)) || grab.is_some();
+    if over {
+        ctx.data_mut(|data| data.insert_temp(seen_id, now_t));
+    }
+    let last_seen: f64 = ctx.data(|data| data.get_temp(seen_id)).unwrap_or(now_t);
+    let calm = !app.views_panel && grab.is_none() && now_t - last_seen > 2.5;
+    let floor = app.settings.disc_dim.clamp(0.05, 1.0);
+    let dim = ctx.animate_value_with_time(seen_id.with("dim"), if calm { floor } else { 1.0 }, 0.5);
+    if !calm && !app.views_panel {
+        ctx.request_repaint_after(std::time::Duration::from_millis(500));
+    }
+    if toggle {
+        app.actions.push(Action::ToggleViewsPanel);
+        ctx.request_repaint();
+    }
     egui::Area::new(Id::new("views-corner-disc"))
         .order(egui::Order::Tooltip)
         .interactable(true)
         .fixed_pos(at)
         .show(ctx, |ui| {
-            // Dims a few seconds after the pointer leaves it, and comes back
-            // the moment the pointer is over it (or the panel is open).
-            let seen_id = Id::new("views-disc-seen");
-            let now_t = ui.ctx().input(|input| input.time);
-            let last_seen: f64 = ui.data(|data| data.get_temp(seen_id)).unwrap_or(now_t);
-            let calm = !app.views_panel && now_t - last_seen > 3.0;
-            let dim = ui.ctx().animate_value_with_time(seen_id.with("dim"), if calm { 0.4 } else { 1.0 }, 0.5);
             ui.set_opacity(dim);
             let (rect, response) = ui.allocate_exact_size(egui::Vec2::splat(size + 12.0), egui::Sense::click_and_drag());
-            let hot = response.hovered() || response.dragged();
-            if hot {
-                ui.data_mut(|data| data.insert_temp(seen_id, now_t));
-            } else {
-                ui.data_mut(|data| data.insert_temp(seen_id, last_seen));
-                if !calm {
-                    ui.ctx().request_repaint_after(std::time::Duration::from_millis(500));
-                }
-            }
+            let hot = over;
             // A round dark back, so the disc reads over any picture.
             ui.painter().circle_filled(
                 rect.center(),
@@ -107,35 +146,13 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
                 size,
                 if hot { palette.text } else { Color32::from_white_alpha(if app.mini_active { 110 } else { 150 }) },
             );
-            response
-                .clone()
-                .on_hover_text("Views. Click to open, drag to move.");
+            response.on_hover_text("Views. Click to open, drag to move.");
             if hot {
-                ui.ctx().set_cursor_icon(if response.dragged() {
+                ui.ctx().set_cursor_icon(if grab.is_some_and(|g| g.2) {
                     egui::CursorIcon::Grabbing
                 } else {
                     egui::CursorIcon::PointingHand
                 });
-            }
-            // How far the pointer travelled while it was down: a press that
-            // barely moved is a click even if egui called it a drag.
-            let travel_id = Id::new("views-disc-travel");
-            let mut travel: f32 = ui.data(|data| data.get_temp(travel_id)).unwrap_or(0.0);
-            if response.dragged() {
-                travel += response.drag_delta().length();
-                if travel > 6.0 {
-                    drop_at = Some(at + response.drag_delta());
-                }
-            }
-            let small = travel <= 6.0;
-            if response.drag_stopped() || response.clicked() {
-                ui.data_mut(|data| data.insert_temp(travel_id, 0.0f32));
-            } else {
-                ui.data_mut(|data| data.insert_temp(travel_id, travel));
-            }
-            if response.secondary_clicked() || ((response.clicked() || response.drag_stopped()) && small) {
-                app.actions.push(Action::ToggleViewsPanel);
-                ui.ctx().request_repaint();
             }
         });
     if reset {
@@ -331,6 +348,12 @@ pub fn show(app: &mut App, ctx: &Context) {
                         .clicked()
                     {
                         app.actions.push(Action::MoveViewsDisc(None));
+                    }
+                    ui.spacing_mut().slider_width = 90.0;
+                    let mut dim = app.settings.disc_dim;
+                    if ui.add(egui::Slider::new(&mut dim, 0.05..=1.0).text("Disc when idle")).changed() {
+                        app.settings.disc_dim = dim;
+                        app.mark_settings_dirty();
                     }
                     if theme::soft_button(ui, &palette, None, "Default controls", false).clicked() {
                         app.actions.push(Action::ResetBlockNudge);
