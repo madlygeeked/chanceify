@@ -36,3 +36,7 @@ title: Settings explained
 - **Discord swirl**: the small picture on the cover is a swirl in the cover's colour (Settings > Discord). The pictures are in `docs/swirl` and are served from the chanceify GitHub page, so they show once that page is switched on.
 
 - **Discord playlist and profile**: "Say which playlist I'm playing from" adds the playlist name to the hover text, and "Add a button to my Spotify profile" adds a button (Discord shows two buttons at most, so it replaces "Get chanceify"). Both are off until you turn them on. Settings > Discord also shows a live preview of what is being sent.
+
+- **Themes** are a grid of small pictures. Point at one to see it on the whole window; the "Preview a theme when I point at it" switch turns that off.
+- **Proxy** (was Network proxy) has just Off, System, HTTP and SOCKS5 and their boxes.
+- **Views** (the disc): a bare disc with buttons for the mini player, visualizer, full screen visualizer, library only and the default view (library, queue and the visualizer along the bottom). The disc also sits in the mini player. The mini player has the same visualizer and the same Visualizer settings as everywhere else, and shows the volume number.

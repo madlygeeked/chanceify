@@ -45,11 +45,13 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             let area = ui.max_rect();
             // Something bright moving behind everything, in the cover's
             // colours, sized to whatever the window is.
-            let vis = app.settings.mini_vis_mode();
-            if vis > 0 {
+            // The very same visualizer, with the very same settings, as
+            // everywhere else (Visualizer settings in the right-click menu).
+            let shapes = app.settings.vis_shapes_value();
+            if shapes != 0 {
                 let moving =
-                    super::player_bar::lyrics_backdrop(app, ui, area, now.as_ref(), vis - 1);
-                if vis >= 2 {
+                    super::player_bar::lyrics_backdrop(app, ui, area, now.as_ref(), 3);
+                if shapes != crate::settings::Settings::SHAPE_BARS {
                     // Flow and swirl fill the window: a light veil keeps
                     // the words readable.
                     ui.painter()
@@ -97,6 +99,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 portrait(app, &mut inner, body, now.as_ref());
             }
         });
+    // The shared visualizer settings panel, the same one as in every other view.
+    super::player_bar::vis_panel_window(app, &ctx);
 }
 
 /// The right-click menu of the mini player.
@@ -112,10 +116,11 @@ fn options_menu(app: &mut App, page: &egui::Response) {
             if widgets::menu_item(ui, &palette, tick(app.settings.mini_volume), "Volume") {
                 app.actions.push(Action::ToggleMiniVolume);
             }
-            for (value, label) in [(0u8, "No visualizer"), (1, "Bars"), (2, "Flow"), (3, "Swirl")] {
-                if widgets::menu_item(ui, &palette, tick(app.settings.mini_vis_mode() == value), label) {
-                    app.actions.push(Action::SetMiniVis(value));
-                }
+            if widgets::menu_item(ui, &palette, tick(app.settings.vis_shapes_value() != 0), "Visualizer") {
+                app.actions.push(Action::ToggleVisShapes);
+            }
+            if widgets::menu_item(ui, &palette, Some(Icon::Settings), "Visualizer settings") {
+                app.actions.push(Action::ToggleVisPanel);
             }
             widgets::menu_separator(ui, &palette);
             if widgets::menu_item(ui, &palette, tick(app.settings.mini_on_top), "Float over everything") {
@@ -545,9 +550,18 @@ fn volume_row(app: &mut App, ui: &mut egui::Ui, width: f32, now: Option<&NowPlay
         None => volume,
     };
     let (row, _) = ui.allocate_exact_size(vec2(width, 26.0), Sense::hover());
+    // The number sits at the right end, so the volume can be read.
+    ui.painter().text(
+        pos2(row.right(), row.center().y),
+        egui::Align2::RIGHT_CENTER,
+        format!("{shown}%"),
+        theme::regular(12.0),
+        palette.secondary,
+    );
+    let width = (width - 38.0).max(30.0);
     let mut slider_ui = ui.new_child(
         UiBuilder::new()
-            .max_rect(row)
+            .max_rect(Rect::from_min_size(row.min, vec2(width, row.height())))
             .layout(Layout::left_to_right(Align::Center)),
     );
     match widgets::thin_slider(

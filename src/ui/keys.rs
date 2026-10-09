@@ -127,6 +127,8 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "seekwidth", label: "Seek bar length", default: UNSET, action: || Action::CycleSeekWidth },
     Bindable { id: "sharediscord", label: "Copy the song for Discord", default: UNSET, action: || Action::ShareToDiscord },
     Bindable { id: "lastfmlove", label: "Love the song on Last.fm", default: UNSET, action: || Action::LastfmLove },
+    Bindable { id: "queuehover", label: "Queue the song under the pointer", default: UNSET, action: || Action::QueueHovered(false) },
+    Bindable { id: "queuehovertop", label: "Queue the song under the pointer, to play next", default: UNSET, action: || Action::QueueHovered(true) },
     Bindable { id: "likehover", label: "Like the song under the pointer", default: UNSET, action: || Action::LikeHovered },
     Bindable { id: "likeplaying", label: "Like the playing song", default: UNSET, action: || Action::LikePlaying },
     Bindable { id: "tap", label: "Bass jump", default: UNSET, action: || Action::TapTempo },
@@ -209,7 +211,7 @@ pub fn read_keys(text: &str) -> Option<std::collections::BTreeMap<String, String
 pub const CATEGORIES: &[(&str, &[&str])] = &[
     ("Views", &["views", "normalview", "mini", "fullscreen", "lyricsfull", "visshapes", "art", "closewindow"]),
     ("Panels", &["sidebar", "queuelyrics", "queue", "lyrics", "visualizer", "scenes"]),
-    ("Playback", &["playpause", "playspace", "next", "previous", "shuffle", "repeat", "speed", "tap", "lastfmlove", "sharediscord", "likehover", "likeplaying"]),
+    ("Playback", &["playpause", "playspace", "next", "previous", "shuffle", "repeat", "speed", "tap", "lastfmlove", "sharediscord", "queuehover", "queuehovertop", "likehover", "likeplaying"]),
     ("Volume", &["mute", "volup", "voldown", "volup5", "voldown5"]),
     ("Jump in the song", &["back10", "forward10", "seekback5", "seekfwd5", "seekwidth", "tenth0", "tenth1", "tenth2", "tenth3", "tenth4", "tenth5", "tenth6", "tenth7", "tenth8", "tenth9"]),
     ("Going places", &["search", "home", "liked", "settings", "pageback", "pageforward", "artistpage", "albumpage", "tutorial"]),
@@ -245,7 +247,9 @@ pub fn capture_rebind(app: &mut App, ctx: &egui::Context) -> bool {
                 repeat: false,
                 modifiers,
                 ..
-            } => Some((*key, modifiers.shift, modifiers.command, modifiers.alt)),
+            } if !is_modifier_key(*key) => {
+                Some((*key, modifiers.shift, modifiers.command, modifiers.alt))
+            }
             _ => None,
         })
     });
@@ -281,6 +285,16 @@ pub fn capture_rebind(app: &mut App, ctx: &egui::Context) -> bool {
     true
 }
 
+/// A modifier pressed on its own (Ctrl, Shift, Alt, the Windows key). Some
+/// windowing code reports these as keys; they only ever wait for the key
+/// that comes with them.
+fn is_modifier_key(key: Key) -> bool {
+    let name = format!("{key:?}");
+    ["Control", "Ctrl", "Shift", "Alt", "Meta", "Super", "Command", "Win", "Option"]
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
+}
+
 /// Keys that already mean something fixed, so a shortcut cannot be put on
 /// them without breaking something else.
 fn is_reserved(key: Key) -> bool {
@@ -296,6 +310,7 @@ pub fn handle(app: &mut App, ctx: &egui::Context) {
     let pass_id = egui::Id::new("hover-snapshot-pass");
     if ctx.data(|data| data.get_temp::<u64>(pass_id)) != Some(pass) {
         app.hover_snapshot = app.hovered_track.take();
+        app.hover_playable_snapshot = app.hovered_playable.take();
         ctx.data_mut(|data| data.insert_temp(pass_id, pass));
     }
     if capture_rebind(app, ctx) {
@@ -767,5 +782,17 @@ mod tests {
         assert_eq!(parse_chord("nonsense"), None);
         assert_eq!(chord_text(Key::K, true, false), "Shift+K");
         assert_eq!(chord_text(Key::Z, false, true), "Ctrl+Z");
+    }
+}
+
+#[cfg(test)]
+mod modifier_tests {
+    use super::*;
+
+    #[test]
+    fn ordinary_keys_are_not_modifiers() {
+        for key in [Key::A, Key::G, Key::Z, Key::ArrowLeft, Key::F5, Key::Space, Key::Num0] {
+            assert!(!is_modifier_key(key), "{key:?}");
+        }
     }
 }

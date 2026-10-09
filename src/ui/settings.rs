@@ -890,6 +890,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             let theme_buttons_width = theme::soft_button_width(ui, &theme_guide)
                 + theme::soft_button_width(ui, &themes_folder)
                 + 6.0;
+            theme_grid(app, ui, &palette);
+            ui.add_space(6.0);
             filtered_row_sized(
                 ui,
                 &palette,
@@ -899,54 +901,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 theme_buttons_width,
                 |ui| {
                     ui.with_layout(Layout::top_down(Align::Max), |ui| {
-                        let selected = app
-                            .settings
-                            .custom_theme
-                            .as_deref()
-                            .map(|filename| crate::settings::fancy_theme_name(&fastframe_theme::display_name(filename)).into())
-                            .unwrap_or_else(|| app.settings.theme.label(locale));
-                        let response = egui::ComboBox::from_id_salt("appearance_theme")
-                            .selected_text(selected.as_ref())
-                            .width(200.0_f32.min(ui.available_width()))
-                            .show_ui(ui, |ui| {
-                                for choice in ThemeChoice::ALL {
-                                    if ui
-                                        .selectable_label(
-                                            app.settings.custom_theme.is_none()
-                                                && app.settings.theme == choice,
-                                            choice.label(locale).as_ref(),
-                                        )
-                                        .clicked()
-                                    {
-                                        app.actions.push(Action::SetTheme(choice));
-                                    }
-                                }
-                                if app.custom_themes.picker_themes().next().is_some() {
-                                    ui.separator();
-                                }
-                                for theme in app.custom_themes.picker_themes() {
-                                    if ui
-                                        .selectable_label(
-                                            app.settings.custom_theme.as_deref()
-                                                == Some(theme.filename.as_str()),
-                                            crate::settings::fancy_theme_name(&fastframe_theme::display_name(&theme.filename)),
-                                        )
-                                        .clicked()
-                                    {
-                                        app.actions
-                                            .push(Action::SetCustomTheme(theme.filename.clone()));
-                                    }
-                                }
-                            });
-                        response.response.widget_info(|| {
-                            let mut info = egui::WidgetInfo::labeled(
-                                egui::WidgetType::ComboBox,
-                                ui.is_enabled(),
-                                theme_title.as_ref(),
-                            );
-                            info.current_text_value = Some(selected.to_string());
-                            info
-                        });
                         if app.settings.theme == ThemeChoice::Custom && app.settings.custom_theme.is_none() {
                             let mut picked = false;
                             for (label, colour) in [
@@ -1085,7 +1039,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         });
     }
 
-    let proxy = gettext(locale, "Network proxy (most people never need this)");
+    let proxy = gettext(locale, "Proxy");
     let proxy_rows = [RowText::new(
         gettext(locale, "Mode, host, port, username and password"),
         gettext(
@@ -1097,22 +1051,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         any_visible = true;
         ui.push_id("proxy-settings", |ui| {
     section(ui, &palette, &proxy, |ui| {
-        note(
-            ui,
-            &palette,
-            "A proxy is a go-between some work or school networks make you use. If chanceify connects fine, leave this on System and ignore it.",
-        );
-        ui.add_space(8.0);
-        widgets::setting_row(
-            ui,
-            &palette,
-            &pgettext(locale, "proxy", "Mode"),
-            &gettext(
-                locale,
-                "Off ignores environment variables. System uses them, and the OS proxy on macOS and Windows.",
-            ),
-            |_| {},
-        );
         // The row's control slot is right-to-left and too narrow for four
         // choices; they sit on this line so they read Off, System, HTTP, SOCKS5.
         ui.horizontal(|ui| {
@@ -1155,8 +1093,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 app.actions.push(Action::ProxyEdited);
                 proxy_dirty = true;
             }
-            ui.add_space(6.0);
-            widgets::proxy_scope_note(ui, &palette, app.locale, app.settings.proxy_mode);
             ui.add_space(10.0);
         }
         if app.settings.proxy_mode.is_manual() {
@@ -1168,16 +1104,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     }
                 }
             });
-        } else {
-            theme::subtle(
-                ui,
-                &palette,
-                &match app.settings.proxy_mode {
-                    ProxyMode::Off => gettext(locale, "Not using a proxy."),
-                    ProxyMode::System => gettext(locale, "Using the system proxy."),
-                    ProxyMode::Http | ProxyMode::Socks => "".into(),
-                },
-            );
         }
     });
         });
@@ -1916,12 +1842,12 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             ui.horizontal(|ui| {
                 theme::text(
                     ui,
-                    "Ask me before removing one song",
+                    "Confirm removal",
                     theme::regular(13.0),
                     palette.secondary,
                 );
                 let mut ask = app.settings.unavailable_confirm_one;
-                if widgets::switch(ui, &palette, "Ask me before removing one song", &mut ask).changed() {
+                if widgets::switch(ui, &palette, "Confirm removal", &mut ask).changed() {
                     app.settings.unavailable_confirm_one = ask;
                     app.actions.push(Action::SettingsChanged);
                 }
@@ -2093,7 +2019,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             ui.add_space(8.0);
             {
                 let mut on = app.settings.discord_presence;
-                if widgets::switch(ui, &palette, "Show what I'm listening to on Discord", &mut on).changed() {
+                if widgets::switch_labeled(ui, &palette, "Show what I'm listening to on Discord", &mut on).changed() {
                     app.settings.discord_presence = on;
                     app.mark_settings_dirty();
                 }
@@ -2137,7 +2063,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     ];
                     for (label, field) in rows {
                         let mut value = *field(&mut app.settings);
-                        if widgets::switch(ui, &palette, label, &mut value).changed() {
+                        if widgets::switch_labeled(ui, &palette, label, &mut value).changed() {
                             *field(&mut app.settings) = value;
                             app.mark_settings_dirty();
                         }
@@ -2507,14 +2433,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         .clicked()
                     {
                         app.actions.push(Action::ToggleMissingMarkBig);
-                    }
-                    if theme::soft_button(ui, &palette, None, "?", false)
-                        .on_hover_text(
-                            "Covers and artist pictures that Last.fm does not have are copied into this folder as you listen. To add one to Last.fm: open that album or artist on last.fm, press \"Upload image\" (you need a free Last.fm account) and choose the file. Click the ? to open Last.fm.",
-                        )
-                        .clicked()
-                    {
-                        app.actions.push(Action::OpenUrl("https://www.last.fm/music".into()));
                     }
                 });
                 missing_lists(ui, app, &palette);
@@ -3027,4 +2945,111 @@ fn missing_lists(ui: &mut egui::Ui, app: &mut App, palette: &Palette) {
                 });
         }
     });
+}
+
+
+/// Every theme as a small picture of itself, all on show at once. Hovering
+/// one shows it on the whole window for a moment (switch that off with the
+/// box under the grid); clicking keeps it.
+fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette) {
+    use crate::theme::Palette;
+    use egui::{Rect, pos2, vec2};
+    // (name, picture, the theme to show while hovering, the action on click)
+    let mut tiles: Vec<(String, Palette, Option<Palette>, Action, bool)> = Vec::new();
+    for choice in ThemeChoice::ALL {
+        let shown = match choice {
+            ThemeChoice::Dark => Some(Palette::dark()),
+            ThemeChoice::Light => Some(Palette::light()),
+            ThemeChoice::System => None,
+            ThemeChoice::Custom => Some(Palette::from_picked(
+                app.settings.custom_bg,
+                app.settings.custom_accent,
+            )),
+            other => Palette::themed(other),
+        };
+        let picture = shown.unwrap_or_else(Palette::dark);
+        let current = app.settings.custom_theme.is_none() && app.settings.theme == choice;
+        tiles.push((
+            choice.label(app.locale).to_string(),
+            picture,
+            shown,
+            Action::SetTheme(choice),
+            current,
+        ));
+    }
+    for theme in app.custom_themes.picker_themes() {
+        let current = app.settings.custom_theme.as_deref() == Some(theme.filename.as_str());
+        tiles.push((
+            crate::settings::fancy_theme_name(&fastframe_theme::display_name(&theme.filename)).to_string(),
+            theme.palette,
+            Some(theme.palette),
+            Action::SetCustomTheme(theme.filename.clone()),
+            current,
+        ));
+    }
+    let tile = vec2(132.0, 92.0);
+    let mut previewing: Option<Palette> = None;
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+        for (name, picture, preview, action, current) in tiles {
+            let (rect, response) = ui.allocate_exact_size(tile, egui::Sense::click());
+            let painter = ui.painter();
+            let art = Rect::from_min_size(rect.min, vec2(tile.x, 62.0));
+            painter.rect_filled(art, 8.0, picture.window);
+            // A sidebar strip, a few rows and a play button: how the app looks in it.
+            painter.rect_filled(
+                Rect::from_min_size(art.min + vec2(0.0, 0.0), vec2(30.0, art.height())),
+                egui::CornerRadius { nw: 8, sw: 8, ne: 0, se: 0 },
+                picture.panel,
+            );
+            for row in 0..3 {
+                painter.rect_filled(
+                    Rect::from_min_size(art.min + vec2(40.0, 10.0 + row as f32 * 13.0), vec2(60.0 - row as f32 * 12.0, 6.0)),
+                    3.0,
+                    if row == 0 { picture.text } else { picture.secondary },
+                );
+            }
+            painter.circle_filled(art.right_bottom() - vec2(16.0, 14.0), 7.0, picture.accent);
+            painter.rect_filled(
+                Rect::from_min_size(art.min + vec2(6.0, 8.0), vec2(18.0, 5.0)),
+                2.0,
+                picture.surface_active,
+            );
+            painter.rect_stroke(
+                art,
+                8.0,
+                egui::Stroke::new(
+                    if current { 2.5 } else if response.hovered() { 1.5 } else { 1.0 },
+                    if current { palette.accent } else { picture.outline },
+                ),
+                egui::StrokeKind::Inside,
+            );
+            painter.text(
+                pos2(rect.left() + 2.0, rect.bottom() - 14.0),
+                egui::Align2::LEFT_CENTER,
+                name,
+                theme::regular(12.0),
+                if current { palette.accent } else { palette.text },
+            );
+            if response.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                if app.settings.theme_hover_preview && !current {
+                    previewing = preview;
+                }
+            }
+            if response.clicked() {
+                app.actions.push(action);
+            }
+        }
+    });
+    ui.add_space(4.0);
+    let mut hover = app.settings.theme_hover_preview;
+    if widgets::switch_labeled(ui, palette, "Preview a theme when I point at it", &mut hover).changed() {
+        app.settings.theme_hover_preview = hover;
+        app.mark_settings_dirty();
+    }
+    if let Some(shown) = previewing {
+        app.theme_preview = Some((shown, std::time::Instant::now()));
+        ui.ctx().request_repaint_after(std::time::Duration::from_millis(120));
+    }
 }

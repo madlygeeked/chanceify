@@ -385,6 +385,9 @@ fn stat_tile(
         theme::bold(13.5),
         palette.text,
     );
+    if song && !row.uri.is_empty() && response.hovered() {
+        app.hovered_track = Some(row.uri.clone());
+    }
     let plays = if row.plays == 1 { "1 play".to_string() } else { format!("{} plays", row.plays) };
     let mut artist_clicked = false;
     if song {

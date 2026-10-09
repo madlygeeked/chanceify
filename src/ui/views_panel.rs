@@ -47,13 +47,15 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
     let full = app.fullscreen_vis || app.lyrics_fullscreen.is_some();
     // With the sidebar hidden its disc is hidden too, so one sits by the
     // player bar instead.
-    if !full && (app.settings.sidebar_visible || app.mini_active) {
+    if !full && !app.mini_active && app.settings.sidebar_visible {
         return;
     }
     let palette = dark_palette(app);
     egui::Area::new(Id::new("views-corner-disc"))
         .order(egui::Order::Foreground)
-        .fixed_pos(if full {
+        .fixed_pos(if app.mini_active {
+            egui::pos2(4.0, 4.0)
+        } else if full {
             egui::pos2(14.0, 14.0 + theme::titlebar_inset(ctx))
         } else {
             egui::pos2(12.0, ctx.content_rect().bottom() - theme::PLAYER_BAR_HEIGHT - 40.0)
@@ -62,8 +64,8 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
             let button = theme::icon_button(
                 ui,
                 Icon::Disc,
-                22.0,
-                Color32::from_white_alpha(150),
+                if app.mini_active { 16.0 } else { 22.0 },
+                Color32::from_white_alpha(if app.mini_active { 110 } else { 150 }),
                 palette.text,
                 "Views",
             );
@@ -90,10 +92,10 @@ pub fn show(app: &mut App, ctx: &Context) {
             spread: 0,
             color: Color32::from_black_alpha(160),
         });
-    let mut open = true;
+    let mut close = false;
     egui::Window::new("Views")
         .id(Id::new("views-panel"))
-        .open(&mut open)
+        .title_bar(false)
         .order(egui::Order::Foreground)
         .frame(frame)
         .default_pos(egui::pos2(90.0, 90.0))
@@ -104,6 +106,29 @@ pub fn show(app: &mut App, ctx: &Context) {
         .show(ctx, |ui| {
             ui.visuals_mut().override_text_color = Some(palette.text);
             egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui| {
+                // A bare disc where a title would be: press it to put the panel away.
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    if theme::icon_button(ui, Icon::Disc, 20.0, palette.accent, palette.text, "Close").clicked() {
+                        close = true;
+                    }
+                    ui.horizontal_wrapped(|ui| {
+                        ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+                        let presets = [
+                            ("Mini player", app.mini_active, Action::ToggleMiniPlayer),
+                            ("Visualizer", app.settings.vis_shapes_value() != 0, Action::ToggleVisShapes),
+                            ("Full screen visualizer", app.fullscreen_vis, Action::ToggleFullscreenVis),
+                            ("Library only", false, Action::LibraryOnlyView),
+                            ("Default view", false, Action::NormalView),
+                        ];
+                        for (label, on, action) in presets {
+                            if theme::soft_button(ui, &palette, None, label, on).clicked() {
+                                app.actions.push(action);
+                            }
+                        }
+                    });
+                });
+                ui.add_space(8.0);
                 let rows: [(&str, bool, Action); 9] = [
                     ("Library", app.settings.sidebar_visible, Action::ToggleSidebar),
                     ("Queue", app.show_queue_panel, Action::ToggleQueuePanel),
@@ -132,9 +157,6 @@ pub fn show(app: &mut App, ctx: &Context) {
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
-                    if theme::soft_button(ui, &palette, None, "Normal view", false).clicked() {
-                        app.actions.push(Action::NormalView);
-                    }
                     if theme::soft_button(ui, &palette, None, "Default controls", false).clicked() {
                         app.actions.push(Action::ResetBlockNudge);
                     }
@@ -144,7 +166,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                 });
             });
         });
-    if !open {
+    if close {
         app.actions.push(Action::ToggleViewsPanel);
     }
 }

@@ -299,14 +299,11 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                         });
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
-                        let queue_label = match app.settings.queue_click {
-                            0 => "Queue a song: Ctrl+click",
-                            1 => "Queue a song: Alt+click",
-                            _ => "Queue a song: off",
-                        };
-                        if theme::pill_button(ui, &palette, queue_label, false).clicked() {
-                            app.actions.push(Action::CycleQueueClick);
-                        }
+                        theme::subtle(
+                            ui,
+                            &palette,
+                            "Ctrl+click a song queues it. Shift+Ctrl+click plays it next. Or bind a key under Playback.",
+                        );
                     });
                     ui.add_space(6.0);
                     ui.horizontal(|ui| {

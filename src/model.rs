@@ -1385,6 +1385,10 @@ pub enum Action {
     SaveKeysAsDefault,
     /// Likes or unlikes the song the pointer is over.
     LikeHovered,
+    /// The library sidebar alone: no queue, no lyrics panel, no full screen.
+    LibraryOnlyView,
+    /// Queues the song under the pointer; `true` puts it at the top of the queue.
+    QueueHovered(bool),
     /// Likes or unlikes the playing song.
     LikePlaying,
     /// -1 smaller, 1 bigger, 0 back to 100%.

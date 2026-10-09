@@ -1211,7 +1211,7 @@ fn vis_menu(app: &mut App, response: &egui::Response) {
 }
 
 /// The visualizer settings window, opened with V.
-fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
+pub(super) fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
     if !app.vis_panel {
         return;
     }
@@ -1220,7 +1220,7 @@ fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
     let screen_h = ctx
         .input(|input| input.raw.screen_rect)
         .map_or(900.0, |rect| rect.height());
-    let floating = app.fullscreen_vis || app.lyrics_fullscreen.is_some();
+    let floating = app.fullscreen_vis || app.lyrics_fullscreen.is_some() || app.mini_active;
     let above = if floating {
         14.0
     } else {

@@ -1877,6 +1877,7 @@ fn track_row_contents(
     // Remembered for the "like the song under the pointer" key.
     if ui.rect_contains_pointer(rect) && row.item.is_track() {
         app.hovered_track = Some(row.item.uri().to_string());
+        app.hovered_playable = Some(row.item.clone());
     }
     if row.picked {
         // Keep the existing translucent selection, using a neutral palette
@@ -4256,6 +4257,21 @@ pub fn switch(ui: &mut Ui, palette: &Palette, label: &str, on: &mut bool) -> egu
     });
     theme::focus_ring(ui, &response);
     response
+}
+
+/// A switch with its words beside it, for a plain list of on/off choices.
+pub fn switch_labeled(ui: &mut Ui, palette: &Palette, label: &str, on: &mut bool) -> egui::Response {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 10.0;
+        let response = switch(ui, palette, label, on);
+        ui.add(egui::Label::new(
+            egui::RichText::new(label)
+                .font(theme::regular(13.0))
+                .color(palette.text),
+        ).wrap());
+        response
+    })
+    .inner
 }
 
 /// The author's website, linked from the credit line.

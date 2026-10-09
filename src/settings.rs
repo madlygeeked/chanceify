@@ -760,6 +760,9 @@ pub struct Settings {
     /// Show a swirl in the colour of the cover as the small picture on the cover.
     #[serde(default = "yes")]
     pub discord_swirl: bool,
+    /// Hovering a theme in the list shows it for the moment.
+    #[serde(default = "yes")]
+    pub theme_hover_preview: bool,
     /// Say which playlist the song is playing from.
     pub discord_playlist: bool,
     /// A button that opens the reader's Spotify profile.
@@ -1156,6 +1159,7 @@ impl Default for Settings {
             discord_cover: true,
             discord_badge: true,
             discord_swirl: true,
+            theme_hover_preview: true,
             discord_playlist: false,
             discord_profile: false,
             discord_buttons: true,

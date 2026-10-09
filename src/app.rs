@@ -345,6 +345,11 @@ pub struct App {
     pub recap: Option<crate::ui::recap::Recap>,
     /// The song the pointer is over, set while rows are drawn.
     pub hovered_track: Option<String>,
+    /// A theme shown for a moment while the pointer is over it in Settings.
+    pub theme_preview: Option<(Palette, Instant)>,
+    theme_previewing: bool,
+    pub hovered_playable: Option<PlayableItem>,
+    pub hover_playable_snapshot: Option<PlayableItem>,
     /// What `hovered_track` held at the start of this frame.
     pub hover_snapshot: Option<String>,
     pub palette: Palette,
@@ -1033,6 +1038,10 @@ impl App {
             scroll_top: false,
             recap: None,
             hovered_track: None,
+            theme_preview: None,
+            theme_previewing: false,
+            hovered_playable: None,
+            hover_playable_snapshot: None,
             hover_snapshot: None,
             palette,
             locale,
@@ -4496,7 +4505,12 @@ impl App {
             }
         }
         let dark = ctx.theme() == egui::Theme::Dark;
-        let palette = self.custom_palette().unwrap_or_else(|| {
+        let preview = self
+            .theme_preview
+            .filter(|(_, at)| at.elapsed() < Duration::from_millis(250))
+            .map(|(palette, _)| palette);
+        let was_previewing = std::mem::replace(&mut self.theme_previewing, preview.is_some());
+        let palette = preview.or_else(|| self.custom_palette()).unwrap_or_else(|| {
             if dark {
                 Palette::dark()
             } else {
@@ -4520,6 +4534,8 @@ impl App {
             // is drawn by its skin. A cover-driven change happens every song
             // and is not worth a reveal.
             if self.reveal_theme_changes
+                && !preview.is_some()
+                && !was_previewing
                 && !self.settings.theme_from_cover
                 && self.applied_dark.is_some()
                 && !self.settings.winamp_window
@@ -10779,6 +10795,18 @@ impl App {
                 self.show_queue_panel = true;
                 self.show_lyrics_panel = false;
                 self.settings.sidebar_visible = true;
+                // The normal view has the visualizer along the bottom.
+                if self.settings.vis_shapes_value() == 0 {
+                    self.apply(Action::ToggleVisShapes, ctx);
+                }
+                self.settings_dirty = true;
+            }
+            Action::LibraryOnlyView => {
+                self.leave_lyrics_fullscreen(ctx);
+                self.fullscreen_vis = false;
+                self.show_queue_panel = false;
+                self.show_lyrics_panel = false;
+                self.settings.sidebar_visible = true;
                 self.settings_dirty = true;
             }
             Action::ToggleBarSide(bit) => {
@@ -11017,6 +11045,23 @@ impl App {
                     None => self.toast_error(format!("No usable chanceify-keys.json in {}", path.parent().map_or_else(String::new, |p| p.display().to_string()))),
                 }
             }
+            Action::QueueHovered(top) => match self.hover_snapshot.clone() {
+                Some(uri) => {
+                    let item = self.hover_playable_snapshot.clone();
+                    match (top, item) {
+                        (true, Some(item)) => {
+                            let name = item.name().to_string();
+                            self.actions.push(Action::InsertInQueue { items: vec![item], position: 0 });
+                            self.toast(format!("Plays next: {name}"));
+                        }
+                        (_, item) => {
+                            let label = item.map(|item| item.name().to_string()).unwrap_or_default();
+                            self.actions.push(Action::AddToQueue { uri, label });
+                        }
+                    }
+                }
+                None => self.toast("Point at a song, then press the key."),
+            },
             Action::LikeHovered => match self.hover_snapshot.clone() {
                 Some(uri) => self.actions.push(Action::ToggleSaved(uri)),
                 None => self.toast("Point at a song, then press the key."),
