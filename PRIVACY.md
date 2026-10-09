@@ -8,5 +8,3 @@ This app only uses services you already know: <br />
 (Rich presence provided by [Discord](https://discord.com)) <br />
 (Metadata provided by [MusicBrainz](https://musicbrainz.org)) <br />
 (Scrobbling provided by [Last.fm](https://www.last.fm)) <br />
-
-You should be more concerned about their privacy policies than mine.
