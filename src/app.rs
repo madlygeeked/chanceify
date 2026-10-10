@@ -12441,7 +12441,7 @@ impl App {
             links: self.settings.discord_links,
             hide_paused: self.settings.discord_hide_paused,
             files: self.settings.discord_files,
-            listen_along: self.settings.discord_listen_along,
+            listen_along: false,
             // Only once there is a real GitHub page to send people to.
             app_url: (crate::build_info::GITHUB_URL.trim_end_matches('/').len()
                 > "https://github.com".len())
@@ -12461,7 +12461,8 @@ impl App {
             crate::discord::update("", None);
             return;
         }
-        crate::discord::set_listen(self.settings.discord_listen_along);
+        // Listen along is off for good: Discord will not show buttons beside it.
+        crate::discord::set_listen(false);
         crate::discord::set_log_file(self.dirs.index_dir().join("discord-last.txt"));
         self.poll_discord_join();
         // The swirl takes the colour the app has already worked out for the cover.

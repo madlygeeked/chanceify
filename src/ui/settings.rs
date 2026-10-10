@@ -1656,13 +1656,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                             app.mark_settings_dirty();
                         }
                     }
-                    {
-                        let mut value = app.settings.discord_listen_along;
-                        if widgets::switch_labeled(ui, &palette, "Listen along: friends can join my song (turns the buttons off)", &mut value).changed() {
-                            app.settings.discord_listen_along = value;
-                            app.mark_settings_dirty();
-                        }
-                    }
                     ui.add_space(6.0);
                     {
                         let (text, colour) = match crate::discord::link_state() {
@@ -1690,7 +1683,21 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         let activity = app
                             .now_playing()
                             .and_then(|now| crate::discord::activity_for(&now, &style, seconds));
+                        let playing_from = match app.playing_context_uri() {
+                            Some(uri) if uri.starts_with("spotify:playlist:") => {
+                                if style.playlist.is_some() {
+                                    "Playing from one of your playlists: named on the card".to_string()
+                                } else if app.settings.discord_playlist {
+                                    "Playing from a playlist whose name is not loaded yet (open Your Library once)".to_string()
+                                } else {
+                                    "Playing from a playlist (turn on \"Say which playlist\" to name it)".to_string()
+                                }
+                            }
+                            Some(_) => "Not playing from a playlist (an album, artist or liked songs)".to_string(),
+                            None => "chanceify does not know what you are playing from yet".to_string(),
+                        };
                         theme::subtle(ui, &palette, "PREVIEW (what Discord shows right now)");
+                        theme::text(ui, &playing_from, theme::regular(12.0), palette.dim);
                         egui::Frame::new()
                             .fill(palette.surface)
                             .corner_radius(8)

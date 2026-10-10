@@ -67,6 +67,8 @@ impl Activity {
             && self.small_image == other.small_image
             && self.small_text == other.small_text
             && self.buttons == other.buttons
+            && self.join == other.join
+            && self.small_text == other.small_text
             && near(self.start, other.start)
             && near(self.end, other.end)
     }

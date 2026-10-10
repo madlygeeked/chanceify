@@ -1654,7 +1654,7 @@ impl Settings {
         ("Colour strength", 50.0, 250.0, 140.0),
         ("Contrast", 60.0, 200.0, 120.0),
         ("Speed", 0.0, 300.0, 100.0),
-        ("Speeds up with the music", 0.0, 300.0, 100.0),
+        ("Music boost", 0.0, 300.0, 100.0),
         ("Brightness", 20.0, 100.0, 100.0),
         ("Colour overlay", 0.0, 150.0, 100.0),
         ("Colour overlay: bands", 1.0, 6.0, 1.8),

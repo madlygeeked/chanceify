@@ -2114,7 +2114,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 slider_row(
                     ui,
                     &palette,
-                    &gettext(app.locale, "Colour drift speed"),
+                    &gettext(app.locale, "Colour drift"),
                     0.2..=4.0,
                     (9.0 / app.settings.swirl_drift_secs()) as f32,
                     |value| app.actions.push(Action::SetSwirlDrift(value)),
@@ -2135,10 +2135,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             // The settings every shape shares, then the title, then the lyrics.
             let mut shared = |ui: &mut egui::Ui| {
             ui.spacing_mut().item_spacing.x = 18.0;
-            ui.vertical(|ui| {
-            if tab != 1 {
-                return;
-            }
+            if tab == 1 { ui.vertical(|ui| {
             ui.set_width(col_w);
             theme::subtle(ui, &palette, &gettext(app.locale, "BASS JUMP"));
             ui.horizontal_wrapped(|ui| {
@@ -2245,11 +2242,8 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     }
                 });
             }
-            });
-            ui.vertical(|ui| {
-            if tab != 2 {
-                return;
-            }
+            }); }
+            if tab == 2 { ui.vertical(|ui| {
             ui.set_width(col_w);
             theme::subtle(ui, &palette, &gettext(app.locale, "TITLE"));
             if chip(
@@ -2360,11 +2354,8 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 });
             }
             font_grid(app, ui);
-            });
-            ui.vertical(|ui| {
-            if tab != 3 {
-                return;
-            }
+            }); }
+            if tab == 3 { ui.vertical(|ui| {
             ui.set_width(col_w);
             theme::subtle(ui, &palette, &gettext(app.locale, "FULL-SCREEN LYRICS"));
             let on_page = app.lyrics_fullscreen.is_some();
@@ -2447,7 +2438,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     }
                 }
             }
-            });
+            }); }
             };
             if tab != 0 {
                 if columns_fit {
@@ -3193,13 +3184,16 @@ pub(super) fn slider_row(
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         let width = (ui.available_width() - FIELD_WIDTH - 8.0).max(80.0);
+        // The label gets what the row can spare, never more than the usual
+        // column, so a narrow menu keeps a track to drag.
+        let label_col = (width * 0.45).clamp(64.0, LABEL_COLUMN);
         let (rect, _) = ui.allocate_exact_size(vec2(width, 24.0), Sense::hover());
         let galley = crate::bidi::layout(
             ui.painter(),
             label,
             theme::regular(13.5),
             palette.text,
-            LABEL_COLUMN - 14.0,
+            label_col - 14.0,
             1,
             Some(crate::bidi::ELLIPSIS),
         );
@@ -3235,11 +3229,11 @@ pub(super) fn slider_row(
 
         // The track runs between the label and the field, so nothing ever
         // overlaps however long either of them is.
-        let left = rect.left() + LABEL_COLUMN;
+        let left = rect.left() + label_col;
         let right = rect.right() - FIELD_WIDTH - 16.0;
         let track = Rect::from_center_size(
             pos2((left + right) / 2.0, rect.center().y),
-            vec2((right - left).max(20.0), 18.0),
+            vec2((right - left).max(36.0), 18.0),
         );
         let response = ui.interact(
             track,
