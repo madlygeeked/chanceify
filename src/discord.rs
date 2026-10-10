@@ -261,17 +261,9 @@ pub fn activity_for(
     }
     let both = style.say[0] && lines.len() >= 2;
     let artist_only = !style.say[0] && style.say[1];
-    let status_display = if lines.len() >= 2 {
-        match style.status_line {
-            1 => 1,
-            2 => 0,
-            _ => 2,
-        }
-    } else if style.say[0] || artist_only {
-        2
-    } else {
-        0
-    };
+    // The top of the profile reads "Listening to chanceify": the application's
+    // own name, never the song.
+    let status_display = 0;
     Some(Activity {
         details: lines[0].clone(),
         state: lines.get(1).cloned().unwrap_or_default(),
@@ -291,21 +283,11 @@ pub fn activity_for(
         },
         status_display,
         large_image,
-        large_text: if style.say[2] {
-            match &style.playlist {
-                Some(playlist) => format!("{} - from {playlist}", crate::build_info::DISPLAY_NAME),
-                None => crate::build_info::DISPLAY_NAME.to_string(),
-            }
-        } else {
-            let album = if now.album_name.is_empty() {
-                crate::build_info::DISPLAY_NAME.to_string()
-            } else {
-                now.album_name.clone()
-            };
-            match &style.playlist {
-                Some(playlist) => format!("{album} - from {playlist}"),
-                None => album,
-            }
+        // The third line is only the playlist's name; with no playlist it is the album.
+        large_text: match &style.playlist {
+            Some(playlist) => playlist.clone(),
+            None if now.album_name.is_empty() => crate::build_info::DISPLAY_NAME.to_string(),
+            None => now.album_name.clone(),
         },
         small_image,
         small_text: match &style.playlist {
@@ -922,7 +904,7 @@ mod tests {
         chosen.profile_url = Some("https://open.spotify.com/user/abc".into());
         chosen.picks = [2, 4];
         let activity = activity_for(&playing(), &chosen, 0).unwrap();
-        assert!(activity.large_text.ends_with("from Road trip"));
+        assert_eq!(activity.large_text, "Road trip");
         assert_eq!(activity.small_text, "Playing from Road trip");
         assert_eq!(activity.buttons.len(), 2);
         assert_eq!(activity.buttons[1].0, "My Spotify profile");
@@ -965,7 +947,7 @@ mod tests {
         let activity = activity_for(&playing(), &style(), 10_000).unwrap();
         assert_eq!(activity.details, "Song");
         assert_eq!(activity.state, "Artist");
-        assert_eq!(activity.status_display, 2);
+        assert_eq!(activity.status_display, 0);
         assert_eq!(activity.large_image.as_deref(), Some("https://i.scdn.co/image/x"));
         assert_eq!(activity.small_image.as_deref(), Some(BADGE_KEY));
         assert_eq!(activity.buttons.len(), 2);
@@ -982,7 +964,7 @@ mod tests {
     fn the_status_line_follows_the_choice() {
         let mut chosen = style();
         chosen.status_line = 1;
-        assert_eq!(activity_for(&playing(), &chosen, 0).unwrap().status_display, 1);
+        assert_eq!(activity_for(&playing(), &chosen, 0).unwrap().status_display, 0);
         chosen.status_line = 2;
         assert_eq!(activity_for(&playing(), &chosen, 0).unwrap().status_display, 0);
     }
