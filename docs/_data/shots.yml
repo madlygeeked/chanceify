@@ -33,3 +33,19 @@ settings:
   - { file: vis-flow.png,         title: "visualizer: flow",  text: "sheets, depth, speed, direction." }
   - { file: vis-swirl.png,        title: "visualizer: swirl", text: "sliders and colours." }
   - { file: bottom-bar-menu.png,  title: "bottom bar menu",   text: "layout, song bar styles, volume presets, equalizer." }
+
+themes:
+  - { file: theme-dark.png, title: "dark", text: "" }
+  - { file: theme-light.png, title: "light", text: "" }
+  - { file: theme-midnight.png, title: "deep space", text: "" }
+  - { file: theme-ocean.png, title: "ocean", text: "" }
+  - { file: theme-sunset.png, title: "sunset", text: "" }
+  - { file: theme-forest.png, title: "forest", text: "" }
+  - { file: theme-rose.png, title: "rose", text: "" }
+  - { file: theme-grape.png, title: "grape", text: "" }
+  - { file: theme-amoled.png, title: "amoled", text: "" }
+  - { file: theme-mocha.png, title: "mocha", text: "" }
+  - { file: theme-cream.png, title: "cream", text: "" }
+  - { file: theme-night.png, title: "night", text: "" }
+  - { file: theme-glass.png, title: "glass", text: "" }
+  - { file: theme-pink-milk.png, title: "pink milk", text: "" }

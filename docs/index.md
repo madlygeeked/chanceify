@@ -26,6 +26,10 @@ needs spotify premium.
 ## every setting
 
 {% include gallery.html items=site.data.shots.settings %}
+
+## every theme
+
+{% include gallery.html items=site.data.shots.themes %}
 {% endif %}
 
 ## more

@@ -2972,6 +2972,7 @@ pub fn drag_ghost(ctx: &egui::Context, palette: &Palette, locale: Locale) {
 /// The list of columns, shared by the right-click menu and the button at
 /// the end of the heading row (which opens it with a plain left click).
 fn columns_menu(ui: &mut Ui, palette: &Palette, locale: crate::i18n::Locale, widths: &mut crate::settings::TrackColumns) {
+    use crate::model::SortColumn;
     ui.set_width(220.0);
                     ui.spacing_mut().item_spacing.y = 1.0;
                     if checkbox_row(ui, palette, &gettext(locale, "GRID VIEW"), widths.grid) {
