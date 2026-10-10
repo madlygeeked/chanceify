@@ -429,20 +429,24 @@ fn lyrics_menu(app: &mut App, page: &egui::Response, side: bool) {
                 );
             }
             widgets::menu_separator(ui, &palette);
-            let current = app.settings.lyrics_align_value();
-            for (value, label) in [
-                (0u8, "Left"),
-                (2, "Right"),
-                (4, "Focus on the current line"),
-            ] {
+            let right = app.settings.lyrics_right();
+            for (value, label) in [(0u8, "Left"), (2, "Right")] {
                 if widgets::menu_item(
                     ui,
                     &palette,
-                    tick(current == value),
+                    tick((value == 2) == right),
                     &gettext(app.locale, label),
                 ) {
                     app.actions.push(Action::SetLyricsAlign(value));
                 }
+            }
+            if widgets::menu_item(
+                ui,
+                &palette,
+                tick(app.settings.lyrics_focus()),
+                &gettext(app.locale, "Focus on the current line"),
+            ) {
+                app.actions.push(Action::ToggleLyricsFlag(crate::settings::Settings::LYRICS_FOCUS));
             }
         });
 }
@@ -887,7 +891,7 @@ pub fn vis_overlay(app: &mut App, ui: &mut egui::Ui) {
     let pitch = base * 1.5;
     let centre_y = region.center().y;
     // The same anchoring and timestamps as the full-screen lyrics page.
-    let align = app.settings.lyrics_align_value();
+    let right = app.settings.lyrics_right();
     let stamps_on = !app.settings.lyrics_flag(crate::settings::Settings::LYRICS_HIDE_STAMPS);
     let countdown = app.settings.lyrics_flag(crate::settings::Settings::LYRICS_COUNTDOWN);
     let next_line = lyrics
@@ -899,7 +903,8 @@ pub fn vis_overlay(app: &mut App, ui: &mut egui::Ui) {
         .map(|at| (at - now.position_ms).div_ceil(1000))
         .filter(|secs| *secs <= 30);
     let stamp_w = if stamps_on || countdown { 56.0 } else { 0.0 };
-    let text_left = region.left() + stamp_w;
+    // Left: the time on the left, the words after it. Right: the mirror.
+    let text_left = if right { region.left() } else { region.left() + stamp_w };
     let text_w = (region.width() - stamp_w).max(60.0);
     let first = (place.floor() as isize - 3).max(0) as usize;
     let last = ((place.ceil() as isize + 4).max(0) as usize).min(lyrics.lines.len());
@@ -923,10 +928,10 @@ pub fn vis_overlay(app: &mut App, ui: &mut egui::Ui) {
             fit *= 0.88;
         };
         let y = centre_y + d * pitch + d.signum() * near * base * 0.2 - galley.size().y / 2.0;
-        let x = match align {
-            2 => region.right() - galley.size().x,
-            4 => text_left + (text_w - galley.size().x) / 2.0,
-            _ => text_left,
+        let x = if right {
+            region.right() - stamp_w - galley.size().x
+        } else {
+            text_left
         };
         let label = if countdown && next_line == Some(index) && until_next.is_some() {
             until_next.map(|secs| format!("{secs}s"))
@@ -940,8 +945,8 @@ pub fn vis_overlay(app: &mut App, ui: &mut egui::Ui) {
         };
         if let Some(label) = label {
             painter.text(
-                pos2(region.left(), y + galley.size().y / 2.0),
-                egui::Align2::LEFT_CENTER,
+                pos2(if right { region.right() } else { region.left() }, y + galley.size().y / 2.0),
+                if right { egui::Align2::RIGHT_CENTER } else { egui::Align2::LEFT_CENTER },
                 label,
                 theme::bold((base * 0.4).max(11.0)),
                 Color32::WHITE.gamma_multiply((alpha * 0.55).clamp(0.0, 1.0)),
@@ -1029,17 +1034,11 @@ fn fullscreen_contents(app: &mut App, ui: &mut egui::Ui) {
     // so highlighting cannot rewrap the words during a transition.
     // A line takes 300 ms to light up or fade.
     let quiet = palette.text.gamma_multiply(0.68);
-    let align = app.settings.lyrics_align_value();
-    // 3, 4 and 5 are the focus modes: the sung line big, the rest small.
-    // At 3 the page runs backwards: the line being sung is at the bottom
-    // and the next ones fade in from the top.
-    let focus = align >= 3;
-    let reversed = align == 3;
-    let sung_at = match align {
-        3 => 0.8,
-        4 => 0.5,
-        _ => SUNG_LINE_AT,
-    };
+    let right = app.settings.lyrics_right();
+    // Focus: the sung line big, the rest small, held in the middle.
+    let focus = app.settings.lyrics_focus();
+    let reversed = false;
+    let sung_at = if focus { 0.5 } else { SUNG_LINE_AT };
     let stamps_on = !app.settings.lyrics_flag(crate::settings::Settings::LYRICS_HIDE_STAMPS);
     let countdown = app.settings.lyrics_flag(crate::settings::Settings::LYRICS_COUNTDOWN)
         && lyrics.synced;
@@ -1140,11 +1139,7 @@ fn fullscreen_contents(app: &mut App, ui: &mut egui::Ui) {
                     Sense::hover()
                 };
                 let side_w = if column_on { stamp_w + STAMP_GAP } else { 0.0 };
-                let wrap = if focus {
-                    (ui.available_width() - 130.0).max(120.0)
-                } else {
-                    (ui.available_width() - side_w - 8.0).max(120.0)
-                };
+                let wrap = (ui.available_width() - side_w - 8.0).max(120.0);
                 let galley = crate::bidi::layout(ui.painter(), text, font, color, wrap, usize::MAX, None);
                 let center = ui.cursor().top() + galley.size().y * 0.5;
                 let edge = ((center - viewport.top()).min(viewport.bottom() - center)
@@ -1161,10 +1156,12 @@ fn fullscreen_contents(app: &mut App, ui: &mut egui::Ui) {
                         let painter = ui.painter().clone();
                         // Left: words from the left edge, time on the right.
                         // Right: the mirror. Focus: words centred, time right.
-                        let text_x = match align {
-                            0 => rect.left() + 2.0,
-                            2 => rect.right() - 2.0 - galley.size().x,
-                            _ => rect.center().x - galley.size().x / 2.0,
+                        // The time sits on the same side as the words: the
+                        // left edge for Left, the right edge for Right.
+                        let text_x = if right {
+                            rect.right() - 2.0 - side_w - galley.size().x
+                        } else {
+                            rect.left() + 2.0 + side_w
                         };
                         painter.galley(pos2(text_x, rect.top()), galley.clone(), color);
                         // The time of each timed line; the line after the
@@ -1181,10 +1178,10 @@ fn fullscreen_contents(app: &mut App, ui: &mut egui::Ui) {
                         if let Some((label, hot)) = shown {
                             // Words on the left put the time on the right, and
                             // the other way round.
-                            let (x, anchor) = if align == 2 {
-                                (rect.left() + 2.0, egui::Align2::LEFT_CENTER)
-                            } else {
+                            let (x, anchor) = if right {
                                 (rect.right() - 2.0, egui::Align2::RIGHT_CENTER)
+                            } else {
+                                (rect.left() + 2.0, egui::Align2::LEFT_CENTER)
                             };
                             painter.text(
                                 pos2(x, rect.top() + size * 0.62),

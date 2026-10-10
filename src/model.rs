@@ -1505,6 +1505,9 @@ pub enum Action {
     ToggleVisLyrics,
     ToggleVisTextSway,
     ToggleVisSwayBeat,
+    /// What the title sway follows: 0 loudness, 1 bass, 2 beat.
+    SetSwayReact(u8),
+    SetSwaySens(f32),
     SetVisSway(u8),
     SetVisSwayAmount(f32),
     ToggleVisTextOutline,

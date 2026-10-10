@@ -898,6 +898,11 @@ pub struct Settings {
     /// The title only sways on the beat and holds still between hits.
     #[serde(default)]
     pub vis_sway_beat: bool,
+    /// What the title's sway follows while it reacts to the music: 0 the
+    /// loudness, 1 the bass, 2 the beat.
+    pub vis_sway_react: u8,
+    /// How readily the sway reacts (1.0 = normal).
+    pub sway_sens: f32,
     /// How the title sways, an index into `SWAY_PRESETS`.
     #[serde(default)]
     pub vis_sway: u8,
@@ -1368,6 +1373,8 @@ impl Default for Settings {
             vis_text_still: false,
             vis_sway: 0,
             vis_sway_beat: false,
+            vis_sway_react: 2,
+            sway_sens: 1.0,
             vis_sway_amount: 0.0,
             vis_text_no_outline: false,
             vis_text_back: false,
@@ -1843,7 +1850,7 @@ impl Settings {
         "swirl_scale", "swirl_tune", "swirl_warp", "swirl_waves", "theme", "theme_from_cover", "custom_bg", "custom_accent",
         "track_columns", "tracklist_compact", "vis", "vis_bar_sides", "vis_shapes",
         "vis_shapes_last", "vis_shapes_set", "volume_presets", "zoom",
-        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_sway", "vis_sway_amount", "vis_text_no_outline", "vis_text_back", "vis_back_alpha", "vis_back_round", "vis_back_pad", "vis_back_block", "vis_live_preview", "vis_font_random", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "lyrics_vis_mode", "window_opacity", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "bar_layout", "bar_free", "bar_free_pos", "bar_free_seek", "lyrics_ctl_off", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode", "vis_jump_react", "vis_jump_on",
+        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_sway", "vis_sway_amount", "vis_sway_react", "sway_sens", "vis_text_no_outline", "vis_text_back", "vis_back_alpha", "vis_back_round", "vis_back_pad", "vis_back_block", "vis_live_preview", "vis_font_random", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "lyrics_vis_mode", "window_opacity", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "bar_layout", "bar_free", "bar_free_pos", "bar_free_seek", "lyrics_ctl_off", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode", "vis_jump_react", "vis_jump_on",
     ];
 
     /// The shareable part of the settings, as the text of a file.
@@ -1897,6 +1904,30 @@ impl Settings {
     pub const LYRICS_BOUNCE_ART: u8 = 16;
     /// The artist's name is left off the lyrics page; the song's is bigger.
     pub const LYRICS_HIDE_ARTIST: u8 = 32;
+
+    /// The current line is big and the rest small (a switch of its own).
+    pub const LYRICS_FOCUS: u8 = 64;
+
+    /// Lyrics anchored to the right (with their time on the right too).
+    pub fn lyrics_right(&self) -> bool {
+        self.lyrics_align == 2
+    }
+
+    /// Focus on the current line. An old saved "focus" alignment (1, 3, 4, 5)
+    /// counts as the switch being on.
+    pub fn lyrics_focus(&self) -> bool {
+        self.lyrics_flags & Self::LYRICS_FOCUS != 0 || matches!(self.lyrics_align, 1 | 3..=5)
+    }
+
+    /// Moves an old saved focus alignment into the switch.
+    pub fn settle_lyrics_focus(&mut self) {
+        if self.lyrics_focus() {
+            self.lyrics_flags |= Self::LYRICS_FOCUS;
+        }
+        if self.lyrics_align != 2 {
+            self.lyrics_align = 0;
+        }
+    }
 
     pub fn lyrics_align_value(&self) -> u8 {
         // The old plain Centre (1) became the middle focus mode.

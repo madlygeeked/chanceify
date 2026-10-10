@@ -11304,7 +11304,8 @@ impl App {
                 self.mark_settings_dirty();
             }
             Action::SetLyricsAlign(align) => {
-                self.settings.lyrics_align = align.min(5);
+                self.settings.settle_lyrics_focus();
+                self.settings.lyrics_align = if align == 2 { 2 } else { 0 };
                 self.mark_settings_dirty();
             }
             Action::ToggleSideLyricsFlag(bit) => {
@@ -11316,7 +11317,16 @@ impl App {
                 self.mark_settings_dirty();
             }
             Action::ToggleLyricsFlag(bit) => {
-                self.settings.lyrics_flags ^= bit;
+                if bit == crate::settings::Settings::LYRICS_FOCUS {
+                    let was = self.settings.lyrics_focus();
+                    self.settings.settle_lyrics_focus();
+                    self.settings.lyrics_flags &= !bit;
+                    if !was {
+                        self.settings.lyrics_flags |= bit;
+                    }
+                } else {
+                    self.settings.lyrics_flags ^= bit;
+                }
                 self.mark_settings_dirty();
             }
             Action::SetSwirlWaves(waves) => {
@@ -11373,6 +11383,16 @@ impl App {
             }
             Action::ToggleVisTextSway => {
                 self.settings.vis_text_still = !self.settings.vis_text_still;
+                self.mark_settings_dirty();
+            }
+            Action::SetSwayReact(mode) => {
+                self.settings.vis_sway_react = mode.min(2);
+                self.settings.vis_sway_beat = true;
+                self.settings.vis_text_still = false;
+                self.mark_settings_dirty();
+            }
+            Action::SetSwaySens(value) => {
+                self.settings.sway_sens = value.clamp(0.4, 2.5);
                 self.mark_settings_dirty();
             }
             Action::ToggleVisSwayBeat => {

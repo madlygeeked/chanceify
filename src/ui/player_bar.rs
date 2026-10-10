@@ -2274,9 +2274,33 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     app.actions.push(Action::SetVisSway(index as u8));
                 }
                 sway_preview(ui, &palette, app.settings.vis_sway_preset(), app.settings.vis_sway_strength());
-                if chip_i(ui, &palette, "Sway on the beat only", app.settings.vis_sway_beat, ui.available_width().min(290.0)).clicked() {
-                    app.actions.push(Action::ToggleVisSwayBeat);
-                }
+                theme::subtle(ui, &palette, &gettext(app.locale, "SWAY REACTS TO THE MUSIC"));
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing.x = 6.0;
+                    if chip(ui, &palette, &gettext(app.locale, "On"), app.settings.vis_sway_beat, 60.0).clicked() {
+                        app.actions.push(Action::ToggleVisSwayBeat);
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 6.0;
+                    for (value, glyph, tip) in [
+                        (0u8, Glyph::Icon(Icon::Volume2), "Sways with the loudness"),
+                        (1, Glyph::Icon(Icon::Speaker), "Sways with the bass"),
+                        (2, Glyph::Icon(Icon::Zap), "Sways on the beat"),
+                    ] {
+                        if glyph_button(ui, &palette, glyph, tip, app.settings.vis_sway_react.min(2) == value).clicked() {
+                            app.actions.push(Action::SetSwayReact(value));
+                        }
+                    }
+                });
+                slider_row(
+                    ui,
+                    &palette,
+                    &gettext(app.locale, "Sensitivity"),
+                    40.0..=250.0,
+                    app.settings.sway_sens * 100.0,
+                    |value| app.actions.push(Action::SetSwaySens(value / 100.0)),
+                );
                 slider_row(
                     ui,
                     &palette,
@@ -2413,11 +2437,15 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             }); ui.vertical(|ui| {
             ui.set_width(VIS_SINGLE_W);
             if on_page || app.settings.vis_lyrics {
-                let current = app.settings.lyrics_align_value();
-                for (value, label) in [(0u8, "Left"), (2, "Right"), (4, "Focus on the current line")] {
-                    if chip_i(ui, &palette, label, current == value, ui.available_width().min(290.0)).clicked() {
+                let right = app.settings.lyrics_right();
+                for (value, label) in [(0u8, "Left"), (2, "Right")] {
+                    if chip_i(ui, &palette, label, (value == 2) == right, ui.available_width().min(290.0)).clicked() {
                         app.actions.push(Action::SetLyricsAlign(value));
                     }
+                }
+                let focus = app.settings.lyrics_focus();
+                if chip_i(ui, &palette, "Focus on the current line", focus, ui.available_width().min(290.0)).clicked() {
+                    app.actions.push(Action::ToggleLyricsFlag(crate::settings::Settings::LYRICS_FOCUS));
                 }
             }
             if app.extra_vis {
@@ -2548,6 +2576,27 @@ fn glyph_button(
     response.on_hover_text(tip)
 }
 
+/// How much of the sway shows right now: all of it, or what the music asks
+/// for while "reacts to the music" is on (loudness, bass or beat).
+fn sway_gate(app: &App) -> f32 {
+    if !app.settings.vis_sway_beat {
+        return 1.0;
+    }
+    let sens = app.settings.sway_sens.clamp(0.4, 2.5);
+    match app.settings.vis_sway_react.min(2) {
+        0 => {
+            let window = app.audio.tap.window(1536, 0);
+            if window.is_empty() {
+                return 0.0;
+            }
+            let loud = (window.iter().map(|x| x * x).sum::<f32>() / window.len() as f32).sqrt() * 2.0;
+            ((loud * sens - 0.05) / 0.35).clamp(0.0, 1.0)
+        }
+        1 => (app.music_bass_level() * sens * 1.4).clamp(0.0, 1.0),
+        _ => ((app.music_bass_level() * sens - 0.12) / 0.4).clamp(0.0, 1.0),
+    }
+}
+
 /// Every title font as a cell showing the playing song in that very font,
 /// so the choice is made by looking. With the live preview on, hovering a
 /// cell puts that font on the visualizer's title straight away.
@@ -2617,7 +2666,7 @@ fn font_grid(app: &mut App, ui: &mut egui::Ui) {
                         egui::FontId::new(15.0, family),
                         palette.text,
                     );
-                    if response.hovered() {
+                    if response.hovered() || ui.rect_contains_pointer(rect) {
                         hovered = Some(index as u8);
                     }
                     if response.clicked() {
@@ -3730,7 +3779,7 @@ fn tilted_cover(ui: &egui::Ui, cover: Rect, url: Option<&str>, floating: bool, b
     if border {
         ui.painter().add(egui::Shape::closed_line(
             corners,
-            egui::Stroke::new(2.0, Color32::from_white_alpha(120)),
+            egui::Stroke::new(3.0, Color32::from_white_alpha(230)),
         ));
     }
     true
@@ -3777,7 +3826,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
         painter.rect_stroke(
             cover.expand(1.5),
             3.0,
-            egui::Stroke::new(2.0, Color32::from_white_alpha(120)),
+            egui::Stroke::new(3.0, Color32::from_white_alpha(230)),
             egui::StrokeKind::Middle,
         );
     }
@@ -3929,11 +3978,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
     let still = app.settings.vis_text_still;
     let sway = app.settings.vis_sway_preset();
     // On the beat only: the title moves with each hit and holds still between.
-    let gate = if app.settings.vis_sway_beat {
-        ((bass - 0.12) / 0.4).clamp(0.0, 1.0)
-    } else {
-        1.0
-    };
+    let gate = sway_gate(app);
     let strength = app.settings.vis_sway_strength() * gate;
     let contrast = if ink == Color32::WHITE { Color32::BLACK } else { Color32::WHITE };
     let outline = !app.settings.vis_text_no_outline;
@@ -4893,11 +4938,7 @@ pub fn now_playing_overlay(app: &mut App, ui: &mut egui::Ui, art: Rect, now: &No
         .on_hover_cursor(egui::CursorIcon::PointingHand);
     {
         let sway = app.settings.vis_sway_preset();
-        let beat_gate = if app.settings.vis_sway_beat {
-            ((app.music_bass_level() - 0.12) / 0.4).clamp(0.0, 1.0)
-        } else {
-            1.0
-        };
+        let beat_gate = sway_gate(app);
         let strength = app.settings.vis_sway_strength() * beat_gate;
         let still = app.settings.vis_text_still;
         let angle = if still {
