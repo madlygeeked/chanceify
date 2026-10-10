@@ -1285,6 +1285,8 @@ pub enum Action {
     CopyLink(String),
     /// Copy a line about the playing song, with its Spotify link, to paste in Discord.
     ShareToDiscord,
+    /// Copy a named chanceify link for a song, for pasting in Discord.
+    CopyForDiscord { uri: String, title: String, artist: String },
     /// Copy picked songs' links, one per line, and remember the songs so a
     /// paste of the same links can show their rows at once.
     CopySongs(Vec<PlayableItem>),

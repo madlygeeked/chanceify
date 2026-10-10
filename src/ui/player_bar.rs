@@ -5026,7 +5026,40 @@ pub fn now_playing_overlay(app: &mut App, ui: &mut egui::Ui, art: Rect, now: &No
                 _ => vec2((time * 41.0).sin() * reach * drive, (time * 37.0).cos() * reach * drive),
             }
         };
-        let shape = egui::epaint::TextShape::new(title_pos + motion, title_galley.clone(), palette.text)
+        // The title stays inside the card however it sways: the tilt is eased
+        // until the turned words fit, then the words are slid back inside.
+        let size = title_galley.size();
+        let bounds = card.shrink(2.0);
+        let corners = |angle: f32, at: egui::Pos2| -> Rect {
+            let pivot = at + vec2(size.x / 2.0, size.y);
+            let (s, c) = angle.sin_cos();
+            let turned = [vec2(0.0, 0.0), vec2(size.x, 0.0), vec2(0.0, size.y), vec2(size.x, size.y)]
+                .map(|corner| {
+                    let d = at + corner - pivot;
+                    pivot + vec2(d.x * c - d.y * s, d.x * s + d.y * c)
+                });
+            Rect::from_points(&turned)
+        };
+        let mut angle = angle;
+        let mut at = title_pos + motion;
+        for _ in 0..8 {
+            let spread = corners(angle, at);
+            if angle == 0.0 || (spread.width() <= bounds.width() + 0.5 && spread.height() <= bounds.height() + 0.5) {
+                break;
+            }
+            angle *= 0.6;
+        }
+        let spread = corners(angle, at);
+        let shift = vec2(
+            if spread.left() < bounds.left() { bounds.left() - spread.left() }
+            else if spread.right() > bounds.right() { bounds.right() - spread.right() }
+            else { 0.0 },
+            if spread.top() < bounds.top() { bounds.top() - spread.top() }
+            else if spread.bottom() > bounds.bottom() { bounds.bottom() - spread.bottom() }
+            else { 0.0 },
+        );
+        at += shift;
+        let shape = egui::epaint::TextShape::new(at, title_galley.clone(), palette.text)
             .with_angle_and_anchor(angle, egui::Align2::CENTER_BOTTOM);
         ui.painter().add(shape);
         if angle != 0.0 || motion != vec2(0.0, 0.0) {

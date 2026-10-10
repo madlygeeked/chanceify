@@ -1171,8 +1171,60 @@ pub fn item_menu(
 ) {
     let palette = app.palette;
     let locale = app.locale;
-    ui.set_min_width(220.0);
-    ui.set_max_width(300.0);
+    // The menu is exactly as wide as its widest row: no empty space.
+    {
+        let mut labels: Vec<(String, f32)> = vec![
+            (gettext(locale, "Add to queue").into_owned(), 0.0),
+            (gettext(locale, "Copy link").into_owned(), 0.0),
+            (gettext(locale, "Open in Spotify").into_owned(), 0.0),
+        ];
+        if item.is_track() {
+            let saved = app.is_saved(item.uri()).unwrap_or(false);
+            labels.push((
+                gettext(locale, if saved { "Remove from Liked Songs" } else { "Save to Liked Songs" }).into_owned(),
+                0.0,
+            ));
+            labels.push((gettext(locale, "Add to playlist").into_owned(), 22.0));
+            labels.push((gettext(locale, "Go to song radio").into_owned(), 0.0));
+            labels.push((gettext(locale, "Go to artist").into_owned(), 22.0));
+            labels.push((gettext(locale, "Go to album").into_owned(), 0.0));
+            labels.push(("Open in Last.fm".to_string(), 0.0));
+            labels.push((format!("Open in {}", crate::build_info::DISPLAY_NAME), 0.0));
+            labels.push(("Copy for Discord".to_string(), 0.0));
+            if !app.settings.lastfm_session.is_empty() {
+                labels.push(("Love on Last.fm".to_string(), 0.0));
+            }
+        } else {
+            labels.push((gettext(locale, "Save episode").into_owned(), 0.0));
+            labels.push((gettext(locale, "Go to podcast").into_owned(), 0.0));
+        }
+        if matches!(
+            context,
+            Some(RowContext::Context { editable_playlist: Some(_), .. })
+                | Some(RowContext::View { editable_playlist: Some(_), .. })
+        ) {
+            labels.push((gettext(locale, "Remove from this playlist").into_owned(), 0.0));
+            labels.push((gettext(locale, "Move down").into_owned(), 0.0));
+        }
+        let widest = labels
+            .iter()
+            .map(|(text, extra)| {
+                let galley = crate::bidi::layout(
+                    ui.painter(),
+                    text,
+                    theme::regular(13.5),
+                    palette.text,
+                    f32::INFINITY,
+                    1,
+                    None,
+                );
+                10.0 + 26.0 + galley.size().x + 10.0 + extra
+            })
+            .fold(0.0_f32, f32::max)
+            .clamp(160.0, 340.0);
+        ui.set_min_width(widest);
+        ui.set_max_width(widest);
+    }
     let uri = item.uri().to_string();
     let label = item.name().to_string();
     if menu_item(
@@ -1384,6 +1436,26 @@ pub fn item_menu(
                 super::settings::last_fm_part(&artist),
                 super::settings::last_fm_part(&track.name)
             )));
+        }
+        // The very bottom: chanceify's own page for the song, and the same
+        // link as a named one for pasting in Discord.
+        let artist = track.artists.first().map(|artist| artist.name.clone()).unwrap_or_default();
+        if let Some(url) = crate::discord::song_link(item.uri(), &track.name, &artist) {
+            if menu_item(
+                ui,
+                &palette,
+                Some(Icon::ExternalLink),
+                &format!("Open in {}", crate::build_info::DISPLAY_NAME),
+            ) {
+                app.actions.push(Action::OpenUrl(url));
+            }
+            if menu_item(ui, &palette, Some(Icon::Copy), "Copy for Discord") {
+                app.actions.push(Action::CopyForDiscord {
+                    uri: item.uri().to_string(),
+                    title: track.name.clone(),
+                    artist,
+                });
+            }
         }
     }
 }

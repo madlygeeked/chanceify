@@ -10404,6 +10404,14 @@ impl App {
                 }
                 None => self.toast("Nothing is playing"),
             },
+            Action::CopyForDiscord { uri, title, artist } => {
+                let line = match crate::discord::song_link(&uri, &title, &artist) {
+                    Some(url) => format!("Listening to {} by {} on [{}]({})", title, artist, crate::build_info::DISPLAY_NAME, url),
+                    None => format!("Listening to {} by {} on {}", title, artist, crate::build_info::DISPLAY_NAME),
+                };
+                ctx.copy_text(line);
+                self.toast("Copied. Paste it in Discord and it shows a player");
+            }
             Action::CopyLink(uri) => {
                 if let Some(url) = util::open_spotify_url(&uri) {
                     ctx.copy_text(url);
