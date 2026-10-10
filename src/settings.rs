@@ -116,6 +116,10 @@ pub struct TrackColumns {
     /// number of places from the left among the columns shown (the # not
     /// counted). `None` keeps it at the right end.
     pub length_at: Option<u8>,
+    /// Where the cover picture column sits once dragged away from the song
+    /// name: places from the left among the columns shown (the # not counted).
+    /// `None` keeps it right before the song name.
+    pub cover_at: Option<u8>,
     /// The columns share the width of the list between them instead of
     /// keeping the widths they were dragged to.
     pub spread: bool,
@@ -141,6 +145,7 @@ impl Default for TrackColumns {
             order: Self::DEFAULT_ORDER,
             number_at: None,
             length_at: None,
+            cover_at: None,
             spread: false,
         }
     }

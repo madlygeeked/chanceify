@@ -747,7 +747,21 @@ fn submenu<R>(
     close_behavior: Option<egui::PopupCloseBehavior>,
     add_contents: impl FnOnce(&mut Ui) -> R,
 ) -> Option<egui::InnerResponse<R>> {
-    let width = ui.available_width();
+    // Only as wide as its label and arrow, like the plain rows, so the arrow
+    // sits close to the words instead of far off at the menu's edge.
+    let need = {
+        let wanted = crate::bidi::layout(
+            ui.painter(),
+            label,
+            theme::regular(13.5),
+            palette.text,
+            f32::INFINITY,
+            1,
+            None,
+        );
+        10.0 + if icon.is_some() { 26.0 } else { 0.0 } + wanted.size().x + 6.0 + 16.0 + 10.0
+    };
+    let width = fit_width(ui, need);
     let (rect, response) = ui.allocate_exact_size(vec2(width, 28.0), Sense::click());
     let is_in_menu = egui::menu::is_in_menu(ui);
     let submenu_id = egui::menu::SubMenu::id_from_widget_id(response.id);
@@ -904,7 +918,7 @@ pub fn picked_menu(
 ) {
     let palette = app.palette;
     let locale = app.locale;
-    ui.set_min_width(220.0);
+    ui.set_min_width(150.0);
     ui.set_max_width(300.0);
     let count = songs.len();
     let uris: Vec<String> = songs.iter().map(|item| item.uri().to_string()).collect();
@@ -1833,10 +1847,11 @@ pub(crate) fn column_slots(
     laid: &Columns,
     number: Option<(usize, f32)>,
     length: Option<(usize, f32)>,
+    cover: Option<(usize, f32)>,
 ) -> Vec<(crate::model::SortColumn, f32, f32)> {
     use crate::model::SortColumn as Sc;
     let others = laid.playlists + laid.album + laid.added + laid.release + laid.bpm;
-    let extra = number.map_or(0.0, |(_, w)| w) + length.map_or(0.0, |(_, w)| w);
+    let extra = number.map_or(0.0, |(_, w)| w) + length.map_or(0.0, |(_, w)| w) + cover.map_or(0.0, |(_, w)| w);
     let title = (end - start - others - extra).max(0.0);
     let mut cells: Vec<(Sc, f32)> = Vec::new();
     for code in order {
@@ -1852,9 +1867,13 @@ pub(crate) fn column_slots(
             cells.push((column, width));
         }
     }
-    // The length first, then the # (whose place counts the length).
+    // The length first, then the cover (the cover picture's column, marked
+    // by `AddedBy`, which has no column of its own any more), then the #.
     if let Some((at, width)) = length {
         cells.insert(at.min(cells.len()), (Sc::Duration, width));
+    }
+    if let Some((at, width)) = cover {
+        cells.insert(at.min(cells.len()), (Sc::AddedBy, width));
     }
     if let Some((at, width)) = number {
         cells.insert(at.min(cells.len()), (Sc::Index, width));
@@ -2094,10 +2113,19 @@ fn track_row_contents(
     let length_w = cols.duration;
     let number_embedded = if bare || cols.number <= 0.0 { None } else { tcols.number_at.map(usize::from) };
     let length_embedded = if bare || !row.show_time || cols.duration <= 0.0 { None } else { tcols.length_at.map(usize::from) };
+    let cover_w = cols.cover;
+    let cover_embedded = if bare || cols.cover <= 0.0 { None } else { tcols.cover_at.map(usize::from) };
     if number_embedded.is_some() {
         cols.number = 0.0;
     }
-    let embedded_w = number_embedded.map_or(0.0, |_| number_w) + length_embedded.map_or(0.0, |_| length_w);
+    if cover_embedded.is_some() {
+        cols.cover = 0.0;
+    }
+    let embedded_w = number_embedded.map_or(0.0, |_| number_w)
+        + length_embedded.map_or(0.0, |_| length_w)
+        + cover_embedded.map_or(0.0, |_| cover_w);
+    // Without a number column the cover carries the play control.
+    let cover_plays = cols.number == 0.0;
     let painter = ui.painter().clone();
     // A faint vertical rule at the left edge of each optional column.
     let rule = |at: f32| {
@@ -2159,11 +2187,12 @@ fn track_row_contents(
         number_cell = Some(cell);
         x += cols.number;
     }
-    // Cover.
-    if cols.cover > 0.0 {
+    // Cover: drawn where the song name starts, or in its own column when it
+    // has been dragged in among the others.
+    let draw_cover = |ui: &mut Ui, app: &mut App, left: f32| {
         let size = if row.compact { 36.0 } else { 40.0 };
         let cover_rect = Rect::from_center_size(
-            pos2(x + size / 2.0 + 2.0, rect.center().y),
+            pos2(left + size / 2.0 + 2.0, rect.center().y),
             Vec2::splat(size),
         );
         paint_cover(
@@ -2179,9 +2208,7 @@ fn track_row_contents(
             },
             Some(app.backend.art()),
         );
-        // Without a number column the cover carries the play control:
-        // hover shows it, a click uses it, and what plays shows there.
-        if cols.number == 0.0 {
+        if cover_plays {
             let scrim = |alpha: u8| {
                 painter.rect_filled(
                     cover_rect,
@@ -2210,6 +2237,9 @@ fn track_row_contents(
                 theme::paint_icon(ui, Icon::AudioLines, cover_rect, 16.0, palette.accent);
             }
         }
+    };
+    if cols.cover > 0.0 {
+        draw_cover(ui, app, x);
         x += cols.cover;
     }
     let right_fixed = cols.heart
@@ -2239,9 +2269,13 @@ fn track_row_contents(
         &cols,
         number_embedded.map(|at| (at, number_w)),
         length_embedded.map(|at| (at, length_w)),
+        cover_embedded.map(|at| (at, cover_w)),
     );
     for (column, at, width) in &slots {
         match column {
+            crate::model::SortColumn::AddedBy => {
+                draw_cover(ui, app, *at);
+            }
             crate::model::SortColumn::Index => {
                 let cell = Rect::from_min_size(pos2(*at, rect.top()), vec2(*width, row_height));
                 draw_number(ui, cell);
@@ -3587,7 +3621,10 @@ pub fn table_header(
     let show_length = !columns.hide_duration;
     let number_embedded = if show_number { columns.number_at.map(usize::from) } else { None };
     let length_embedded = if show_length { columns.length_at.map(usize::from) } else { None };
-    let embedded_w = number_embedded.map_or(0.0, |_| 44.0) + length_embedded.map_or(0.0, |_| 56.0);
+    let cover_embedded = if show_cover { columns.cover_at.map(usize::from) } else { None };
+    let embedded_w = number_embedded.map_or(0.0, |_| 44.0)
+        + length_embedded.map_or(0.0, |_| 56.0)
+        + cover_embedded.map_or(0.0, |_| 52.0);
     let right_fixed = columns.buttons_width() + if show_length && length_embedded.is_none() { 56.0 } else { 0.0 } + 8.0;
     // Unless it is locked to the left, the whole table sits in the middle:
     // the number, cover, song name and columns move together and grow out
@@ -3606,7 +3643,9 @@ pub fn table_header(
         heading(ui, x + 18.0, "#", SortColumn::Index, 44.0, None, natural.then_some(true), &mut anchors);
         x += 44.0;
     }
-    if show_cover {
+    if show_cover && cover_embedded.is_none() {
+        // The cover's handle: drag it to move the cover among the columns.
+        heading(ui, x + 14.0, "cover", SortColumn::AddedBy, 52.0, Some(Icon::Disc), None, &mut anchors);
         x += 52.0;
     }
     if columns.spread {
@@ -3621,6 +3660,7 @@ pub fn table_header(
         &laid,
         number_embedded.map(|at| (at, 44.0)),
         length_embedded.map(|at| (at, 56.0)),
+        cover_embedded.map(|at| (at, 52.0)),
     );
     let title_at = slots.iter().position(|(c, _, _)| *c == SortColumn::Title);
     // (edge, column, whether dragging right makes the column wider)
@@ -3632,6 +3672,10 @@ pub fn table_header(
         }
         if *column == SortColumn::Duration {
             heading(ui, at + room - 21.0, "length", SortColumn::Duration, *room, Some(Icon::Clock), None, &mut anchors);
+            continue;
+        }
+        if *column == SortColumn::AddedBy {
+            heading(ui, at + 14.0, "cover", SortColumn::AddedBy, *room, Some(Icon::Disc), None, &mut anchors);
             continue;
         }
         let label = match column {
@@ -3662,6 +3706,13 @@ pub fn table_header(
             SortColumn::Index => {
                 let places = slots.iter().filter(|(c, x, w)| *c != SortColumn::Index && before(*x, *w)).count();
                 widths.number_at = (places > 0).then_some(places.min(250) as u8);
+            }
+            SortColumn::AddedBy => {
+                let places = slots
+                    .iter()
+                    .filter(|(c, x, w)| *c != SortColumn::AddedBy && *c != SortColumn::Index && before(*x, *w))
+                    .count();
+                widths.cover_at = (places > 0).then_some(places.min(250) as u8);
             }
             SortColumn::Duration => {
                 let others: Vec<_> = slots
@@ -3735,7 +3786,8 @@ pub fn table_header(
         Stroke::new(1.0, palette.outline),
     );
     ui.add_space(6.0);
-    action.sorted = clicked;
+    // The cover's handle only drags; it is not something to sort by.
+    action.sorted = clicked.filter(|column| *column != SortColumn::AddedBy);
     if widths != *columns {
         action.columns = Some(widths);
     }
