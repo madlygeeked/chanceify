@@ -158,7 +158,7 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
             ui.painter().circle_filled(
                 rect.center(),
                 (size + 12.0) / 2.0,
-                Color32::from_rgb(if hot { 20 } else { 14 }, if hot { 22 } else { 16 }, if hot { 26 } else { 20 }),
+                Color32::from_rgba_unmultiplied(if hot { 20 } else { 14 }, if hot { 22 } else { 16 }, if hot { 26 } else { 20 }, if hot { 235 } else { 110 }),
             );
             ui.painter().circle_stroke(
                 rect.center(),
@@ -245,17 +245,40 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                 );
                 change = Some(Some([top_left.x, top_left.y, width]));
             }
-            let edge = Rect::from_min_max(
-                egui::pos2(outer.right() - 12.0, outer.top() + 14.0),
-                egui::pos2(outer.right() + 4.0, outer.bottom() - 4.0),
+            // Resizable from any edge or corner: the right side and the
+            // bottom-right corner widen it, the left side widens it and
+            // moves it so the far edge stays put. Everything inside scales.
+            let right_edge = Rect::from_min_max(
+                egui::pos2(outer.right() - 10.0, outer.top() + 10.0),
+                egui::pos2(outer.right() + 6.0, outer.bottom() + 6.0),
             );
-            let edge_response = ui.interact(edge, Id::new("pop-out-edge"), egui::Sense::drag());
-            if edge_response.hovered() || edge_response.dragged() {
-                ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+            let left_edge = Rect::from_min_max(
+                egui::pos2(outer.left() - 6.0, outer.top() + 10.0),
+                egui::pos2(outer.left() + 10.0, outer.bottom() + 6.0),
+            );
+            let bottom_edge = Rect::from_min_max(
+                egui::pos2(outer.left() + 10.0, outer.bottom() - 8.0),
+                egui::pos2(outer.right() - 10.0, outer.bottom() + 6.0),
+            );
+            let right_response = ui.interact(right_edge, Id::new("pop-out-edge"), egui::Sense::drag());
+            let left_response = ui.interact(left_edge, Id::new("pop-out-edge-left"), egui::Sense::drag());
+            let bottom_response = ui.interact(bottom_edge, Id::new("pop-out-edge-bottom"), egui::Sense::drag());
+            for response in [&right_response, &left_response, &bottom_response] {
+                if response.hovered() || response.dragged() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+                }
             }
-            if edge_response.dragged() {
-                let wider = (width + edge_response.drag_delta().x).clamp(300.0, 620.0);
-                change = Some(Some([top_left.x, top_left.y, wider]));
+            let max_w = (screen.width() - 16.0).clamp(300.0, 1400.0);
+            if right_response.dragged() || bottom_response.dragged() {
+                let dx = right_response.drag_delta().x + bottom_response.drag_delta().x;
+                let wider = (width + dx).clamp(300.0, max_w);
+                let x = top_left.x.min((screen.right() - wider).max(screen.left()));
+                change = Some(Some([x, top_left.y, wider]));
+            }
+            if left_response.dragged() {
+                let wider = (width - left_response.drag_delta().x).clamp(300.0, max_w);
+                let x = (top_left.x + width - wider).max(screen.left());
+                change = Some(Some([x, top_left.y, wider]));
             }
             grip_response.context_menu(|ui| {
                 if ui.button("Snap to the library sidebar").clicked() {
@@ -395,19 +418,6 @@ pub fn show(app: &mut App, ctx: &Context) {
                             on_top,
                         ],
                     };
-                    let mini_chips: Vec<(&str, bool, Action)> = if app.settings.mini_player {
-                        vec![
-                            ("Mini: queue", app.settings.mini_queue, Action::ToggleMiniQueue),
-                            ("Mini: volume", app.settings.mini_volume, Action::ToggleMiniVolume),
-                            ("Mini: still", app.settings.mini_vis_mode() == 0, Action::SetMiniVis(0)),
-                            ("Mini: bars", app.settings.mini_vis_mode() == 1, Action::SetMiniVis(1)),
-                            ("Mini: flow", app.settings.mini_vis_mode() == 2, Action::SetMiniVis(2)),
-                            ("Mini: swirl", app.settings.mini_vis_mode() == 3, Action::SetMiniVis(3)),
-                        ]
-                    } else {
-                        Vec::new()
-                    };
-                    let chips: Vec<_> = chips.into_iter().chain(mini_chips).collect();
                     if !chips.is_empty() {
                         ui.horizontal_wrapped(|ui| {
                             for (label, on, action) in chips {

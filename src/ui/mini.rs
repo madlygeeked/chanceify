@@ -66,7 +66,7 @@ pub fn window(app: &mut App, ctx: &egui::Context) {
         app.mini_active = true;
         super::keys::handle(app, &ctx);
         show(app, ui);
-        super::window_controls(ui, &app.palette, app.locale);
+        close_button(app, ui);
         super::window_resize(ui);
         app.mini_active = false;
         let (outer, inner) = ctx.input(|input| (input.viewport().outer_rect, input.viewport().inner_rect));
@@ -197,10 +197,6 @@ fn options_menu(app: &mut App, page: &egui::Response) {
             {
                 app.actions.push(Action::ToggleMiniFade);
             }
-            widgets::menu_separator(ui, &palette);
-            if widgets::menu_item(ui, &palette, Some(Icon::Expand), "Back to the full window") {
-                app.actions.push(Action::ToggleMiniPlayer);
-            }
         });
 }
 
@@ -212,19 +208,7 @@ fn strip_buttons(app: &mut App, ui: &mut egui::Ui, strip: Rect) {
             .max_rect(strip)
             .layout(Layout::left_to_right(Align::Center)),
     );
-    row.add_space(6.0);
-    if theme::icon_button(
-        &mut row,
-        Icon::Expand,
-        15.0,
-        palette.secondary,
-        palette.text,
-        "Back to the full window",
-    )
-    .clicked()
-    {
-        app.actions.push(Action::ToggleMiniPlayer);
-    }
+    row.add_space(28.0);
     let queue = app.settings.mini_queue;
     if theme::icon_button(
         &mut row,
@@ -644,6 +628,11 @@ fn volume_row(app: &mut App, ui: &mut egui::Ui, width: f32, now: Option<&NowPlay
 
 /// The queue, scrolling in the room under the controls.
 fn queue_list(app: &mut App, ui: &mut egui::Ui, body: Rect, palette: theme::Palette) {
+    // The queue is only fetched for the side panel, so ask for it here the
+    // moment the mini player wants it instead of waiting for a refresh.
+    if matches!(app.queue, crate::model::Loadable::NotLoaded) {
+        app.actions.push(Action::RefreshQueue);
+    }
     let height = (body.bottom() - ui.cursor().top()).max(40.0);
     let list = Rect::from_min_size(
         pos2(body.left(), ui.cursor().top()),
@@ -670,4 +659,34 @@ fn queue_list(app: &mut App, ui: &mut egui::Ui, body: Rect, palette: theme::Pale
         .show(&mut scroll_ui, |ui| {
             super::queue::contents(app, ui, true);
         });
+}
+
+/// A small close button in the top-right corner, drawn only while the
+/// pointer is over the window. It is the only way out besides the disc.
+fn close_button(app: &mut App, ui: &mut egui::Ui) {
+    let palette = app.palette;
+    let ctx = ui.ctx().clone();
+    let screen = ctx.content_rect();
+    let hovered = ctx.input(|input| input.pointer.hover_pos()).is_some_and(|p| screen.contains(p));
+    let rect = Rect::from_min_size(pos2(screen.right() - 24.0, screen.top() + 4.0), vec2(20.0, 20.0));
+    let id = egui::Id::new("mini-close");
+    let response = ui.interact(rect, id, Sense::click());
+    let strength = ctx.animate_bool_with_time(id.with("fade"), hovered, 0.15);
+    if strength > 0.01 {
+        let colour = if response.hovered() { palette.text } else { palette.secondary };
+        if response.hovered() {
+            ui.painter().rect_filled(rect, 10.0, palette.surface.gamma_multiply(strength));
+        }
+        let c = rect.center();
+        let d = 4.0;
+        let stroke = egui::Stroke::new(1.5, colour.gamma_multiply(strength));
+        ui.painter().line_segment([c + vec2(-d, -d), c + vec2(d, d)], stroke);
+        ui.painter().line_segment([c + vec2(-d, d), c + vec2(d, -d)], stroke);
+        if response.hovered() {
+            ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+    }
+    if response.clicked() {
+        app.actions.push(Action::ToggleMiniPlayer);
+    }
 }

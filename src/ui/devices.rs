@@ -61,9 +61,7 @@ fn enable_playback_row(app: &mut App, ui: &mut egui::Ui) {
     }
     let icon_rect =
         Rect::from_center_size(pos2(rect.left() + 24.0, rect.center().y), Vec2::splat(22.0));
-    Icon::Laptop
-        .image(palette.text, 22.0)
-        .paint_at(ui, icon_rect);
+    theme::logo(ui, icon_rect.center(), 22.0);
     let painter = ui.painter().with_clip_rect(rect);
     painter.text(
         pos2(rect.left() + 48.0, rect.center().y - 9.0),
@@ -311,9 +309,14 @@ pub fn popup(app: &mut App, ctx: &egui::Context) {
                                 pos2(rect.left() + 24.0, rect.center().y),
                                 egui::Vec2::splat(22.0),
                             );
-                            device_icon(&device.kind)
-                                .image(color, 22.0)
-                                .paint_at(ui, icon_rect);
+                            // chanceify always wears its own logo, never a laptop.
+                            if is_local || device.name.to_lowercase().contains("chanceify") {
+                                theme::logo(ui, icon_rect.center(), 22.0);
+                            } else {
+                                device_icon(&device.kind)
+                                    .image(color, 22.0)
+                                    .paint_at(ui, icon_rect);
+                            }
                             let painter = ui.painter().with_clip_rect(rect);
                             crate::bidi::paint_line(
                                 &painter,

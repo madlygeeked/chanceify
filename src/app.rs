@@ -11312,7 +11312,7 @@ impl App {
             Action::ImportSettings => self.import_settings_file("chanceify-settings.json"),
             Action::LoadDefaultSettings => self.import_settings_file("defaults.json"),
             Action::ToggleViewsPanel => self.views_panel = !self.views_panel,
-            Action::OpenViewsPanel => self.views_panel = true,
+            Action::OpenViewsPanel => self.views_panel = !self.views_panel,
             Action::RegisterLinks => match crate::link::register_links() {
                 Ok(()) => self.toast("chanceify:// links now open chanceify"),
                 Err(error) => self.toast_error(format!("Could not set that up: {error}")),

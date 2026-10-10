@@ -383,10 +383,34 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 .data_mut(|data| data.insert_temp(egui::Id::new("tour-player"), row));
             // The cover and the song's name at the left of the row.
             {
+                // Popped out, the slim row is only as wide as the library
+                // sidebar above it, and only there.
+                let side = if popped_out {
+                    let sidebar_w = if app.settings.sidebar_visible {
+                        ui.ctx()
+                            .data(|data| data.get_temp::<Rect>(egui::Id::new("tour-sidebar")))
+                            .map_or(app.settings.sidebar_width, |rect| rect.width())
+                    } else {
+                        260.0
+                    };
+                    (sidebar_w - 28.0).max(150.0)
+                } else {
+                    side
+                };
                 let region = Rect::from_min_max(
                     pos2(grown.left(), row.top()),
                     pos2(grown.left() + side, row.bottom()),
                 );
+                if popped_out && region.height() >= 20.0 {
+                    ui.painter().rect_filled(
+                        Rect::from_min_max(
+                            pos2(grown.left() - 16.0, row.top()),
+                            pos2(region.right() + 16.0, row.bottom() + 1.0),
+                        ),
+                        0.0,
+                        palette.panel,
+                    );
+                }
                 if region.height() >= 20.0 {
                     now_playing_block(app, ui, region, now.as_ref());
                 }
@@ -548,11 +572,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     } else {
                         palette.dim
                     };
-                    for dx in [2.0, 7.0, 12.0] {
-                        for dy in [6.0] {
-                            ui.painter().circle_filled(pos2(x - 2.0 + dx, top + 1.0 + dy), 1.2, color);
-                        }
-                    }
+                    let _ = color;
                     if drag.hovered() || drag.dragged() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
                     }
@@ -630,11 +650,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     let handle = Rect::from_min_size(pos2(x - 2.0, y + h / 2.0 - 6.0), vec2(14.0, 12.0));
                     let drag = ui.interact(handle, egui::Id::new("seek-handle"), Sense::drag());
                     let color = if drag.hovered() || drag.dragged() { palette.text } else { palette.dim };
-                    for dx in [2.0, 7.0, 12.0] {
-                        for dy in [6.0] {
-                            ui.painter().circle_filled(pos2(x - 2.0 + dx, y + h / 2.0 - 6.0 + dy), 1.2, color);
-                        }
-                    }
+                    let _ = color;
                     if drag.hovered() || drag.dragged() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
                     }
@@ -689,7 +705,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             });
             let name_region = Rect::from_min_max(
                 pos2(grown.left(), row.top()),
-                pos2(grown.left() + side, row.bottom()),
+                pos2(grown.left() + if popped_out { 150.0 } else { side }, row.bottom()),
             );
             row_menus(app, ui, row, blocks, name_region);
         });
@@ -4600,7 +4616,7 @@ fn transport_impl(
     };
 
     // Button widths: icon buttons occupy icon size + 12; the disc is 36.
-    let widths = [29.0 * kc, 30.0 * kc, 36.0 * kc, 30.0 * kc, 29.0 * kc];
+    let widths = [30.0 * kc, 36.0 * kc, 30.0 * kc, 29.0 * kc, 29.0 * kc];
     let gap = 10.0 * kc;
     // Back, play and next sit together; shuffle and repeat stand a little
     // apart at either end.
@@ -4609,7 +4625,7 @@ fn transport_impl(
     let mut index = 0;
     let mut slot = |width: f32| {
         let rect = Rect::from_center_size(pos2(x + width / 2.0, cy), vec2(width, 36.0 * kc));
-        x += width + if index == 0 || index == 3 { apart } else { gap };
+        x += width + if index == 2 { apart } else { gap };
         index += 1;
         rect
     };
@@ -4628,33 +4644,7 @@ fn transport_impl(
         child
     };
 
-    let shuffle_color = if shuffle { palette.accent } else { dim };
     let mut cell = centered(ui, slot(widths[0]));
-    let shuffle_button = theme::icon_button(
-        &mut cell,
-        Icon::Shuffle,
-        17.0 * kc,
-        shuffle_color,
-        if shuffle {
-            palette.accent_hover
-        } else {
-            palette.text
-        },
-        &gettext(app.locale, "Shuffle"),
-    );
-    shuffle_button.widget_info(|| {
-        egui::WidgetInfo::selected(
-            egui::WidgetType::Checkbox,
-            cell.is_enabled(),
-            shuffle,
-            gettext(app.locale, "Shuffle"),
-        )
-    });
-    if shuffle_button.clicked() {
-        app.actions.push(Action::ToggleShuffle);
-    }
-
-    let mut cell = centered(ui, slot(widths[1]));
     if theme::icon_button(
         &mut cell,
         Icon::SkipBackFilled,
@@ -4668,7 +4658,7 @@ fn transport_impl(
         app.actions.push(Action::Previous);
     }
 
-    let disc = slot(widths[2]);
+    let disc = slot(widths[1]);
     if loading || app.any_play_pending() {
         ui.painter()
             .circle_filled(disc.center(), 18.0 * kc, palette.text);
@@ -4705,7 +4695,7 @@ fn transport_impl(
         }
     }
 
-    let mut cell = centered(ui, slot(widths[3]));
+    let mut cell = centered(ui, slot(widths[2]));
     if theme::icon_button(
         &mut cell,
         Icon::SkipForwardFilled,
@@ -4717,6 +4707,32 @@ fn transport_impl(
     .clicked()
     {
         app.actions.push(Action::Next);
+    }
+
+    let shuffle_color = if shuffle { palette.accent } else { dim };
+    let mut cell = centered(ui, slot(widths[3]));
+    let shuffle_button = theme::icon_button(
+        &mut cell,
+        Icon::Shuffle,
+        17.0 * kc,
+        shuffle_color,
+        if shuffle {
+            palette.accent_hover
+        } else {
+            palette.text
+        },
+        &gettext(app.locale, "Shuffle"),
+    );
+    shuffle_button.widget_info(|| {
+        egui::WidgetInfo::selected(
+            egui::WidgetType::Checkbox,
+            cell.is_enabled(),
+            shuffle,
+            gettext(app.locale, "Shuffle"),
+        )
+    });
+    if shuffle_button.clicked() {
+        app.actions.push(Action::ToggleShuffle);
     }
 
     let (repeat_icon, repeat_color, tooltip) = match repeat {
@@ -4785,7 +4801,10 @@ fn transport_impl(
     let row_cy = row.center().y;
     let full_width = (zone.1 - zone.0 - time_width - 8.0 - right_label).clamp(100.0, 1600.0);
     // S steps the bar through short, medium and full width.
-    let slider_width = if app.settings.seek_custom_width > 0.0 {
+    let force_full = ui.ctx().data(|data| data.get_temp::<bool>(egui::Id::new("popout-full-seek"))).unwrap_or(false);
+    let slider_width = if force_full {
+        full_width
+    } else if app.settings.seek_custom_width > 0.0 {
         app.settings.seek_custom_width.min(full_width).max(100.0)
     } else {
         match app.settings.seek_width {
@@ -4902,11 +4921,7 @@ fn transport_impl(
         let handle = Rect::from_min_size(pos2(slider_left - 2.0, row.top() + 1.0), vec2(14.0, 12.0));
         let drag = ui.interact(handle, egui::Id::new(("block-handle", 1u8)), Sense::drag());
         let color = if drag.hovered() || drag.dragged() { palette.text } else { palette.dim };
-        for dx in [2.0, 7.0, 12.0] {
-            for dy in [6.0] {
-                ui.painter().circle_filled(pos2(slider_left - 2.0 + dx, row.top() + 1.0 + dy), 1.2, color);
-            }
-        }
+        let _ = color;
         if drag.hovered() || drag.dragged() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
         }
@@ -4985,11 +5000,7 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
         } else {
             app.palette.dim
         };
-        for dx in [1.5, 6.5, 11.5] {
-            for dy in [9.0] {
-                ui.painter().circle_filled(grip.min + vec2(dx, dy), 1.4, colour);
-            }
-        }
+        let _ = colour;
         if response.hovered() {
             ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
         }

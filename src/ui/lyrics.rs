@@ -1461,7 +1461,7 @@ fn controls_slim(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: 
 pub(super) fn controls_width(app: &App, width: f32) -> f32 {
     let k = app.settings.controls_scale_value();
     let kc = 1.0 + (k - 1.0) * 0.5;
-    width.max(218.0 * kc + 40.0).clamp(300.0, 620.0)
+    width.max(218.0 * kc + 40.0).clamp(300.0, 1400.0)
 }
 
 /// How tall the pop-out controls panel is: buttons, song bar, volume.
@@ -1500,6 +1500,8 @@ pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egu
         pos2(outer.left(), buttons_row.bottom() + 4.0),
         vec2(width, seek_h),
     );
+    // The song-length bar always fills the panel, however wide it is made.
+    ui.ctx().data_mut(|data| data.insert_temp(egui::Id::new("popout-full-seek"), true));
     super::player_bar::transport(
         app,
         ui,
@@ -1509,9 +1511,11 @@ pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egu
         outer.center().x - controls_w / 2.0,
         (outer.left() + 54.0, outer.right() - 14.0),
     );
+    ui.ctx().data_mut(|data| data.remove::<bool>(egui::Id::new("popout-full-seek")));
+    // The volume bar stays inside the song bar's ends: never longer.
     let volume_row = Rect::from_min_size(
-        pos2(outer.left() + 20.0, seek_row.bottom() + 4.0),
-        vec2(width - 40.0, volume_h),
+        pos2(outer.left() + 60.0, seek_row.bottom() + 4.0),
+        vec2(width - 120.0, volume_h),
     );
     super::player_bar::volume_row(app, ui, volume_row);
     if now.playing {

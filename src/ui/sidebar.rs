@@ -1276,9 +1276,6 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                         super::settings::last_fm_part(&app.settings.lastfm_user)
                     )));
                 }
-                if super::widgets::menu_item(ui, &app.palette, None, "Open local songs") {
-                    app.actions.push(Action::Open(Page::Local));
-                }
             });
         ui.add_space(6.0);
         let can_back = app.can_go_back();

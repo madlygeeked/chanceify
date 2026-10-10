@@ -91,6 +91,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         calm::show(app, ui);
         keys::handle(app, ctx);
         views_panel::show(app, ctx);
+        dialogs::show(app, ctx);
         toasts(app, ctx, 20.0);
         window_controls(ui, &app.palette, app.locale);
         window_resize(ui);
@@ -101,6 +102,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         lyrics::vis_overlay(app, ui);
         keys::handle(app, ctx);
         views_panel::show(app, ctx);
+        dialogs::show(app, ctx);
         toasts(app, ctx, 20.0);
         window_controls(ui, &app.palette, app.locale);
         window_resize(ui);
