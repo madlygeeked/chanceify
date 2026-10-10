@@ -821,7 +821,8 @@ pub fn table(app: &mut App, ui: &mut egui::Ui, table: Table<'_>) {
     let mut missing = None;
     let mut retry_shown = false;
     // The grid is a toggle in the columns menu, never automatic.
-    let grid = rows > 0 && app.settings.track_columns.grid;
+    let cfg = app.settings.track_columns;
+    let grid = rows > 0 && cfg.grid;
     if grid {
         let card_height = widgets::card_row_height(ui);
         widgets::virtual_wrapped_cards(ui, rows, card_height, |ui, row| {
