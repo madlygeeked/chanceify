@@ -11555,6 +11555,10 @@ impl App {
                     self.mark_settings_dirty();
                 }
             }
+            Action::SetVisFontRandom(on) => {
+                self.settings.vis_font_random = on;
+                self.mark_settings_dirty();
+            }
             Action::SetVisLivePreview(on) => {
                 self.settings.vis_live_preview = on;
                 self.mark_settings_dirty();

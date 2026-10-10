@@ -2309,7 +2309,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     (Settings::LYRICS_HIDE_ARTIST, "Artist name", true),
                 ] {
                     // The art options only mean something on the page.
-                    if !on_page && matches!(bit, Settings::LYRICS_HIDE_ART | Settings::LYRICS_FLOAT_ART | Settings::LYRICS_BOUNCE_ART | Settings::LYRICS_COUNTDOWN | Settings::LYRICS_HIDE_ARTIST) {
+                    if !on_page && matches!(bit, Settings::LYRICS_HIDE_ART | Settings::LYRICS_FLOAT_ART | Settings::LYRICS_BOUNCE_ART | Settings::LYRICS_HIDE_ARTIST) {
                         continue;
                     }
                     let on = app.settings.lyrics_flag(bit) != inverted;
@@ -2424,6 +2424,9 @@ fn font_grid(app: &mut App, ui: &mut egui::Ui) {
         if chip(ui, &palette, "Live preview", app.settings.vis_live_preview, 100.0).clicked() {
             app.actions.push(Action::SetVisLivePreview(!app.settings.vis_live_preview));
         }
+        if chip(ui, &palette, "Random each song", app.settings.vis_font_random, 120.0).clicked() {
+            app.actions.push(Action::SetVisFontRandom(!app.settings.vis_font_random));
+        }
     });
     let sample = app
         .now_playing()
@@ -2483,12 +2486,33 @@ fn font_grid(app: &mut App, ui: &mut egui::Ui) {
 
 /// The font the title is drawn in this frame: the one the reader is hovering
 /// in the grid when the live preview is on, otherwise the chosen one.
-fn vis_font_in_use(ctx: &egui::Context, chosen: u8) -> usize {
+fn vis_font_in_use(ctx: &egui::Context, chosen: u8, random: bool, uri: &str) -> usize {
     let last = crate::system_fonts::VIS_FONTS.len() - 1;
     let hovered = ctx
         .data(|data| data.get_temp::<(u8, u64)>(egui::Id::new("vis-font-preview")))
         .filter(|(_, pass)| pass + 2 >= ctx.cumulative_pass_nr());
-    hovered.map_or(usize::from(chosen), |(index, _)| usize::from(index)).min(last)
+    if let Some((index, _)) = hovered {
+        return usize::from(index).min(last);
+    }
+    if random {
+        // One face per song, from the ones this computer has.
+        let id = egui::Id::new("vis-fonts-available");
+        let available = ctx.data(|data| data.get_temp::<Vec<u8>>(id)).unwrap_or_else(|| {
+            let found: Vec<u8> = (1..=last)
+                .filter(|index| crate::system_fonts::vis_font_bytes(*index).is_some())
+                .map(|index| index as u8)
+                .collect();
+            ctx.data_mut(|data| data.insert_temp(id, found.clone()));
+            found
+        });
+        if !available.is_empty() {
+            use std::hash::{Hash, Hasher};
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            uri.hash(&mut hasher);
+            return usize::from(available[(hasher.finish() % available.len() as u64) as usize]);
+        }
+    }
+    usize::from(chosen).min(last)
 }
 
 /// The family for visualizer font `font_index`, loading the file the first
@@ -3336,7 +3360,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
     };
     // The face: Inter, or one of the installed ones, loaded the first time
     // it is asked for.
-    let font_index = vis_font_in_use(ui.ctx(), app.settings.vis_text_font);
+    let font_index = vis_font_in_use(ui.ctx(), app.settings.vis_text_font, app.settings.vis_font_random, &now.uri);
     let family = vis_font_family(ui.ctx(), font_index);
     // Where the words go depends on the layout the reader chose: under the
     // cover (0), beside it (1), beside it and big (2), or above it with the

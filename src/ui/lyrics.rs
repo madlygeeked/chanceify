@@ -966,7 +966,16 @@ pub fn vis_overlay(app: &mut App, ui: &mut egui::Ui) {
     // The same anchoring and timestamps as the full-screen lyrics page.
     let align = app.settings.lyrics_align_value();
     let stamps_on = !app.settings.lyrics_flag(crate::settings::Settings::LYRICS_HIDE_STAMPS);
-    let stamp_w = if stamps_on { 56.0 } else { 0.0 };
+    let countdown = app.settings.lyrics_flag(crate::settings::Settings::LYRICS_COUNTDOWN);
+    let next_line = lyrics
+        .lines
+        .iter()
+        .position(|line| line.at_ms.is_some_and(|at| at > now.position_ms));
+    let until_next = next_line
+        .and_then(|i| lyrics.lines[i].at_ms)
+        .map(|at| (at - now.position_ms).div_ceil(1000))
+        .filter(|secs| *secs <= 30);
+    let stamp_w = if stamps_on || countdown { 56.0 } else { 0.0 };
     let text_left = region.left() + stamp_w;
     let text_w = (region.width() - stamp_w).max(60.0);
     let first = (place.floor() as isize - 3).max(0) as usize;
@@ -994,14 +1003,21 @@ pub fn vis_overlay(app: &mut App, ui: &mut egui::Ui) {
             4 => text_left + (text_w - galley.size().x) / 2.0,
             _ => text_left,
         };
-        if stamps_on
-            && let Some(at) = line.at_ms
-        {
-            let secs = (at / 1000) as u64;
+        let label = if countdown && next_line == Some(index) && until_next.is_some() {
+            until_next.map(|secs| format!("{secs}s"))
+        } else if stamps_on {
+            line.at_ms.map(|at| {
+                let secs = u64::from(at / 1000);
+                format!("{}:{:02}", secs / 60, secs % 60)
+            })
+        } else {
+            None
+        };
+        if let Some(label) = label {
             painter.text(
                 pos2(region.left(), y + galley.size().y / 2.0),
                 egui::Align2::LEFT_CENTER,
-                format!("{}:{:02}", secs / 60, secs % 60),
+                label,
                 theme::bold((base * 0.4).max(11.0)),
                 Color32::WHITE.gamma_multiply((alpha * 0.55).clamp(0.0, 1.0)),
             );

@@ -884,6 +884,8 @@ pub struct Settings {
     pub vis_back_block: bool,
     /// Hovering a font shows it on the title at once.
     pub vis_live_preview: bool,
+    /// Each song gets a title font of its own, picked from the ones installed.
+    pub vis_font_random: bool,
     /// Which of `system_fonts::VIS_FONTS` it is drawn in.
     #[serde(default)]
     pub vis_text_font: u8,
@@ -1337,6 +1339,7 @@ impl Default for Settings {
             vis_back_pad: 12.0,
             vis_back_block: false,
             vis_live_preview: true,
+            vis_font_random: false,
             vis_text_font: 0,
             vis_text_no_artist: false,
             discord_presence: false,
@@ -1787,7 +1790,7 @@ impl Settings {
         "swirl_scale", "swirl_tune", "swirl_warp", "swirl_waves", "theme", "theme_from_cover", "custom_bg", "custom_accent",
         "track_columns", "tracklist_compact", "vis", "vis_bar_sides", "vis_shapes",
         "vis_shapes_last", "vis_shapes_set", "volume_presets", "zoom",
-        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_sway", "vis_sway_amount", "vis_text_no_outline", "vis_text_back", "vis_back_alpha", "vis_back_round", "vis_back_pad", "vis_back_block", "vis_live_preview", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "lyrics_vis_mode", "window_opacity", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "bar_layout", "bar_free", "bar_free_pos", "bar_free_seek", "lyrics_ctl_off", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode",
+        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_sway", "vis_sway_amount", "vis_text_no_outline", "vis_text_back", "vis_back_alpha", "vis_back_round", "vis_back_pad", "vis_back_block", "vis_live_preview", "vis_font_random", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "lyrics_vis_mode", "window_opacity", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "bar_layout", "bar_free", "bar_free_pos", "bar_free_seek", "lyrics_ctl_off", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode",
     ];
 
     /// The shareable part of the settings, as the text of a file.

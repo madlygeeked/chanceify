@@ -3483,7 +3483,7 @@ pub fn table_header(
             // The title gives way to its neighbours: a column after it is
             // resized from its left edge, one before it from its right edge.
             match title_at {
-                Some(title) if index < title => edges.push((at + *room, *column, true)),
+                Some(title) if index < title => edges.push((at + room, *column, true)),
                 _ => edges.push((*at, *column, false)),
             }
         }
