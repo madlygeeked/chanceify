@@ -1103,6 +1103,14 @@ pub struct Settings {
     pub vis_title_layout: u8,
     /// How hard the bass jump shakes the window (1.0 = normal).
     pub jump_shake: f32,
+    /// How easily the screen jumps: more means smaller rises count (0.4 to 2.5).
+    pub jump_sens: f32,
+    /// The rest between two jumps, in hundredths of a second (10 to 100).
+    pub jump_gap: f32,
+    /// Music quieter than this never makes a jump, 0 to 20 (percent of full).
+    pub jump_floor: f32,
+    /// How fast the jump follows a song's own loudness, 1 to 30.
+    pub jump_adapt: f32,
     /// Which app icon the window and taskbar button wear. See `app_icons`.
     pub app_icon: u8,
     /// The compact mini player layout, switched on by the reader. A window
@@ -1439,6 +1447,10 @@ impl Default for Settings {
             vis_title_layout: 0,
             vis_presets: Vec::new(),
             jump_shake: 0.5,
+            jump_sens: 1.0,
+            jump_gap: 32.0,
+            jump_floor: 3.0,
+            jump_adapt: 5.0,
             app_icon: 1,
             mini_player: false,
             mini_queue: true,

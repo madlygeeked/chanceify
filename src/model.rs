@@ -1466,6 +1466,8 @@ pub enum Action {
     SetJumpReact(u8),
     ToggleJumpAuto,
     SetJumpShake(f32),
+    /// One of the bass jump's reaction sliders: 0 sensitivity, 1 rest, 2 quiet cutoff, 3 adapting.
+    SetJumpTune(u8, f32),
     /// Opacity of the bars (true) or the flow (false), 0.1 to 1.
     SetVisOpacity(bool, f32),
     SetSwirlArtEdge(f32),

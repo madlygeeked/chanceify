@@ -11261,6 +11261,17 @@ impl App {
                     self.mark_settings_dirty();
                 }
             }
+            Action::SetJumpTune(which, value) => {
+                if value.is_finite() {
+                    match which {
+                        0 => self.settings.jump_sens = value.clamp(0.4, 2.5),
+                        1 => self.settings.jump_gap = value.clamp(10.0, 100.0),
+                        2 => self.settings.jump_floor = value.clamp(0.0, 20.0),
+                        _ => self.settings.jump_adapt = value.clamp(1.0, 30.0),
+                    }
+                    self.mark_settings_dirty();
+                }
+            }
             Action::ToggleJumpAuto => {
                 self.settings.vis_jump_on = !self.settings.vis_jump_on;
                 let text = if self.settings.vis_jump_on { "Bass jump on" } else { "Bass jump off" };

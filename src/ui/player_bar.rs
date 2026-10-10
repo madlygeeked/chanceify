@@ -1353,7 +1353,14 @@ pub(super) fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
         _ => screen.right() - (screen.width() * 0.5).min(560.0) - 14.0,
     };
     let tab_now = ctx.data(|data| data.get_temp::<u8>(egui::Id::new("vis-menu-tab"))).unwrap_or(0).min(3);
-    let natural_w = if tab_now == 0 { 3.0 * vis_col_w(0.0) + 36.0 + 28.0 } else { 300.0 };
+    let two_wide = tab_now == 2 || (tab_now == 3 && (app.lyrics_fullscreen.is_some() || app.settings.vis_lyrics));
+    let natural_w = if tab_now == 0 {
+        3.0 * vis_col_w(0.0) + 36.0 + 28.0
+    } else if two_wide {
+        2.0 * VIS_SINGLE_W + 18.0 + 28.0
+    } else {
+        300.0
+    };
     let height_id = egui::Id::new(("vis-panel-natural-h", tab_now));
     let natural_h = ctx.data(|data| data.get_temp::<f32>(height_id)).unwrap_or(440.0).max(120.0);
     let fit = ((screen.width() - 16.0) / natural_w)
@@ -2136,6 +2143,19 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     app.actions.push(Action::SetJumpShake(value));
                 },
             );
+            // How the jump reacts, so a finicky song can be tuned by hand.
+            slider_row(ui, &palette, &gettext(app.locale, "Sensitivity"), 40.0..=250.0,
+                app.settings.jump_sens * 100.0,
+                |value| app.actions.push(Action::SetJumpTune(0, value / 100.0)));
+            slider_row(ui, &palette, &gettext(app.locale, "Rest between"), 10.0..=100.0,
+                app.settings.jump_gap,
+                |value| app.actions.push(Action::SetJumpTune(1, value)));
+            slider_row(ui, &palette, &gettext(app.locale, "Quiet cutoff"), 0.0..=20.0,
+                app.settings.jump_floor,
+                |value| app.actions.push(Action::SetJumpTune(2, value)));
+            slider_row(ui, &palette, &gettext(app.locale, "Follows the song"), 1.0..=30.0,
+                app.settings.jump_adapt,
+                |value| app.actions.push(Action::SetJumpTune(3, value)));
             ui.add_space(6.0);
             theme::subtle(ui, &palette, &gettext(app.locale, "COLOUR"));
             if chip(
@@ -2213,10 +2233,10 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 });
             }
             }); }
-            if tab == 2 { ui.vertical(|ui| {
+            if tab == 2 { ui.horizontal_top(|ui| { ui.vertical(|ui| {
             ui.set_width(VIS_SINGLE_W);
             theme::subtle(ui, &palette, &gettext(app.locale, "TITLE"));
-            if chip(
+            if chip_i(
                 ui,
                 &palette,
                 "Title sway",
@@ -2227,7 +2247,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             {
                 app.actions.push(Action::ToggleVisTextSway);
             }
-            if chip(
+            if chip_i(
                 ui,
                 &palette,
                 "Art border",
@@ -2254,7 +2274,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     app.actions.push(Action::SetVisSway(index as u8));
                 }
                 sway_preview(ui, &palette, app.settings.vis_sway_preset(), app.settings.vis_sway_strength());
-                if chip(ui, &palette, "Sway on the beat only", app.settings.vis_sway_beat, ui.available_width().min(290.0)).clicked() {
+                if chip_i(ui, &palette, "Sway on the beat only", app.settings.vis_sway_beat, ui.available_width().min(290.0)).clicked() {
                     app.actions.push(Action::ToggleVisSwayBeat);
                 }
                 slider_row(
@@ -2266,7 +2286,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     |value| app.actions.push(Action::SetVisSwayAmount(value / 100.0)),
                 );
             }
-            if chip(
+            if chip_i(
                 ui,
                 &palette,
                 "Title outline",
@@ -2277,7 +2297,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             {
                 app.actions.push(Action::ToggleVisTextOutline);
             }
-            if chip(
+            if chip_i(
                 ui,
                 &palette,
                 "Panel behind the title",
@@ -2296,7 +2316,9 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 slider_row(ui, &palette, "Room round the words", 0.0..=40.0, app.settings.vis_back_pad,
                     |value| app.actions.push(Action::SetVisBack(2, value)));
             }
-            if chip(
+            }); ui.vertical(|ui| {
+            ui.set_width(VIS_SINGLE_W);
+            if chip_i(
                 ui,
                 &palette,
                 "Artist name under the title",
@@ -2324,15 +2346,15 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 });
             }
             font_grid(app, ui);
-            }); }
-            if tab == 3 { ui.vertical(|ui| {
+            }); }); }
+            let on_page = app.lyrics_fullscreen.is_some();
+            if tab == 3 { ui.horizontal_top(|ui| { ui.vertical(|ui| {
             ui.set_width(VIS_SINGLE_W);
             theme::subtle(ui, &palette, &gettext(app.locale, "FULL-SCREEN LYRICS"));
-            let on_page = app.lyrics_fullscreen.is_some();
             // These two belong to the lyrics drawn over the visualizer, so the
             // lyrics page itself does not show them.
             if !on_page {
-                if chip(
+                if chip_i(
                     ui,
                     &palette,
                     "Show lyrics over it",
@@ -2343,7 +2365,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 {
                     app.actions.push(Action::ToggleVisLyrics);
                 }
-                if chip(
+                if chip_i(
                     ui,
                     &palette,
                     "Dark background behind the lyrics",
@@ -2358,11 +2380,11 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             if !(on_page || app.settings.vis_lyrics) {
                 use crate::settings::Settings;
                 let on = app.settings.lyrics_flag(Settings::LYRICS_BOUNCE_ART);
-                if chip(ui, &palette, "Art bounces to the music", on, ui.available_width().min(290.0)).clicked() {
+                if chip_i(ui, &palette, "Art bounces to the music", on, ui.available_width().min(290.0)).clicked() {
                     app.actions.push(Action::ToggleLyricsFlag(Settings::LYRICS_BOUNCE_ART));
                 }
                 let floats = app.settings.lyrics_flag(Settings::LYRICS_FLOAT_ART);
-                if chip(ui, &palette, "Floating art", floats, ui.available_width().min(290.0)).clicked() {
+                if chip_i(ui, &palette, "Floating art", floats, ui.available_width().min(290.0)).clicked() {
                     app.actions.push(Action::ToggleLyricsFlag(Settings::LYRICS_FLOAT_ART));
                 }
             }
@@ -2383,13 +2405,17 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                         continue;
                     }
                     let on = app.settings.lyrics_flag(bit) != inverted;
-                    if chip(ui, &palette, label, on, ui.available_width().min(290.0)).clicked() {
+                    if chip_i(ui, &palette, label, on, ui.available_width().min(290.0)).clicked() {
                         app.actions.push(Action::ToggleLyricsFlag(bit));
                     }
                 }
+            }
+            }); ui.vertical(|ui| {
+            ui.set_width(VIS_SINGLE_W);
+            if on_page || app.settings.vis_lyrics {
                 let current = app.settings.lyrics_align_value();
                 for (value, label) in [(0u8, "Left"), (2, "Right"), (4, "Focus on the current line")] {
-                    if chip(ui, &palette, label, current == value, ui.available_width().min(290.0)).clicked() {
+                    if chip_i(ui, &palette, label, current == value, ui.available_width().min(290.0)).clicked() {
                         app.actions.push(Action::SetLyricsAlign(value));
                     }
                 }
@@ -2402,7 +2428,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     ("Artist", app.settings.extra_show_artist, 1),
                     ("Heart", app.settings.extra_show_heart, 2),
                 ] {
-                    if chip(ui, &palette, label, on, ui.available_width().min(290.0)).clicked() {
+                    if chip_i(ui, &palette, label, on, ui.available_width().min(290.0)).clicked() {
                         match which {
                             0 => app.settings.extra_show_title = !on,
                             1 => app.settings.extra_show_artist = !on,
@@ -2412,7 +2438,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     }
                 }
             }
-            }); }
+            }); }); }
             };
             if tab != 0 {
                 if columns_fit {
@@ -3094,6 +3120,70 @@ fn chip(
     width: f32,
 ) -> egui::Response {
     chip_sensing(ui, palette, label, active, width, Sense::click())
+}
+
+/// The little picture a menu option carries, when it has one.
+fn icon_for(label: &str) -> Option<Icon> {
+    Some(match label {
+        "Title sway" => Icon::Wind,
+        "Art border" => Icon::Square,
+        "Sway on the beat only" => Icon::Zap,
+        "Title outline" => Icon::Pencil,
+        "Panel behind the title" => Icon::Tv,
+        "Artist name under the title" | "Artist name" | "Artist" => Icon::User,
+        "Show lyrics over it" => Icon::Mic,
+        "Dark background behind the lyrics" => Icon::Moon,
+        "Art bounces to the music" | "Song name" => Icon::Music,
+        "Floating art" => Icon::Sparkles,
+        "Album art" => Icon::Disc,
+        "Timestamps" => Icon::Clock,
+        "Countdown" => Icon::Watch,
+        "Left" => Icon::ArrowLeft,
+        "Right" => Icon::ArrowRight,
+        "Focus on the current line" => Icon::Expand,
+        "Heart" => Icon::Heart,
+        _ => return None,
+    })
+}
+
+/// A chip with its picture before the words (words only when it has none).
+fn chip_i(
+    ui: &mut egui::Ui,
+    palette: &crate::theme::Palette,
+    label: &str,
+    active: bool,
+    width: f32,
+) -> egui::Response {
+    let Some(icon) = icon_for(label) else {
+        return chip(ui, palette, label, active, width);
+    };
+    let (rect, response) = ui.allocate_exact_size(vec2(width, 24.0), Sense::click());
+    let fill = if active {
+        palette.accent.gamma_multiply(0.35)
+    } else if response.hovered() {
+        palette.surface_hover
+    } else {
+        palette.surface
+    };
+    ui.painter().rect_filled(rect, egui::CornerRadius::same(6), fill);
+    let ink = if active { palette.text } else { palette.secondary };
+    let slot = Rect::from_min_size(pos2(rect.left() + 4.0, rect.top()), vec2(22.0, 24.0));
+    theme::paint_icon(ui, icon, slot, 14.0, ink);
+    let galley = crate::bidi::layout(
+        ui.painter(),
+        label,
+        theme::regular(12.5),
+        ink,
+        (width - 34.0).max(10.0),
+        1,
+        Some(crate::bidi::ELLIPSIS),
+    );
+    ui.painter().galley(
+        pos2(rect.left() + 30.0, rect.center().y - galley.size().y / 2.0),
+        galley,
+        palette.text,
+    );
+    response
 }
 
 fn chip_sensing(
