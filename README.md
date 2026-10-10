@@ -20,7 +20,7 @@ needs spotify premium.
 - **keybinds.** every key can be changed.
 - **your files stay with you.** everything lives in the folder beside the app.
 
-more help: [madlygeeked.github.io/chanceify](https://madlygeeked.github.io/chanceify)
+more help: [chanceify](https://madlygeeked.github.io/chanceify)
 
 ---
 
