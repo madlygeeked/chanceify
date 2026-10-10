@@ -11,7 +11,7 @@
   <a href="https://github.com/madlygeeked/chanceify/issues">issues</a>
 </p>
 
-a small, fast spotify player for windows. needs spotify premium.
+a spotify player for windows. needs spotify premium.
 
 ## get it
 
