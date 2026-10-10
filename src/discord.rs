@@ -414,7 +414,7 @@ static LINK: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
 /// The chanceify song page (worker/embed.js). Empty until it is deployed.
 /// Where the badge on the card leads: chanceify's own page.
-pub const SITE_URL: &str = "https://madlygeeked.github.io/";
+pub const SITE_URL: &str = "https://madlygeeked.github.io/chanceify/";
 
 pub const EMBED_URL: &str = "https://chanceify-embed.chance-a10.workers.dev";
 
