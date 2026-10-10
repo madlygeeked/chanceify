@@ -355,6 +355,8 @@ pub struct App {
     pub extra_vis: bool,
     /// The visualizer settings panel open inside the extra window.
     pub extra_vis_panel: bool,
+    /// What the extra window shows: 0 the visualizer, 1 the lyrics.
+    pub extra_mode: u8,
     pub extra_vis_since: Option<std::time::Instant>,
     /// A theme shown for a moment while the pointer is over it in Settings.
     pub theme_preview: Option<(Palette, Instant)>,
@@ -655,7 +657,6 @@ pub struct App {
     /// drawing and read when the toggle is pressed.
     pub mini_active: bool,
     /// The big window's size from before the mini player took over.
-    mini_restore: Option<[f32; 2]>,
     /// Whether the always-on-top level was last sent on for the mini player.
     mini_top_sent: bool,
     /// The app icon last sent to the window, so a change is sent once.
@@ -1057,6 +1058,7 @@ impl App {
             lastfm_song_count: 0,
             extra_vis: false,
             extra_vis_panel: false,
+            extra_mode: 0,
             extra_vis_since: None,
             theme_preview: None,
             theme_previewing: false,
@@ -1245,7 +1247,6 @@ impl App {
             session_window_pos: session.window_pos,
             last_window_size: None,
             mini_active: false,
-            mini_restore: None,
             mini_top_sent: false,
             icon_sent: None,
             icon_tint_sent: None,
@@ -9815,10 +9816,6 @@ impl App {
     /// Leaves the mini player, both full screens and calm mode, so what
     /// comes next is drawn in the ordinary window.
     fn leave_special_views(&mut self, ctx: &egui::Context) {
-        if self.mini_active {
-            self.apply(Action::ToggleMiniPlayer, ctx);
-        }
-        self.settings.mini_player = false;
         self.fullscreen_vis = false;
         self.calm_mode = false;
         self.leave_lyrics_fullscreen(ctx);
@@ -10991,17 +10988,23 @@ impl App {
             }
             Action::GoView(kind) => {
                 use crate::model::ViewKind as V;
+                // The mini player is a window of its own: it opens and
+                // closes without touching the view behind it.
                 let already = match kind {
-                    V::Mini => self.mini_active,
+                    V::Mini => false,
                     V::FullVisualizer => self.fullscreen_vis,
                     V::FullLyrics => self.lyrics_fullscreen.is_some(),
                     V::Calm => self.calm_mode,
                     _ => false,
                 };
-                self.leave_special_views(ctx);
-                if !already {
+                if kind != V::Mini {
+                    self.leave_special_views(ctx);
+                }
+                if kind == V::Mini {
+                    self.apply(Action::ToggleMiniPlayer, ctx);
+                } else if !already {
                     match kind {
-                        V::Mini => self.apply(Action::ToggleMiniPlayer, ctx),
+                        V::Mini => {}
                         // Normal: the ordinary window, exactly as it was left.
                         V::Visualizer => {}
                         V::FullVisualizer => self.apply(Action::ToggleFullscreenVis, ctx),
@@ -11572,52 +11575,9 @@ impl App {
                 ctx.request_repaint();
             }
             Action::ToggleMiniPlayer => {
-                let was_mini = self.mini_active;
-                if was_mini {
-                    // Back to the whole window, at the size it had.
-                    self.settings.mini_player = false;
-                    let [width, height] = self
-                        .mini_restore
-                        .or(self.settings.mini_restore_size)
-                        .unwrap_or([1240.0, 800.0]);
-                    // The full window's smallest size comes back, and the
-                    // panel check sends its own minimum again.
-                    if !crate::window::fixed_size() {
-                        ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(egui::vec2(
-                            crate::window::MAIN_MIN_SIZE[0],
-                            crate::window::MAIN_MIN_SIZE[1],
-                        )));
-                        ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
-                    }
-                    ctx.data_mut(|data| {
-                        data.insert_temp(egui::Id::new("main-min-width"), crate::window::MAIN_MIN_SIZE[0]);
-                    });
-                    ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
-                        width, height,
-                    )));
-                } else {
-                    // Remember the big window's size, then shrink to a
-                    // tall little player. Only a size that was really the
-                    // whole window is worth coming back to.
-                    self.mini_restore = self
-                        .last_window_size
-                        .filter(|size| size[0] >= 740.0 && size[1] >= 500.0);
-                    if self.mini_restore.is_some() {
-                        self.settings.mini_restore_size = self.mini_restore;
-                    }
-                    self.settings.mini_player = true;
-                    let height = if self.settings.mini_queue { 680.0 } else { 340.0 };
-                    // The window may shrink to the little player, and stays
-                    // resizable there.
-                    if !crate::window::fixed_size() {
-                        ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(egui::vec2(300.0, 260.0)));
-                        ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
-                    }
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(false));
-                    ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
-                        400.0, height,
-                    )));
-                }
+                // The mini player is a window of its own, like the extra
+                // visualizer window: the main window is left as it is.
+                self.settings.mini_player = !self.settings.mini_player;
                 self.mark_settings_dirty();
             }
             Action::ToggleArtSweep => {

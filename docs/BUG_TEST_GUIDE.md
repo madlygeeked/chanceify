@@ -2,7 +2,7 @@
 Do one pass per build. Write down anything odd with the version number (Settings > About).
 
 1. Fresh start: close chanceify, delete nothing, start it. It opens, no freeze.
-2. Every view: Z disc menu, then Mini player, Visualizer, Full screen visualizer, Full screen lyrics, Library only, Calm mode, Default view. Go through each twice.
+2. Every view: press Z (or click the disc), then the five icons: Mini player (its own window), Normal, Full screen visualizer, Full screen lyrics, Calm mode. Also New visualizer window (visualizer or lyrics, wave and X buttons, drag, resize). Go through each twice, with the pop-out controls on and off.
 3. Every key: Settings > Keys, press each key once. Nothing should crash.
 4. Playback: play, pause, next, previous, seek, volume, shuffle, repeat, queue add, like and unlike.
 5. Search: click the search box once, type, play a result. Also with a long name and a song with symbols.

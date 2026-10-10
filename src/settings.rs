@@ -132,7 +132,7 @@ impl TrackColumns {
     }
 
     /// The narrowest a column may be dragged before it is treated as hidden.
-    pub const MIN: f32 = 56.0;
+    pub const MIN: f32 = 38.0;
     /// The widest, so one drag cannot swallow the song names.
     pub const MAX: f32 = 640.0;
 
@@ -852,6 +852,8 @@ pub struct Settings {
     pub float_hide_bar: bool,
     /// Width of the Views panel.
     pub views_width: f32,
+    /// The mini player window: x, y, width, height.
+    pub mini_window: Option<[f32; 4]>,
     /// The full window's size before the mini player, kept between launches.
     pub mini_restore_size: Option<[f32; 2]>,
     pub float_big: Option<[f32; 3]>,
@@ -1276,6 +1278,7 @@ impl Default for Settings {
             float_controls: None,
             float_hide_bar: false,
             views_width: 316.0,
+            mini_window: None,
             mini_restore_size: None,
             float_big: None,
             float_lyrics: None,

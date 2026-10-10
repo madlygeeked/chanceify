@@ -195,7 +195,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     }
     // Clean screen: the controls are popped out and the reader wants the
     // whole bottom bar gone, track info included.
-    if app.settings.float_hide_bar
+    if (app.settings.float_hide_bar || app.settings.vis_shapes_value() == 0)
         && !app.mini_active
         && app.float_slot(super::views_panel::default_float(ui.ctx())).is_some()
     {
@@ -258,7 +258,21 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     // buttons, then the song-length bar, then the volume. The row grows with
     // the controls' size setting, so nothing is drawn over the picture.
     let controls_k = app.settings.controls_scale_value();
-    let layout = app.settings.bar_layout_value();
+    // However the reader set it, a narrow window stacks the controls: two
+    // rows when it is getting tight, three when it is small, so the buttons
+    // always sit together instead of spreading across the bar.
+    let window_w = ui.ctx().content_rect().width();
+    let auto_layout = if window_w < 760.0 {
+        2
+    } else if window_w < 1300.0 {
+        1
+    } else {
+        0
+    };
+    let layout = match app.settings.bar_layout_value() {
+        3 => 3,
+        chosen => chosen.max(auto_layout),
+    };
     let stacked = layout != 0;
     let strip_h = if lyrics_page {
         0.0

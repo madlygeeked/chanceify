@@ -84,6 +84,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     app.sync_mini_level(ctx);
     // The extra visualizer window, if one is open, in whatever view this is.
     extra_window::show(app, ctx);
+    // The mini player window, if it is open, in whatever view this is.
+    mini::window(app, ctx);
     // Calm mode: the whole window is one slow, quiet picture.
     if app.calm_mode {
         calm::show(app, ui);
@@ -104,32 +106,10 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         window_resize(ui);
         return;
     }
-    // The mini player, by the reader's choice or because the window was made
-    // small: one compact layout in place of the sidebar, the panels and the
-    // player bar. The shortcuts, the toasts and the dialogs still work.
-    app.mini_active = mini::wanted(app, ctx);
+    // The mini player is a window of its own (see `mini::window`), so the
+    // main window is never the mini player.
+    app.mini_active = false;
     app.sync_mini_level(ctx);
-    // The little player may shrink and stay resizable, however it was opened
-    // (also at launch, when it was left on).
-    let min_id = Id::new("mini-min-sent");
-    if app.mini_active != ctx.data(|data| data.get_temp::<bool>(min_id)).unwrap_or(false) {
-        ctx.data_mut(|data| data.insert_temp(min_id, app.mini_active));
-        if app.mini_active && !crate::window::fixed_size() {
-            ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(vec2(300.0, 260.0)));
-            ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
-        }
-    }
-    if app.mini_active {
-        app.window_alpha = mini::fade_level(app, ctx);
-        mini::show(app, ui);
-        dialogs::show(app, ctx);
-        views_panel::show(app, ctx);
-        update::show(app, ctx);
-        toasts(app, ctx, 16.0);
-        window_controls(ui, &app.palette, app.locale);
-        window_resize(ui);
-        return;
-    }
     app.window_alpha = 1.0;
     // The bass-jump key: a short flash of the accent over the whole window.
     let jump = app.jump_level();
@@ -207,7 +187,7 @@ fn keep_room_for_panels(app: &App, ctx: &Context) {
         // Back to the small floor (the mini player lives down there) once
         // the panels no longer need the room.
         let min = if width <= crate::window::MAIN_MIN_SIZE[0] {
-            vec2(300.0, 260.0)
+            vec2(crate::window::MAIN_MIN_SIZE[0], crate::window::MAIN_MIN_SIZE[1])
         } else {
             vec2(width, crate::window::MAIN_MIN_SIZE[1])
         };

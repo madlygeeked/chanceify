@@ -1609,6 +1609,48 @@ pub(crate) fn artist_links(
     clicked
 }
 
+/// Lays `text` on one line so it fits `avail`: the font shrinks first (down
+/// to `min_size`), and what still does not fit is cut with an ellipsis.
+fn fitted_galley(
+    painter: &egui::Painter,
+    text: &str,
+    font: &egui::FontId,
+    min_size: f32,
+    avail: f32,
+    color: Color32,
+) -> std::sync::Arc<egui::Galley> {
+    let mut galley = painter.layout_no_wrap(text.to_string(), font.clone(), color);
+    if galley.size().x > avail && galley.size().x > 0.0 {
+        let size = (font.size * avail / galley.size().x).max(min_size);
+        galley = painter.layout_no_wrap(
+            text.to_string(),
+            egui::FontId::new(size, font.family.clone()),
+            color,
+        );
+    }
+    if galley.size().x > avail {
+        let shrunk = egui::FontId::new(galley.job.sections.first().map_or(font.size, |s| s.format.font_id.size), font.family.clone());
+        let mut chars: Vec<char> = text.chars().collect();
+        while chars.len() > 1 {
+            chars.pop();
+            let cut: String = chars.iter().collect::<String>() + "…";
+            galley = painter.layout_no_wrap(cut, shrunk.clone(), color);
+            if galley.size().x <= avail {
+                break;
+            }
+        }
+    }
+    galley
+}
+
+/// One cell of a track row: the text scales down and is cut with an
+/// ellipsis rather than running into the next column.
+fn paint_cell(painter: &egui::Painter, left: f32, right: f32, cy: f32, text: &str, size: f32, color: Color32) {
+    let avail = (right - left - 8.0).max(10.0);
+    let galley = fitted_galley(painter, text, &theme::regular(size), 8.0, avail, color);
+    painter.galley(pos2(left, cy - galley.size().y / 2.0), galley, color);
+}
+
 /// Column widths of the track table, computed from the available width.
 pub(crate) struct Columns {
     pub(crate) number: f32,
@@ -1689,7 +1731,7 @@ pub(crate) fn table_layout(
         // Too many columns for the room. Rather than drop some, every one is
         // squeezed towards a small floor, and the song names give up a bit
         // too. Only if even that is not enough are the last ones dropped.
-        const FLOOR: f32 = 62.0;
+        const FLOOR: f32 = 38.0;
         const TITLE_SQUEEZE: f32 = 110.0;
         let tight = (width - fixed - TITLE_SQUEEZE).max(0.0);
         while !picked.is_empty() && picked.len() as f32 * FLOOR > tight {
@@ -1950,6 +1992,14 @@ fn track_row_contents(
         cols.number = 30.0;
     }
     let painter = ui.painter().clone();
+    // A faint vertical rule at the left edge of each optional column.
+    let rule = |at: f32| {
+        painter.vline(
+            at - 4.0,
+            rect.y_range().shrink(row_height * 0.28),
+            Stroke::new(1.0, palette.outline.gamma_multiply(0.35)),
+        );
+    };
     let mut x = rect.left() + 8.0;
 
     // Number / play.
@@ -2331,6 +2381,7 @@ fn track_row_contents(
     // The playlists column: the same icons, in a cell of their own, laid out
     // left to right so the first playlist is always at the cell's left.
     if cols.playlists > 0.0 {
+        rule(x);
         let cell = Rect::from_min_size(pos2(x, rect.top()), vec2(cols.playlists, row_height));
         let (height, gap) = membership_metrics(app.settings.membership_icon_scale);
         let fit = (((cell.width() - 12.0 + gap) / (height + gap)).floor() as usize).max(1);
@@ -2344,6 +2395,7 @@ fn track_row_contents(
         x += cols.playlists;
     }
     if cols.album > 0.0 {
+        rule(x);
         if let PlayableItem::Track(track) = row.item
             && let Some(album) = &track.album
         {
@@ -2392,6 +2444,7 @@ fn track_row_contents(
     }
     // Date added.
     if cols.added > 0.0 {
+        rule(x);
         // Spotify stamps the epoch on dates it never recorded; an empty
         // cell is truer than January 1970.
         if let Some(added) = row
@@ -2400,13 +2453,7 @@ fn track_row_contents(
         {
             let cell = Rect::from_min_size(pos2(x, rect.top()), vec2(cols.added, row_height));
             let label = util::format_relative_date(app.locale, added, jiff::Timestamp::now());
-            painter.with_clip_rect(cell.shrink2(vec2(0.0, 0.0)).intersect(painter.clip_rect())).text(
-                pos2(cell.left(), cell.center().y),
-                egui::Align2::LEFT_CENTER,
-                &label,
-                theme::regular(13.0),
-                palette.secondary,
-            );
+            paint_cell(&painter, cell.left(), cell.right(), cell.center().y, &label, 13.0, palette.secondary);
             // Relative labels cross a boundary while the table is idle, so
             // keep the visible value in step with the clock.
             if label.ends_with(" ago") {
@@ -2419,17 +2466,11 @@ fn track_row_contents(
 
     // The album's release date.
     if cols.release > 0.0 {
+        rule(x);
         if let PlayableItem::Track(track) = row.item
             && let Some(date) = track.album.as_ref().and_then(|album| album.release_date.as_deref())
         {
-            let cell = Rect::from_min_size(pos2(x, rect.top()), vec2((cols.release - 6.0).max(0.0), row_height));
-            painter.with_clip_rect(cell.intersect(painter.clip_rect())).text(
-                pos2(x, rect.center().y),
-                egui::Align2::LEFT_CENTER,
-                date,
-                theme::regular(13.0),
-                palette.secondary,
-            );
+            paint_cell(&painter, x, x + cols.release, rect.center().y, date, 13.0, palette.secondary);
         }
         x += cols.release;
     }
@@ -2458,6 +2499,7 @@ fn track_row_contents(
     // as it scrolls, and a row of dashes would read as a column of answers
     // that are all "unknown".
     if cols.bpm > 0.0 {
+        rule(x);
         let cell = Rect::from_min_size(pos2(x, rect.top()), vec2(cols.bpm, row_height));
         let measured_key = app.live_key_for(row.item);
         if app.bpm_for(row.item).is_none()
@@ -2479,13 +2521,13 @@ fn track_row_contents(
             // column read at a glance while scrolling. 104 is what the
             // record is.
             let label = format!("{}", tempo.round());
-            let drawn = painter.text(
-                pos2(cell.left(), cell.center().y),
-                egui::Align2::LEFT_CENTER,
-                &label,
-                theme::regular(13.0),
-                palette.secondary,
-            );
+            let drawn = {
+                let galley = fitted_galley(&painter, &label, &theme::regular(13.0), 8.0, (cell.width() - 8.0).max(10.0), palette.secondary);
+                let at = pos2(cell.left(), cell.center().y - galley.size().y / 2.0);
+                let shape_rect = Rect::from_min_size(at, galley.size());
+                painter.galley(at, galley, palette.secondary);
+                shape_rect
+            };
             // The key from the sound, when the column is wide enough.
             if let Some(key) = &measured_key
                 && cell.right() - drawn.right() > 36.0
@@ -3212,22 +3254,10 @@ pub fn table_header(
         |ui: &mut Ui, x: f32, text: &str, column: SortColumn, room: f32, anchors: &mut Vec<egui::Response>| {
             let active = sort.and_then(|sort| sort.direction(column));
             let arrow_room = if active.is_some() { 13.0 } else { 0.0 };
-            let mut galley = ui.painter().layout_no_wrap(
-                text.to_string(),
-                font.clone(),
-                egui::Color32::PLACEHOLDER,
-            );
-            // In a squeezed column the heading shrinks to fit instead of
-            // running into the next one.
-            let avail = (room - 12.0 - arrow_room).max(20.0);
-            if galley.size().x > avail {
-                let scaled = (font.size * avail / galley.size().x).max(8.5);
-                galley = ui.painter().layout_no_wrap(
-                    text.to_string(),
-                    egui::FontId::new(scaled, font.family.clone()),
-                    egui::Color32::PLACEHOLDER,
-                );
-            }
+            // In a squeezed column the heading shrinks to fit, then is cut
+            // with an ellipsis, instead of running into the next one.
+            let avail = (room - 12.0 - arrow_room).max(12.0);
+            let galley = fitted_galley(ui.painter(), text, &font, 8.0, avail, egui::Color32::PLACEHOLDER);
             let size = galley.size();
             let top_left = pos2(x, rect.center().y - size.y / 2.0);
             let head =

@@ -335,28 +335,28 @@ pub fn show(app: &mut App, ctx: &Context) {
                 .max_height((screen_h - 120.0).max(200.0))
                 .auto_shrink([false, true])
                 .show(ui, |ui| {
-                    // The five views. Exactly one is on at a time.
-                    let half = (ui.available_width() - 6.0) / 2.0;
+                    // Icons only, one row: the four views of this window (exactly
+                    // one is on) and the mini player, which is a window of its own.
                     let views = [
                         (Icon::Shrink, "Mini player", ViewKind::Mini),
                         (Icon::PanelLeft, "Normal", ViewKind::Visualizer),
                         (Icon::AudioLines, "Full screen visualizer", ViewKind::FullVisualizer),
                         (Icon::Mic, "Full screen lyrics", ViewKind::FullLyrics),
+                        (Icon::Moon, "Calm mode", ViewKind::Calm),
                     ];
-                    for pair in views.chunks(2) {
-                        ui.horizontal(|ui| {
-                            for (icon, label, kind) in pair {
-                                let on = current == *kind || (*kind == ViewKind::Visualizer && current == ViewKind::Default);
-                                if view_button(ui, &palette, *icon, label, on, half).clicked() {
-                                    app.actions.push(Action::GoView(*kind));
-                                }
+                    let each = ((ui.available_width() - 6.0 * 4.0) / 5.0).max(30.0);
+                    ui.horizontal(|ui| {
+                        for (icon, label, kind) in views {
+                            let on = if kind == ViewKind::Mini {
+                                app.settings.mini_player
+                            } else {
+                                current == kind || (kind == ViewKind::Visualizer && current == ViewKind::Default)
+                            };
+                            if view_button(ui, &palette, icon, label, on, each).clicked() {
+                                app.actions.push(Action::GoView(kind));
                             }
-                        });
-                    }
-                    let full = ui.available_width();
-                    if view_button(ui, &palette, Icon::Moon, "Calm mode", current == ViewKind::Calm, full).clicked() {
-                        app.actions.push(Action::GoView(ViewKind::Calm));
-                    }
+                        }
+                    });
                     ui.add_space(4.0);
                     let float_on = app.float_slot(default_float(ctx)).is_some();
                     let on_top = ("Always on top", app.settings.mini_on_top, Action::ToggleMiniOnTop);
@@ -366,15 +366,6 @@ pub fn show(app: &mut App, ctx: &Context) {
                     use crate::settings::Settings as S;
                     // Only what belongs to the view you are in.
                     let chips: Vec<(&str, bool, Action)> = match current {
-                        ViewKind::Mini => vec![
-                            ("Queue", app.settings.mini_queue, Action::ToggleMiniQueue),
-                            ("Volume", app.settings.mini_volume, Action::ToggleMiniVolume),
-                            ("Nothing moving", app.settings.mini_vis_mode() == 0, Action::SetMiniVis(0)),
-                            ("Bars", app.settings.mini_vis_mode() == 1, Action::SetMiniVis(1)),
-                            ("Flow", app.settings.mini_vis_mode() == 2, Action::SetMiniVis(2)),
-                            ("Swirl", app.settings.mini_vis_mode() == 3, Action::SetMiniVis(3)),
-                            on_top,
-                        ],
                         ViewKind::Calm => Vec::new(),
                         ViewKind::FullVisualizer => vec![
                             ("Lyrics on it", app.settings.vis_lyrics, Action::ToggleVisLyrics),
@@ -411,6 +402,19 @@ pub fn show(app: &mut App, ctx: &Context) {
                             on_top,
                         ],
                     };
+                    let mini_chips: Vec<(&str, bool, Action)> = if app.settings.mini_player {
+                        vec![
+                            ("Mini: queue", app.settings.mini_queue, Action::ToggleMiniQueue),
+                            ("Mini: volume", app.settings.mini_volume, Action::ToggleMiniVolume),
+                            ("Mini: still", app.settings.mini_vis_mode() == 0, Action::SetMiniVis(0)),
+                            ("Mini: bars", app.settings.mini_vis_mode() == 1, Action::SetMiniVis(1)),
+                            ("Mini: flow", app.settings.mini_vis_mode() == 2, Action::SetMiniVis(2)),
+                            ("Mini: swirl", app.settings.mini_vis_mode() == 3, Action::SetMiniVis(3)),
+                        ]
+                    } else {
+                        Vec::new()
+                    };
+                    let chips: Vec<_> = chips.into_iter().chain(mini_chips).collect();
                     if !chips.is_empty() {
                         ui.horizontal_wrapped(|ui| {
                             for (label, on, action) in chips {
@@ -525,9 +529,10 @@ fn panel_dim(ctx: &Context, over: bool) -> f32 {
     ctx.animate_value_with_time(seen_id.with("dim"), if away { 0.05 } else { 1.0 }, 0.4)
 }
 
-/// A pill for one of the views: its icon, its name, a lit fill when it is on.
+/// A round-ended pill holding just an icon (the name is its tooltip), lit
+/// when it is on.
 fn view_button(ui: &mut egui::Ui, palette: &Palette, icon: Icon, label: &str, on: bool, width: f32) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 36.0), egui::Sense::click());
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 38.0), egui::Sense::click());
     if ui.is_rect_visible(rect) {
         let fill = if on {
             palette.text
@@ -538,15 +543,10 @@ fn view_button(ui: &mut egui::Ui, palette: &Palette, icon: Icon, label: &str, on
         };
         ui.painter().rect_filled(rect, rect.height() / 2.0, fill);
         let color = if on { palette.window } else { palette.text };
-        let galley = crate::bidi::layout_line(ui.painter(), label, theme::medium(13.0), color);
-        let icon_box = Rect::from_min_size(egui::pos2(rect.left() + 12.0, rect.center().y - 9.0), egui::vec2(18.0, 18.0));
-        theme::paint_icon(ui, icon, icon_box, 16.0, color);
-        let text_room = rect.right() - 10.0 - (icon_box.right() + 8.0);
-        let clip = Rect::from_min_max(egui::pos2(icon_box.right() + 8.0, rect.top()), egui::pos2(rect.right() - 8.0, rect.bottom()));
-        let x = icon_box.right() + 8.0 + ((text_room - galley.size().x) / 2.0).max(0.0);
-        ui.painter().with_clip_rect(clip).galley(egui::pos2(x, rect.center().y - galley.size().y / 2.0), galley, color);
+        theme::paint_icon(ui, icon, rect, 18.0, color);
     }
-    response
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label));
+    response.on_hover_text(label)
 }
 
 /// Which of the exclusive views is on now: the mini player, a full screen,
@@ -554,8 +554,6 @@ fn view_button(ui: &mut egui::Ui, palette: &Palette, icon: Icon, label: &str, on
 fn current_view(app: &App) -> ViewKind {
     if app.calm_mode {
         ViewKind::Calm
-    } else if app.mini_active {
-        ViewKind::Mini
     } else if app.fullscreen_vis {
         ViewKind::FullVisualizer
     } else if app.lyrics_fullscreen.is_some() {

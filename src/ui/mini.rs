@@ -18,21 +18,73 @@ use crate::util;
 
 use super::widgets::{self, SliderEvent};
 
-/// A window narrower or shorter than the full layout's old minimum of 760
-/// by 520 turns into the mini player by itself.
-const AUTO_WIDTH: f32 = 740.0;
-const AUTO_HEIGHT: f32 = 500.0;
-
-/// Whether this frame should be the mini player.
-///
-/// The size comes from the window itself rather than the drawing area, so a
-/// test that draws into a small area still gets the full layout.
-pub fn wanted(app: &App, ctx: &egui::Context) -> bool {
-    if app.settings.mini_player {
-        return true;
+/// The mini player as a window of its own, like the extra visualizer
+/// window: it opens and closes beside the main window and never changes it.
+/// Its size and place are kept between launches.
+pub fn window(app: &mut App, ctx: &egui::Context) {
+    use egui::{ViewportBuilder, ViewportClass, ViewportCommand, ViewportId};
+    if !app.settings.mini_player {
+        return;
     }
-    ctx.input(|input| input.viewport().inner_rect)
-        .is_some_and(|rect| rect.width() < AUTO_WIDTH || rect.height() < AUTO_HEIGHT)
+    let id = ViewportId::from_hash_of("chanceify-mini-player");
+    let saved = app.settings.mini_window;
+    let default_height = if app.settings.mini_queue { 680.0 } else { 340.0 };
+    let mut builder = ViewportBuilder::default()
+        .with_title("chanceify mini player")
+        .with_decorations(false)
+        .with_min_inner_size([240.0, 200.0])
+        .with_inner_size(saved.map_or([400.0, default_height], |s| [s[2].max(240.0), s[3].max(200.0)]));
+    if let Some(s) = saved
+        && s[0] > -20000.0
+        && s[1] > -20000.0
+    {
+        builder = builder.with_position([s[0], s[1]]);
+    }
+    if app.settings.mini_on_top {
+        builder = builder.with_always_on_top();
+    }
+    let mut close = false;
+    let mut geometry: Option<[f32; 4]> = None;
+    let on_top = app.settings.mini_on_top;
+    ctx.show_viewport_immediate(id, builder, |ui, class| {
+        let ctx = ui.ctx().clone();
+        if class != ViewportClass::Immediate && class != ViewportClass::Root {
+            close = true;
+            return;
+        }
+        if ctx.input(|input| input.viewport().close_requested()) {
+            close = true;
+            return;
+        }
+        // "Always on top" follows the setting while the window is open.
+        let level_id = egui::Id::new("mini-window-top");
+        if ctx.data(|data| data.get_temp::<bool>(level_id)) != Some(on_top) {
+            ctx.data_mut(|data| data.insert_temp(level_id, on_top));
+            ctx.send_viewport_cmd(ViewportCommand::WindowLevel(crate::app::on_top_window_level(on_top)));
+        }
+        // Everything in here sees the mini player's layout.
+        app.mini_active = true;
+        super::keys::handle(app, &ctx);
+        show(app, ui);
+        super::window_controls(ui, &app.palette, app.locale);
+        super::window_resize(ui);
+        app.mini_active = false;
+        let (outer, inner) = ctx.input(|input| (input.viewport().outer_rect, input.viewport().inner_rect));
+        if let (Some(outer), Some(inner)) = (outer, inner) {
+            geometry = Some([outer.min.x, outer.min.y, inner.width(), inner.height()]);
+        }
+        ctx.request_repaint_after(std::time::Duration::from_millis(33));
+    });
+    app.mini_active = false;
+    if close {
+        app.settings.mini_player = false;
+        app.mark_settings_dirty();
+    } else if let Some(now) = geometry
+        && saved.is_none_or(|old| old.iter().zip(now).any(|(a, b)| (a - b).abs() > 1.0))
+    {
+        app.settings.mini_window = Some(now);
+        app.mark_settings_dirty();
+    }
 }
 
 pub fn show(app: &mut App, ui: &mut egui::Ui) {
@@ -114,8 +166,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 portrait(app, &mut inner, body, now.as_ref());
             }
         });
-    // The shared visualizer settings panel, the same one as in every other view.
-    super::player_bar::vis_panel_window(app, &ctx);
 }
 
 /// The right-click menu of the mini player.
@@ -206,6 +256,7 @@ fn strip_buttons(app: &mut App, ui: &mut egui::Ui, strip: Rect) {
 /// How opaque the floating mini player is, 0 to 1: solid while the pointer
 /// is on it (and for a moment after), see-through once it has been away.
 /// Always 1 unless the mini player floats over everything with the fade on.
+#[allow(dead_code)]
 pub fn fade_level(app: &App, ctx: &egui::Context) -> f32 {
     const AWAY: f32 = 0.42;
     const LINGER: f64 = 1.0;
