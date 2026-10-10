@@ -2267,7 +2267,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     ui,
                     &palette,
                     "SWAY STYLE",
-                    &[(Icon::Wind, 0..4), (Icon::Music, 4..9), (Icon::Wine, 9..12)],
+                    &[(Icon::Wind, 0..4), (Icon::Music, 4..9), (Icon::Wine, 9..12), (Icon::Zap, 12..15), (Icon::ArrowRight, 15..17), (Icon::Expand, 17..20), (Icon::Sparkles, 20..22)],
                     &names,
                     Some(current),
                 ) {
@@ -3078,6 +3078,9 @@ fn sway_preview(ui: &mut egui::Ui, palette: &crate::theme::Palette, preset: crat
     // A steady beat for the preview, so bass-driven styles show their pump.
     let pulse = ((time * 2.0).sin().max(0.0)).powi(3);
     let lean = |phase: f32| -> f32 {
+        if matches!(preset.kind, 1 | 2 | 4) {
+            return 0.0;
+        }
         ((0.05 * (t * 0.9 - phase * 0.6).sin() + 0.03 * (t * 1.7 - phase * 0.9 + 1.0).sin())
             * (1.0 + 2.0 * pulse * preset.bass * 0.5)
             * preset.lean
@@ -3088,9 +3091,20 @@ fn sway_preview(ui: &mut egui::Ui, palette: &crate::theme::Palette, preset: crat
         let w = galley.size().x;
         let h = galley.size().y;
         let bob = (time * 3.0 * preset.speed - i as f32 * 0.55).sin() * preset.bob * h * strength;
-        let origin = pos2(x, base - h + bob);
+        let drive = 0.4 + 0.6 * pulse * preset.bass.min(1.6);
+        let motion = match preset.kind {
+            1 => vec2(0.0, -(t * 2.4 - i as f32 * 0.12).sin().abs() * preset.amp * h * strength * drive),
+            2 => vec2((t * 1.6 - i as f32 * 0.1).sin() * preset.amp * h * strength * (0.6 + 0.4 * drive), 0.0),
+            4 => vec2(
+                (time * 41.0 + i as f32 * 7.3).sin() * preset.amp * h * strength * drive,
+                (time * 37.0 + i as f32 * 5.1).cos() * preset.amp * h * strength * drive,
+            ),
+            _ => vec2(0.0, 0.0),
+        };
+        let origin = pos2(x, base - h + bob) + motion;
+        let ripple = if preset.kind == 3 { 0.0 } else { 0.22 };
         let (pivot, angle) = if preset.stalk > 0.0 {
-            (pos2(x + w / 2.0, base + bob), lean(i as f32 * 0.22))
+            (pos2(x + w / 2.0, base + bob), lean(i as f32 * ripple))
         } else {
             (pos2(rect.left() + 6.0 + total / 2.0, base), lean(0.0))
         };
@@ -4074,7 +4088,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
             0.6
         };
         let lean_at = |phase: f32| -> f32 {
-            if still {
+            if still || matches!(sway.kind, 1 | 2 | 4) {
                 return 0.0;
             }
             let damp = if sway.stalk > 0.0 {
@@ -4093,7 +4107,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
                 .clamp(-max_lean, max_lean)
         };
         let angle = if sway.stalk > 0.0 { 0.0 } else { lean_at(row as f32) };
-        if !still && (sway.stalk > 0.0 || angle != 0.0 || sway.bob > 0.0) {
+        if !still && (sway.stalk > 0.0 || angle != 0.0 || sway.bob > 0.0 || sway.kind != 0) {
             moving = true;
         }
         let (sin, cos) = angle.sin_cos();
@@ -4116,12 +4130,41 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
             if back_on {
                 bob = bob.clamp(-back_vpad.max(3.0), back_vpad.max(3.0));
             }
-            let origin = pos2(x, line_top + (line_h - h) + bob);
+            // Bounce, slide and shake move the letters without turning them.
+            let motion = if still || sway.kind == 0 || sway.kind == 3 {
+                vec2(0.0, 0.0)
+            } else {
+                let t = time * sway.speed;
+                let drive = 0.4 + 0.6 * (bass * sway.bass).clamp(0.0, 1.6);
+                match sway.kind {
+                    1 => vec2(
+                        0.0,
+                        -(t * 2.4 - i as f32 * 0.12).sin().abs() * sway.amp * line_h * strength * drive,
+                    ),
+                    2 => vec2(
+                        (t * 1.6 - i as f32 * 0.1).sin() * sway.amp * line_h * strength * (0.6 + 0.4 * drive),
+                        0.0,
+                    ),
+                    _ => vec2(
+                        (time * 41.0 + i as f32 * 7.3).sin() * sway.amp * line_h * strength * drive,
+                        (time * 37.0 + i as f32 * 5.1).cos() * sway.amp * line_h * strength * drive,
+                    ),
+                }
+            };
+            let motion = if back_on {
+                vec2(motion.x, motion.y.clamp(-back_vpad.max(3.0), back_vpad.max(3.0)))
+            } else {
+                motion
+            };
+            let origin = pos2(x, line_top + (line_h - h) + bob) + motion;
             // Stalk styles: this letter leans about its own foot, a little out
             // of step with its neighbour so the line ripples like wheat.
             let (angle, turn_here): (f32, Box<dyn Fn(egui::Pos2) -> egui::Pos2 + '_>) =
                 if sway.stalk > 0.0 {
-                    let a = lean_at(row as f32 + i as f32 * 0.22);
+                    // Lean: every letter tilts together, so the line slants
+                    // one way and then the other with its feet fixed.
+                    let ripple = if sway.kind == 3 { 0.0 } else { 0.22 };
+                    let a = lean_at(row as f32 + i as f32 * ripple);
                     let foot = pos2(x + w / 2.0, line_top + line_h + bob);
                     let (s2, c2) = a.sin_cos();
                     (
@@ -4941,7 +4984,7 @@ pub fn now_playing_overlay(app: &mut App, ui: &mut egui::Ui, art: Rect, now: &No
         let beat_gate = sway_gate(app);
         let strength = app.settings.vis_sway_strength() * beat_gate;
         let still = app.settings.vis_text_still;
-        let angle = if still {
+        let angle = if still || matches!(sway.kind, 1 | 2 | 4) {
             0.0
         } else {
             let time = ui.input(|input| input.time) as f32;
@@ -4955,10 +4998,24 @@ pub fn now_playing_overlay(app: &mut App, ui: &mut egui::Ui, art: Rect, now: &No
                 * sway.lean
                 * strength
         };
-        let shape = egui::epaint::TextShape::new(title_pos, title_galley.clone(), palette.text)
+        // Bounce, slide and shake move the whole title without turning it.
+        let motion = if still || matches!(sway.kind, 0 | 3) {
+            vec2(0.0, 0.0)
+        } else {
+            let time = ui.input(|input| input.time) as f32;
+            let t = time * sway.speed;
+            let reach = title_extent.y * sway.amp * strength;
+            let drive = 0.4 + 0.6 * (app.music_bass_level() * sway.bass).clamp(0.0, 1.6);
+            match sway.kind {
+                1 => vec2(0.0, -(t * 2.4).sin().abs() * reach * drive),
+                2 => vec2((t * 1.6).sin() * reach * (0.6 + 0.4 * drive), 0.0),
+                _ => vec2((time * 41.0).sin() * reach * drive, (time * 37.0).cos() * reach * drive),
+            }
+        };
+        let shape = egui::epaint::TextShape::new(title_pos + motion, title_galley.clone(), palette.text)
             .with_angle_and_anchor(angle, egui::Align2::CENTER_BOTTOM);
         ui.painter().add(shape);
-        if angle != 0.0 {
+        if angle != 0.0 || motion != vec2(0.0, 0.0) {
             ui.ctx().request_repaint();
         }
     }
