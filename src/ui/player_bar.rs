@@ -3160,7 +3160,7 @@ pub(super) fn slider_row(
         let width = (ui.available_width() - FIELD_WIDTH - 8.0).max(80.0);
         // The label gets what the row can spare, never more than the usual
         // column, so a narrow menu keeps a track to drag.
-        let label_col = (width * 0.45).clamp(64.0, LABEL_COLUMN);
+        let label_col = (width * 0.58).clamp(84.0, LABEL_COLUMN);
         let (rect, _) = ui.allocate_exact_size(vec2(width, 24.0), Sense::hover());
         let galley = crate::bidi::layout(
             ui.painter(),
@@ -3548,7 +3548,7 @@ fn fullscreen_title_size(rect: Rect) -> f32 {
 /// and turns to face the pointer while it is over it, in 3D, with a shadow
 /// that turns with it: the full-screen lyrics' card. Returns whether it drew
 /// the cover; with the card flat and still, the caller draws it as usual.
-fn tilted_cover(ui: &egui::Ui, cover: Rect, url: Option<&str>, floating: bool) -> bool {
+fn tilted_cover(ui: &egui::Ui, cover: Rect, url: Option<&str>, floating: bool, border: bool) -> bool {
     let ctx = ui.ctx().clone();
     let side = cover.width();
     let pointer = ui.input(|input| input.pointer.hover_pos());
@@ -3592,18 +3592,19 @@ fn tilted_cover(ui: &egui::Ui, cover: Rect, url: Option<&str>, floating: bool) -
             pos2(cover.center().x + x * half * f, cover.center().y + y * half * f)
         })
         .collect();
-    for layer in 0..8 {
-        let grow = layer as f32 * 6.0;
+    // A soft shadow right behind the card, wider the further it falls.
+    for layer in 0..10 {
+        let grow = layer as f32 * 3.5;
         let points: Vec<egui::Pos2> = corners
             .iter()
             .map(|p| {
                 let out = (*p - cover.center()).normalized();
-                *p + out * grow + vec2(0.0, 18.0)
+                *p + out * grow + vec2(0.0, 8.0)
             })
             .collect();
         ui.painter().add(egui::Shape::convex_polygon(
             points,
-            Color32::from_black_alpha(17),
+            Color32::from_black_alpha(9),
             egui::Stroke::NONE,
         ));
     }
@@ -3635,6 +3636,13 @@ fn tilted_cover(ui: &egui::Ui, cover: Rect, url: Option<&str>, floating: bool) -
         }
     }
     ui.painter().add(egui::Shape::mesh(mesh));
+    // The border follows the tilted card's own corners.
+    if border {
+        ui.painter().add(egui::Shape::closed_line(
+            corners,
+            egui::Stroke::new(2.0, Color32::from_white_alpha(120)),
+        ));
+    }
     true
 }
 
@@ -3662,7 +3670,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
     // lyrics have.
     let floating = app.settings.lyrics_flag(crate::settings::Settings::LYRICS_FLOAT_ART);
     let url = now.art_url.clone().or_else(|| now.art_small.clone());
-    let tilted = tilted_cover(ui, cover, url.as_deref(), floating);
+    let tilted = tilted_cover(ui, cover, url.as_deref(), floating, app.settings.vis_art_border);
     if !tilted {
         super::widgets::paint_cover(
             ui,
@@ -3675,7 +3683,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
         );
     }
     big_art_missing_mark(app, ui, cover, "fullscreen-vis");
-    if app.settings.vis_art_border {
+    if app.settings.vis_art_border && !tilted {
         painter.rect_stroke(
             cover.expand(1.5),
             3.0,

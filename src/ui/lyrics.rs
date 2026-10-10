@@ -1159,12 +1159,11 @@ fn fullscreen_contents(app: &mut App, ui: &mut egui::Ui) {
                             sense,
                         );
                         let painter = ui.painter().clone();
-                        // Left: time column, small fixed gap, words from one
-                        // shared edge. Right: the mirror of that. Centre:
-                        // words centred, time at the left edge.
+                        // Left: words from the left edge, time on the right.
+                        // Right: the mirror. Focus: words centred, time right.
                         let text_x = match align {
-                            0 => rect.left() + side_w,
-                            2 => rect.right() - side_w - galley.size().x,
+                            0 => rect.left() + 2.0,
+                            2 => rect.right() - 2.0 - galley.size().x,
                             _ => rect.center().x - galley.size().x / 2.0,
                         };
                         painter.galley(pos2(text_x, rect.top()), galley.clone(), color);
@@ -1180,10 +1179,12 @@ fn fullscreen_contents(app: &mut App, ui: &mut egui::Ui) {
                             None
                         };
                         if let Some((label, hot)) = shown {
+                            // Words on the left put the time on the right, and
+                            // the other way round.
                             let (x, anchor) = if align == 2 {
-                                (rect.right() - 2.0, egui::Align2::RIGHT_CENTER)
-                            } else {
                                 (rect.left() + 2.0, egui::Align2::LEFT_CENTER)
+                            } else {
+                                (rect.right() - 2.0, egui::Align2::RIGHT_CENTER)
                             };
                             painter.text(
                                 pos2(x, rect.top() + size * 0.62),

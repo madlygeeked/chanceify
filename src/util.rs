@@ -306,11 +306,12 @@ fn mark_rgba(size: usize, polished: bool) -> Vec<u8> {
 }
 
 pub fn greeting(locale: Locale) -> Cow<'static, str> {
-    match local_hour() {
+    let hello = match local_hour() {
         5..=11 => gettext(locale, "Good morning"),
         12..=17 => gettext(locale, "Good afternoon"),
         _ => gettext(locale, "Good evening"),
-    }
+    };
+    Cow::Owned(format!("{hello}!"))
 }
 
 fn local_hour() -> u8 {

@@ -1432,7 +1432,7 @@ impl Default for Settings {
             recents_show_cover: true,
             vis_title_layout: 0,
             vis_presets: Vec::new(),
-            jump_shake: 1.0,
+            jump_shake: 0.5,
             app_icon: 1,
             mini_player: false,
             mini_queue: true,

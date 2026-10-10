@@ -268,7 +268,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                 let top = (outer.top() - side - pad * 2.0 - 8.0).max(screen.top() + 4.0 + pad);
                 let cover = Rect::from_min_size(egui::pos2(outer.left() + pad, top), egui::vec2(side, side));
                 let card = Rect::from_min_max(cover.min - egui::vec2(pad, pad), egui::pos2(outer.right(), cover.bottom() + pad));
-                let palette = dark_palette(app);
+                let palette = app.palette;
                 // The whole card is a handle, registered first so the cover,
                 // the name and the heart still take their own clicks.
                 let handle = ui.interact(card, Id::new("pop-out-card-grip"), egui::Sense::click_and_drag());
@@ -281,7 +281,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                 ui.painter().rect(
                     card,
                     12.0,
-                    Color32::from_rgba_unmultiplied(0x14, 0x16, 0x1a, 235),
+                    palette.panel.gamma_multiply(0.94),
                     Stroke::new(1.0, palette.outline),
                     egui::StrokeKind::Inside,
                 );
@@ -318,7 +318,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                     ui.painter(),
                     &now.title,
                     theme::bold((side * 0.2).clamp(14.0, 22.0)),
-                    Color32::WHITE,
+                    palette.text,
                     text_w,
                     2,
                     Some(crate::bidi::ELLIPSIS),
@@ -327,7 +327,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                     ui.painter(),
                     &now.subtitle,
                     theme::regular((side * 0.15).clamp(12.0, 16.0)),
-                    Color32::from_white_alpha(190),
+                    palette.secondary,
                     text_w,
                     1,
                     Some(crate::bidi::ELLIPSIS),
@@ -344,7 +344,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                 if words_click.clicked() {
                     open_song(app);
                 }
-                ui.painter().galley(egui::pos2(text_left, y), title, Color32::WHITE);
+                ui.painter().galley(egui::pos2(text_left, y), title, palette.text);
                 // The like heart, right after the song's name.
                 super::player_bar::like_heart(
                     app,
@@ -354,7 +354,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                     18.0,
                     &now.uri,
                 );
-                ui.painter().galley(egui::pos2(text_left, y + title_h + 4.0), artist, Color32::WHITE);
+                ui.painter().galley(egui::pos2(text_left, y + title_h + 4.0), artist, palette.secondary);
             }
             if grip_response.hovered() || grip_response.dragged() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
