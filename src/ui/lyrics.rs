@@ -1399,8 +1399,7 @@ pub(super) fn controls_width_for(scale: f32) -> f32 {
 pub(super) fn controls_height(app: &App) -> f32 {
     let k = app.settings.controls_scale_value();
     let kc = 1.0 + (k - 1.0) * 0.5;
-    let presets = if app.settings.volume_presets_value().is_empty() { 0.0 } else { 28.0 * kc };
-    10.0 + 36.0 * kc + 4.0 + 26.0 * k + presets + 10.0
+    10.0 + 36.0 * kc + 4.0 + 26.0 * k + 10.0
 }
 
 pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f32, centred: bool) -> Option<Rect> {
@@ -1445,21 +1444,23 @@ pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egu
         (outer.left() + 54.0, outer.right() - 14.0),
     );
     ui.ctx().data_mut(|data| data.remove::<bool>(egui::Id::new("popout-full-seek")));
-    // The volume bar sits on the first row, right of the repeat button.
+    // The volume bar sits on the first row, right of the repeat button; the
+    // volume buttons are squeezed in above it on the same row.
     let volume_left = outer.left() + 14.0 + controls_w + 10.0;
+    let presets = app.settings.volume_presets_value();
+    let has_presets = !presets.is_empty();
+    let slider_h = if has_presets { (volume_h * 0.62).max(12.0) } else { volume_h };
+    let chips_h = if has_presets { (buttons_h - slider_h - 2.0).clamp(10.0, 18.0) } else { 0.0 };
+    let block_h = slider_h + if has_presets { chips_h + 1.0 } else { 0.0 };
+    let block_top = buttons_row.center().y - block_h / 2.0;
     let volume_row = Rect::from_min_max(
-        pos2(volume_left, buttons_row.center().y - volume_h / 2.0),
-        pos2(outer.right() - 14.0, buttons_row.center().y + volume_h / 2.0),
+        pos2(volume_left, block_top + block_h - slider_h),
+        pos2(outer.right() - 14.0, block_top + block_h),
     );
     let before_volume = app.actions.len();
     super::player_bar::volume_row(app, ui, volume_row);
-    // The volume buttons, one row under the song bar.
-    let presets = app.settings.volume_presets_value();
-    if !presets.is_empty() {
-        let row = Rect::from_min_size(
-            pos2(outer.left() + 14.0, seek_row.bottom() + 2.0),
-            vec2(width - 28.0, 24.0 * kc),
-        );
+    if has_presets {
+        let row = Rect::from_min_size(pos2(volume_left, block_top), vec2(volume_row.width(), chips_h));
         super::player_bar::popout_presets(app, ui, row, &presets);
     }
     // The bars need a double-click before they answer: a single press on

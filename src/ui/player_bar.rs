@@ -1836,12 +1836,26 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             let screen_w = ui.ctx().content_rect().width();
             // Two columns from a modest width when the swirl's column is
             // not open, so the panel is shorter and fits one screen.
-            let columns_fit = screen_w >= 1000.0;
+            let columns_fit = screen_w >= 780.0;
             let col_w = if columns_fit {
-                300.0
+                ((screen_w - 136.0) / 3.0).clamp(210.0, 300.0)
             } else {
                 (screen_w - 64.0).clamp(200.0, 300.0)
             };
+            // The settings sit in four tabs, one open at a time, so the
+            // panel is only as big as what is in front of you.
+            let tab_id = egui::Id::new("vis-menu-tab");
+            let tab: u8 = ui.ctx().data(|data| data.get_temp::<u8>(tab_id)).unwrap_or(0).min(3);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                for (index, label) in ["Shapes", "Bass and colour", "Title", "Lyrics"].iter().enumerate() {
+                    let width = if index == 1 { 130.0 } else { 90.0 };
+                    if chip(ui, &palette, label, tab == index as u8, width).clicked() {
+                        ui.ctx().data_mut(|data| data.insert_temp(tab_id, index as u8));
+                    }
+                }
+            });
+            super::widgets::menu_separator(ui, &palette);
             let mut columns = |ui: &mut egui::Ui| {
             ui.spacing_mut().item_spacing.x = 18.0;
             ui.vertical(|ui| {
@@ -2054,12 +2068,12 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                         .iter()
                         .map(|(name, _)| *name)
                         .collect();
-                    // All the looks sit open, one click each: no dropdown to
-                    // open first.
-                    if let Some(index) = open_choices(
+                    // Six looks for each family, numbered; no words.
+                    if let Some(index) = numbered_rows(
                         ui,
                         &palette,
                         &gettext(app.locale, "LOOK"),
+                        &[(Icon::Disc, 0..6), (Icon::Sparkles, 6..12), (Icon::Waves, 12..18)],
                         &names,
                         active,
                     ) {
@@ -2071,7 +2085,9 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 {
                     // Scrolling art only has a speed; the ripple, blur and
                     // colour sliders are for the waves.
-                    if art_scroll && index != 8 {
+                    // Only the two speeds are left; the ripples, blur and
+                    // colour are what the looks above are for.
+                    if index != 8 && index != 9 {
                         continue;
                     }
                     slider_row(
@@ -2097,16 +2113,20 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             }
             });
             };
-            if columns_fit {
-                ui.horizontal_top(|ui| columns(ui));
-            } else {
-                ui.vertical(|ui| columns(ui));
+            if tab == 0 {
+                if columns_fit {
+                    ui.horizontal_top(|ui| columns(ui));
+                } else {
+                    ui.vertical(|ui| columns(ui));
+                }
             }
-            super::widgets::menu_separator(ui, &palette);
             // The settings every shape shares, then the title, then the lyrics.
             let mut shared = |ui: &mut egui::Ui| {
             ui.spacing_mut().item_spacing.x = 18.0;
             ui.vertical(|ui| {
+            if tab != 1 {
+                return;
+            }
             ui.set_width(col_w);
             theme::subtle(ui, &palette, &gettext(app.locale, "BASS JUMP"));
             ui.horizontal_wrapped(|ui| {
@@ -2215,6 +2235,9 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             }
             });
             ui.vertical(|ui| {
+            if tab != 2 {
+                return;
+            }
             ui.set_width(col_w);
             theme::subtle(ui, &palette, &gettext(app.locale, "TITLE"));
             if chip(
@@ -2244,7 +2267,14 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 let presets = crate::settings::Settings::SWAY_PRESETS;
                 let names: Vec<&str> = presets.iter().map(|preset| preset.name).collect();
                 let current = (app.settings.vis_sway as usize).min(names.len() - 1);
-                if let Some(index) = open_choices(ui, &palette, "SWAY STYLE", &names, Some(current)) {
+                if let Some(index) = numbered_rows(
+                    ui,
+                    &palette,
+                    "SWAY STYLE",
+                    &[(Icon::Wind, 0..4), (Icon::Music, 4..9), (Icon::Wine, 9..12)],
+                    &names,
+                    Some(current),
+                ) {
                     app.actions.push(Action::SetVisSway(index as u8));
                 }
                 sway_preview(ui, &palette, app.settings.vis_sway_preset(), app.settings.vis_sway_strength());
@@ -2289,9 +2319,6 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     |value| app.actions.push(Action::SetVisBack(1, value)));
                 slider_row(ui, &palette, "Room round the words", 0.0..=40.0, app.settings.vis_back_pad,
                     |value| app.actions.push(Action::SetVisBack(2, value)));
-                if chip(ui, &palette, "One block, not a strip a line", app.settings.vis_back_block, ui.available_width().min(290.0)).clicked() {
-                    app.actions.push(Action::SetVisBack(3, if app.settings.vis_back_block { 0.0 } else { 1.0 }));
-                }
             }
             if chip(
                 ui,
@@ -2305,20 +2332,27 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 app.actions.push(Action::ToggleVisArtist);
             }
             {
-                let layouts = [
-                    "Under the cover",
-                    "Beside the cover",
-                    "Beside it, big",
-                    "Above it, artist below",
-                ];
-                let current = (app.settings.vis_title_layout as usize).min(layouts.len() - 1);
-                if let Some(index) = open_choices(ui, &palette, "TITLE LAYOUT", &layouts, Some(current)) {
-                    app.actions.push(Action::SetVisTitleLayout(index as u8));
-                }
+                theme::subtle(ui, &palette, "TITLE LAYOUT");
+                let current = (app.settings.vis_title_layout as usize).min(2);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 6.0;
+                    for (index, glyph, tip) in [
+                        (0usize, Glyph::TitleUnder, "Under the cover"),
+                        (1, Glyph::TitleBeside, "Beside the cover"),
+                        (2, Glyph::TitleBig, "Beside it, big"),
+                    ] {
+                        if glyph_button(ui, &palette, glyph, tip, current == index).clicked() {
+                            app.actions.push(Action::SetVisTitleLayout(index as u8));
+                        }
+                    }
+                });
             }
             font_grid(app, ui);
             });
             ui.vertical(|ui| {
+            if tab != 3 {
+                return;
+            }
             ui.set_width(col_w);
             theme::subtle(ui, &palette, &gettext(app.locale, "FULL-SCREEN LYRICS"));
             let on_page = app.lyrics_fullscreen.is_some();
@@ -2403,10 +2437,12 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             }
             });
             };
-            if columns_fit {
-                ui.horizontal_top(|ui| shared(ui));
-            } else {
-                ui.vertical(|ui| shared(ui));
+            if tab != 0 {
+                if columns_fit {
+                    ui.horizontal_top(|ui| shared(ui));
+                } else {
+                    ui.vertical(|ui| shared(ui));
+                }
             }
         }
     }
@@ -2423,6 +2459,10 @@ enum Glyph {
     Mirror,
     /// A circle with a line through it.
     Nothing,
+    /// The title under the cover, beside it, beside it and big.
+    TitleUnder,
+    TitleBeside,
+    TitleBig,
 }
 
 /// A small square button with a picture and no text; the words are the tooltip.
@@ -2479,6 +2519,21 @@ fn glyph_button(
                 ));
             }
         }
+        Glyph::TitleUnder => {
+            painter.rect_filled(Rect::from_center_size(pos2(c.x, c.y - 4.0), vec2(11.0, 11.0)), 2.0, ink);
+            painter.line_segment([pos2(c.x - 9.0, c.y + 9.0), pos2(c.x + 9.0, c.y + 9.0)], egui::Stroke::new(2.0, ink));
+        }
+        Glyph::TitleBeside => {
+            painter.rect_filled(Rect::from_center_size(pos2(c.x - 8.0, c.y), vec2(10.0, 10.0)), 2.0, ink);
+            painter.line_segment([pos2(c.x + 1.0, c.y - 2.5), pos2(c.x + 11.0, c.y - 2.5)], egui::Stroke::new(1.6, ink));
+            painter.line_segment([pos2(c.x + 1.0, c.y + 2.5), pos2(c.x + 8.0, c.y + 2.5)], egui::Stroke::new(1.6, ink));
+        }
+        Glyph::TitleBig => {
+            painter.rect_filled(Rect::from_center_size(pos2(c.x - 8.0, c.y), vec2(10.0, 10.0)), 2.0, ink);
+            for dy in [-5.5_f32, 0.0, 5.5] {
+                painter.line_segment([pos2(c.x + 1.0, c.y + dy), pos2(c.x + 11.0, c.y + dy)], egui::Stroke::new(3.0, ink));
+            }
+        }
         Glyph::Nothing => {
             painter.circle_stroke(c, 7.5, egui::Stroke::new(1.5, ink));
             painter.line_segment(
@@ -2507,49 +2562,67 @@ fn font_grid(app: &mut App, ui: &mut egui::Ui) {
     let sample = app
         .now_playing()
         .map_or_else(|| "Song title".to_string(), |now| now.title.clone());
-    let columns = 2usize;
-    let gap = 6.0;
-    let width = ((ui.available_width().min(290.0) - gap * (columns as f32 - 1.0)) / columns as f32).floor().max(80.0);
     let current = usize::from(app.settings.vis_text_font).min(crate::system_fonts::VIS_FONTS.len() - 1);
     let mut hovered: Option<u8> = None;
-    for (row_index, row) in (0..crate::system_fonts::VIS_FONTS.len()).collect::<Vec<_>>().chunks(columns).enumerate() {
-        let _ = row_index;
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = gap;
-            for &index in row {
-                let (rect, response) = ui.allocate_exact_size(vec2(width, 42.0), Sense::click());
-                let fill = if index == current {
-                    palette.accent.gamma_multiply(0.35)
-                } else if response.hovered() {
-                    palette.surface_hover
-                } else {
-                    palette.surface
-                };
-                ui.painter().rect_filled(rect, egui::CornerRadius::same(6), fill);
-                let family = vis_font_family(ui.ctx(), index);
-                let painter = ui.painter().with_clip_rect(rect.shrink(3.0));
-                painter.text(
-                    pos2(rect.left() + 8.0, rect.top() + 14.0),
-                    egui::Align2::LEFT_CENTER,
-                    &sample,
-                    egui::FontId::new(15.0, family),
-                    palette.text,
-                );
-                painter.text(
-                    pos2(rect.left() + 8.0, rect.bottom() - 9.0),
-                    egui::Align2::LEFT_CENTER,
-                    crate::system_fonts::VIS_FONTS[index].0,
-                    theme::regular(10.0),
-                    palette.secondary,
-                );
-                if response.hovered() {
-                    hovered = Some(index as u8);
+    // A drop-down: one button showing the chosen face, a list under it when
+    // it is opened. Built into the panel rather than a pop-up on a pop-up.
+    let open_id = egui::Id::new("vis-font-open");
+    let open = ui.ctx().data(|data| data.get_temp::<bool>(open_id)).unwrap_or(false);
+    let width = ui.available_width().min(290.0);
+    let family_now = vis_font_family(ui.ctx(), current);
+    let (rect, response) = ui.allocate_exact_size(vec2(width, 30.0), Sense::click());
+    let fill = if response.hovered() { palette.surface_hover } else { palette.surface };
+    ui.painter().rect_filled(rect, egui::CornerRadius::same(6), fill);
+    ui.painter().with_clip_rect(rect.shrink2(vec2(6.0, 0.0))).text(
+        pos2(rect.left() + 10.0, rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        crate::system_fonts::VIS_FONTS[current].0,
+        egui::FontId::new(15.0, family_now),
+        palette.text,
+    );
+    theme::paint_icon(
+        ui,
+        if open { Icon::ChevronUp } else { Icon::ChevronDown },
+        Rect::from_center_size(pos2(rect.right() - 16.0, rect.center().y), vec2(20.0, 20.0)),
+        15.0,
+        palette.secondary,
+    );
+    if response.clicked() {
+        ui.ctx().data_mut(|data| data.insert_temp(open_id, !open));
+    }
+    if open {
+        egui::ScrollArea::vertical()
+            .id_salt("vis-font-list")
+            .max_height(240.0)
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 2.0;
+                for index in 0..crate::system_fonts::VIS_FONTS.len() {
+                    let (rect, response) = ui.allocate_exact_size(vec2(width - 8.0, 30.0), Sense::click());
+                    let fill = if index == current {
+                        palette.accent.gamma_multiply(0.35)
+                    } else if response.hovered() {
+                        palette.surface_hover
+                    } else {
+                        palette.surface
+                    };
+                    ui.painter().rect_filled(rect, egui::CornerRadius::same(6), fill);
+                    let family = vis_font_family(ui.ctx(), index);
+                    ui.painter().with_clip_rect(rect.shrink2(vec2(4.0, 0.0))).text(
+                        pos2(rect.left() + 10.0, rect.center().y),
+                        egui::Align2::LEFT_CENTER,
+                        format!("{}   {}", crate::system_fonts::VIS_FONTS[index].0, sample),
+                        egui::FontId::new(15.0, family),
+                        palette.text,
+                    );
+                    if response.hovered() {
+                        hovered = Some(index as u8);
+                    }
+                    if response.clicked() {
+                        app.actions.push(Action::SetVisFont(index as u8));
+                        ui.ctx().data_mut(|data| data.insert_temp(open_id, false));
+                    }
                 }
-                if response.clicked() {
-                    app.actions.push(Action::SetVisFont(index as u8));
-                }
-            }
-        });
+            });
     }
     let pass = ui.ctx().cumulative_pass_nr();
     if app.settings.vis_live_preview
@@ -2980,6 +3053,7 @@ fn sway_preview(ui: &mut egui::Ui, palette: &crate::theme::Palette, preset: crat
     ui.ctx().request_repaint();
 }
 
+#[allow(dead_code)]
 fn open_choices(
     ui: &mut egui::Ui,
     palette: &crate::theme::Palette,
@@ -2999,6 +3073,35 @@ fn open_choices(
                     picked = Some(index);
                 }
                 index += 1;
+            }
+        });
+    }
+    picked
+}
+
+/// Presets as rows of numbered buttons: a picture for the family, then 1, 2,
+/// 3... for each of its looks. The words are the tooltips.
+fn numbered_rows(
+    ui: &mut egui::Ui,
+    palette: &crate::theme::Palette,
+    title: &str,
+    rows: &[(Icon, std::ops::Range<usize>)],
+    names: &[&str],
+    selected: Option<usize>,
+) -> Option<usize> {
+    let mut picked = None;
+    theme::subtle(ui, palette, title);
+    for (icon, range) in rows {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            let (rect, _) = ui.allocate_exact_size(vec2(26.0, 24.0), Sense::hover());
+            theme::paint_icon(ui, *icon, rect, 17.0, palette.secondary);
+            for (number, index) in range.clone().enumerate() {
+                let name = names.get(index).copied().unwrap_or("");
+                let label = format!("{}", number + 1);
+                if chip(ui, palette, &label, selected == Some(index), 30.0).on_hover_text(name).clicked() {
+                    picked = Some(index);
+                }
             }
         });
     }
@@ -3707,9 +3810,10 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
             let width = line_width(line);
             let left = line_left(width);
             let y = top + row as f32 * line_h;
+            let vpad = pad * 0.5 + 4.0;
             strips.push(Rect::from_min_max(
-                pos2(left - pad, y),
-                pos2(left + width + pad, y + line_h),
+                pos2(left - pad, y - vpad),
+                pos2(left + width + pad, y + line_h + vpad),
             ));
         }
         if let Some(artist) = artist.as_ref() {
@@ -3719,15 +3823,10 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
                 pos2(left + artist.size().x + pad, artist_top + artist.size().y),
             ));
         }
-        if app.settings.vis_back_block {
-            if let Some(first) = strips.first().copied() {
-                let whole = strips.iter().fold(first, |all, strip| all.union(*strip));
-                painter.rect_filled(whole.expand(2.0), round, back);
-            }
-        } else {
-            for strip in strips {
-                painter.rect_filled(strip, round, back);
-            }
+        // Always one block round all of it.
+        if let Some(first) = strips.first().copied() {
+            let whole = strips.iter().fold(first, |all, strip| all.union(*strip));
+            painter.rect_filled(whole.expand(2.0), round, back);
         }
     }
     let mut moving = false;
@@ -3741,9 +3840,12 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
         let line_pivot = pos2(x + whole_width / 2.0, line_top + line_h);
         let back_on = app.settings.vis_text_back;
         let back_pad = app.settings.vis_back_pad.clamp(0.0, 40.0);
+        let back_vpad = back_pad * 0.5 + 4.0;
         // With a backing, the letters may not lean past it.
         let max_lean = if back_on {
-            ((back_pad + 3.0) / line_h.max(1.0)).clamp(0.0, 1.0).asin()
+            // The ends of a long line swing up and down as it leans, so the
+            // lean is capped where that stays inside the block.
+            ((back_vpad + 1.0) / (whole_width / 2.0).max(1.0)).clamp(0.0, 1.0).asin()
         } else {
             0.6
         };
@@ -3788,7 +3890,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
                 (time * 3.0 * sway.speed - i as f32 * 0.55).sin() * sway.bob * h * strength
             };
             if back_on {
-                bob = bob.clamp(-3.0, 3.0);
+                bob = bob.clamp(-back_vpad.max(3.0), back_vpad.max(3.0));
             }
             let origin = pos2(x, line_top + (line_h - h) + bob);
             // Stalk styles: this letter leans about its own foot, a little out
@@ -5576,14 +5678,35 @@ pub(super) fn popout_presets(app: &mut App, ui: &mut egui::Ui, rect: Rect, prese
         None => volume,
     };
     let adjustable = now.as_ref().is_none_or(|now| now.can_set_volume);
-    let mut child = ui.new_child(
-        UiBuilder::new()
-            .max_rect(rect)
-            .layout(Layout::left_to_right(Align::Center)),
-    );
-    child.spacing_mut().item_spacing.x = 6.0;
+    // Small chips squeezed into whatever height the row has, centred over
+    // the volume bar, so they never need a row of their own.
+    let h = rect.height().clamp(10.0, 18.0);
+    let gap = 3.0;
+    let n = presets.len().max(1) as f32;
+    let w = ((rect.width() - gap * (n - 1.0)) / n).clamp(18.0, 34.0);
+    let total = w * n + gap * (n - 1.0);
+    let mut x = rect.center().x - total / 2.0;
     for preset in presets {
-        if chip(&mut child, &palette, &format!("{preset}"), shown == *preset, 40.0).clicked() && adjustable {
+        let cell = Rect::from_min_size(pos2(x, rect.center().y - h / 2.0), vec2(w, h));
+        x += w + gap;
+        let response = ui.interact(cell, ui.id().with(("popout-preset", *preset)), Sense::click());
+        let active = shown == *preset;
+        let fill = if active {
+            palette.accent.gamma_multiply(0.35)
+        } else if response.hovered() {
+            palette.surface_hover
+        } else {
+            palette.surface
+        };
+        ui.painter().rect_filled(cell, egui::CornerRadius::same(5), fill);
+        ui.painter().text(
+            cell.center(),
+            egui::Align2::CENTER_CENTER,
+            format!("{preset}"),
+            theme::regular((h * 0.62).clamp(8.5, 11.5)),
+            if active { palette.text } else { palette.secondary },
+        );
+        if response.clicked() && adjustable {
             app.volume_preview = None;
             app.actions.push(Action::SetVolume(*preset));
         }

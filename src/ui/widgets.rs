@@ -207,6 +207,13 @@ fn membership_icons(ui: &Ui, app: &mut App, rect: Rect, right: f32, row: &TrackR
         .unwrap_or(false);
     let total = shown.len();
     let (height, gap) = membership_metrics(app.settings.membership_icon_scale);
+    // In the playlists column too many icons shrink to fit rather than
+    // being dropped one at a time.
+    let shrink = ui
+        .data(|data| data.get_temp::<f32>(egui::Id::new("membership-shrink")))
+        .unwrap_or(1.0)
+        .clamp(0.2, 1.0);
+    let (height, gap) = (height * shrink, gap * shrink);
     let art = app.backend.art().clone();
     // Anchored to the right of the title column and growing leftwards, so the
     // first playlist always sits against the album column and each further
@@ -2544,13 +2551,17 @@ fn track_row_contents(
         rule(x);
         let cell = Rect::from_min_size(pos2(x, rect.top()), vec2(cols.playlists, row_height));
         let (height, gap) = membership_metrics(app.settings.membership_icon_scale);
-        let fit = (((cell.width() - 12.0 + gap) / (height + gap)).floor() as usize).max(1);
-        // `membership_icons` grows leftwards from `right`, so hand it the
-        // right edge of exactly as many icons as fit.
-        let wanted = membership_shown(app, &row).len().min(fit);
+        let wanted = membership_shown(app, &row).len();
         if wanted > 0 {
-            let right = cell.left() + wanted as f32 * height + (wanted as f32 - 1.0) * gap;
+            let n = wanted as f32;
+            let natural = n * height + (n - 1.0) * gap;
+            let shrink = ((cell.width() - 12.0) / natural).clamp(0.2, 1.0);
+            let (h, g) = (height * shrink, gap * shrink);
+            let right = cell.left() + n * h + (n - 1.0) * g;
+            let key = egui::Id::new("membership-shrink");
+            ui.data_mut(|data| data.insert_temp(key, shrink));
             membership_icons(ui, app, cell, right, &row);
+            ui.data_mut(|data| data.remove::<f32>(key));
         }
         x += cols.playlists;
     }

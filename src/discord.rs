@@ -675,7 +675,9 @@ fn activity_json_level(activity: &Activity, level: u8) -> Value {
                 value["state_url"] = json!(url);
             }
         }
-        if level < 2 && let Some(secret) = &activity.join {
+        // Discord refuses a join secret next to buttons ("secrets cannot
+        // currently be sent with buttons"), so buttons win when both are on.
+        if level < 2 && activity.buttons.is_empty() && let Some(secret) = &activity.join {
             value["party"] = json!({
                 "id": format!("chanceify-{}", std::process::id()),
                 "size": [1, 10],

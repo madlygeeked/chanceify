@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 /// Faces offered for the title in the full-screen visualizer: a name to show
 /// and the file in Windows' font folder. The first entry is the app's own.
-pub const VIS_FONTS: [(&str, &str); 15] = [
+pub const VIS_FONTS: [(&str, &str); 28] = [
     ("Inter (default)", ""),
     ("Impact", "impact.ttf"),
     ("Georgia", "georgia.ttf"),
@@ -21,6 +21,19 @@ pub const VIS_FONTS: [(&str, &str); 15] = [
     ("Lucida Handwriting", "LHANDW.TTF"),
     ("Brush Script", "BRUSHSCI.TTF"),
     ("Segoe Print", "segoepr.ttf"),
+    ("Arial Black", "ariblk.ttf"),
+    ("Rockwell", "ROCK.TTF"),
+    ("Candara", "candara.ttf"),
+    ("Constantia", "constan.ttf"),
+    ("Corbel", "corbel.ttf"),
+    ("Cooper Black", "COOPBL.TTF"),
+    ("Bauhaus 93", "BAUHS93.TTF"),
+    ("Jokerman", "JOKERMAN.TTF"),
+    ("Chiller", "CHILLER.TTF"),
+    ("Old English", "OLDENGL.TTF"),
+    ("Stencil", "STENCIL.TTF"),
+    ("Papyrus", "PAPYRUS.TTF"),
+    ("Mistral", "MISTRAL.TTF"),
 ];
 
 /// The bytes of visualizer font `index`, when this computer has it.
