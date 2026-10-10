@@ -12410,7 +12410,7 @@ impl App {
     /// How the Discord profile is to look, from the settings and what plays.
     pub fn discord_style(&mut self) -> crate::discord::Style {
         let swirl = None;
-        let playlist_name = if self.settings.discord_playlist || self.settings.discord_playlist_line {
+        let playlist_name = {
             self.playing_context_uri()
                 .filter(|uri| uri.starts_with("spotify:playlist:"))
                 .and_then(|uri| util::uri_id(&uri).map(str::to_string))
@@ -12420,21 +12420,18 @@ impl App {
                         .map(|playlist| playlist.name.clone())
                 })
                 .filter(|name| !name.trim().is_empty())
-        } else {
-            None
         };
-        let playlist = playlist_name.clone().filter(|_| self.settings.discord_playlist);
+        // Fixed on: the playlist being played from shows, with a profile and a
+        // playlist button.
+        let playlist = playlist_name.clone();
         let playlist_line = playlist_name.filter(|_| self.settings.discord_playlist_line);
-        let picks = [self.settings.discord_button_1.min(5), self.settings.discord_button_2.min(5)];
-        let playlist_url = if picks.contains(&3) || self.settings.discord_playlist_line {
-            self.playing_context_uri()
-                .filter(|uri| uri.starts_with("spotify:playlist:"))
-                .and_then(|uri| util::uri_id(&uri).map(str::to_string))
-                .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric()))
-                .map(|id| format!("https://open.spotify.com/playlist/{id}"))
-        } else {
-            None
-        };
+        let picks = [4u8, 3u8];
+        let playlist_url = self
+            .playing_context_uri()
+            .filter(|uri| uri.starts_with("spotify:playlist:"))
+            .and_then(|uri| util::uri_id(&uri).map(str::to_string))
+            .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric()))
+            .map(|id| format!("https://open.spotify.com/playlist/{id}"));
         let profile_url = picks
             .contains(&4)
             .then(|| self.user_id().map(str::to_string))
@@ -12443,25 +12440,15 @@ impl App {
             .map(|id| format!("https://open.spotify.com/user/{id}"));
         let style = crate::discord::Style {
             // The name under "Listening to" is the first line that is on.
-            status_line: if self.settings.discord_say_song {
-                0
-            } else if self.settings.discord_say_artist {
-                1
-            } else {
-                2
-            },
-            say: [
-                self.settings.discord_say_song,
-                self.settings.discord_say_artist,
-                self.settings.discord_say_app,
-            ],
-            cover: self.settings.discord_cover,
-            badge: self.settings.discord_badge,
+            status_line: 0,
+            say: [true, true, true],
+            cover: true,
+            badge: true,
             swirl,
             playlist,
             playlist_line,
             profile_url,
-            buttons: self.settings.discord_buttons,
+            buttons: true,
             playlist_url,
             song_page: picks.contains(&1),
             picks,
@@ -12480,10 +12467,8 @@ impl App {
 
     /// Keeps the Discord profile showing what is playing, when asked to.
     fn sync_discord(&mut self) {
-        let mut id = self.settings.discord_client_id.trim().to_string();
-        if id.is_empty() {
-            id = crate::discord::DEFAULT_APPLICATION_ID.to_string();
-        }
+        // chanceify's own Discord application, built in: nothing to fill in.
+        let id = crate::discord::DEFAULT_APPLICATION_ID.to_string();
         if !self.settings.discord_presence {
             crate::discord::set_listen(false);
             crate::discord::update("", None);

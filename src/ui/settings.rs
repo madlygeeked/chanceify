@@ -1958,27 +1958,6 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                         "Shows on your Discord profile like Spotify does: the song and artist, the cover and a progress bar, with a small chanceify badge. Discord's desktop app has to be open.",
                     );
                     ui.add_space(4.0);
-                    ui.add_space(4.0);
-                    theme::text(ui, "What the card says", theme::bold(13.0), palette.text);
-                    for (label, which) in [
-                        ("The song", 0u8),
-                        ("The artist", 1),
-                        ("chanceify (third line)", 2),
-                    ] {
-                        let mut on = match which {
-                            0 => app.settings.discord_say_song,
-                            1 => app.settings.discord_say_artist,
-                            _ => app.settings.discord_say_app,
-                        };
-                        if widgets::switch_labeled(ui, &palette, label, &mut on).changed() {
-                            match which {
-                                0 => app.settings.discord_say_song = on,
-                                1 => app.settings.discord_say_artist = on,
-                                _ => app.settings.discord_say_app = on,
-                            }
-                            app.mark_settings_dirty();
-                        }
-                    }
                     if theme::soft_button(ui, &palette, None, "Let chanceify:// links open chanceify (Windows)", false)
                         .on_hover_text("Adds one entry for your Windows user, so the song page's Open in chanceify button works.")
                         .clicked()
@@ -1986,13 +1965,9 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                         app.actions.push(Action::RegisterLinks);
                     }
                     ui.add_space(4.0);
-                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 8] = [
-                        ("Show the album cover", |s| &mut s.discord_cover),
-                        ("Tiny chanceify badge in the corner of the cover", |s| &mut s.discord_badge),
-                        ("Say which playlist I'm playing from", |s| &mut s.discord_playlist),
+                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 4] = [
                         ("Playlist name after the artist, linking to the playlist", |s| &mut s.discord_playlist_line),
                         ("Make the song and artist names links to Spotify", |s| &mut s.discord_links),
-                        ("Show buttons under the song (Discord shows two)", |s| &mut s.discord_buttons),
                         ("Show songs I play from my own files", |s| &mut s.discord_files),
                         ("Show nothing while paused", |s| &mut s.discord_hide_paused),
                     ];
@@ -2001,54 +1976,6 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                         if widgets::switch_labeled(ui, &palette, label, &mut value).changed() {
                             *field(&mut app.settings) = value;
                             app.mark_settings_dirty();
-                        }
-                    }
-                    if app.settings.discord_buttons {
-                        ui.add_space(4.0);
-                        theme::text(
-                            ui,
-                            &*gettext(app.locale, "Pick the two buttons under the song. The top one shows first."),
-                            theme::regular(12.5),
-                            palette.secondary,
-                        );
-                        let names = [
-                            "None",
-                            "Open in chanceify",
-                            "Open in Spotify",
-                            "The playlist",
-                            "My profile",
-                            "Get chanceify",
-                        ];
-                        for slot in 0..2usize {
-                            ui.add_space(2.0);
-                            theme::text(
-                                ui,
-                                &*if slot == 0 { gettext(app.locale, "First button") } else { gettext(app.locale, "Second button") },
-                                theme::bold(13.0),
-                                palette.text,
-                            );
-                            ui.horizontal_wrapped(|ui| {
-                                ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
-                                for (kind, name) in names.iter().enumerate() {
-                                    let kind = kind as u8;
-                                    let (mine, other) = if slot == 0 {
-                                        (app.settings.discord_button_1, app.settings.discord_button_2)
-                                    } else {
-                                        (app.settings.discord_button_2, app.settings.discord_button_1)
-                                    };
-                                    if theme::pill_button(ui, &palette, &gettext(app.locale, name), mine == kind)
-                                        .clicked()
-                                        && mine != kind
-                                    {
-                                        // Never the same button twice: they swap.
-                                        let other = if other == kind && kind != 0 { mine } else { other };
-                                        let (first, second) = if slot == 0 { (kind, other) } else { (other, kind) };
-                                        app.settings.discord_button_1 = first;
-                                        app.settings.discord_button_2 = second;
-                                        app.mark_settings_dirty();
-                                    }
-                                }
-                            });
                         }
                     }
                     ui.add_space(6.0);
@@ -2134,20 +2061,6 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                     if theme::soft_button(ui, &palette, None, "Copy what I'm playing for Discord", false).clicked() {
                         app.actions.push(Action::ShareToDiscord);
                     }
-                    ui.add_space(4.0);
-                    ui.horizontal(|ui| {
-                        theme::text(ui, "Discord Application ID (optional)", theme::regular(12.5), palette.secondary);
-                        if ui
-                            .add(
-                                egui::TextEdit::singleline(&mut app.settings.discord_client_id)
-                                    .desired_width(210.0)
-                                    .hint_text("empty = chanceify's own"),
-                            )
-                            .changed()
-                        {
-                            app.mark_settings_dirty();
-                        }
-                    });
                 }
             }
         });
