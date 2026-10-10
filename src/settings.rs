@@ -988,6 +988,10 @@ pub struct Settings {
     /// 0 album big, swirl small; 1 swirl big, album small; 2 chanceify badge only.
     pub discord_look: u8,
     pub discord_song_page: bool,
+    /// The two buttons under the song: 0 none, 1 open in chanceify, 2 open in
+    /// Spotify, 3 the playlist, 4 the reader's profile, 5 get chanceify.
+    pub discord_button_1: u8,
+    pub discord_button_2: u8,
     /// Show the "Listen on Spotify" and "Get chanceify" buttons.
     pub discord_buttons: bool,
     /// Make the song and the artist links to Spotify.
@@ -1389,6 +1393,8 @@ impl Default for Settings {
             discord_playlist_button: false,
             discord_look: 0,
             discord_song_page: false,
+            discord_button_1: 2,
+            discord_button_2: 5,
             discord_buttons: true,
             discord_links: true,
             discord_hide_paused: false,

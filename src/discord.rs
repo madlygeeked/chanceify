@@ -39,6 +39,8 @@ pub struct Activity {
     pub small_text: String,
     /// At most two buttons under the activity: a label and a web address.
     pub buttons: Vec<(String, String)>,
+    /// Where pressing the big picture leads, when Discord allows it.
+    pub large_url: Option<String>,
     /// Seconds since 1970 the song (would have) started, and ends. Both
     /// `None` while paused.
     pub start: Option<i64>,
@@ -67,6 +69,7 @@ impl Activity {
             && self.small_image == other.small_image
             && self.small_text == other.small_text
             && self.buttons == other.buttons
+            && self.large_url == other.large_url
             && self.join == other.join
             && self.small_text == other.small_text
             && near(self.start, other.start)
@@ -116,6 +119,9 @@ pub struct Style {
     /// The reader's Spotify profile address, when they want a button for it.
     pub profile_url: Option<String>,
     pub buttons: bool,
+    /// The two buttons the reader picked, in order: 0 none, 1 open in
+    /// chanceify, 2 open in Spotify, 3 the playlist, 4 their profile, 5 get chanceify.
+    pub picks: [u8; 2],
     /// A button to the playlist the song plays from.
     pub playlist_url: Option<String>,
     /// The song button leads to the chanceify song page, not Spotify.
@@ -191,31 +197,39 @@ pub fn activity_for(
     let mut buttons: Vec<(String, String)> = Vec::new();
     // Discord will not show buttons next to a join (listen along) card.
     if style.buttons && !(style.listen_along && timed && !is_file && !now.is_episode) {
-        let page = if style.song_page && !is_file {
+        let wants_page = style.picks.contains(&1);
+        let page = if wants_page && !is_file {
             song_link(&now.uri, &now.title, &now.subtitle)
         } else {
             None
         };
-        if let Some(url) = page.as_ref().or(song_url.as_ref()) {
-            buttons.push((
-                if page.is_some() { "Open the song" } else { "Listen on Spotify" }.to_string(),
-                url.clone(),
-            ));
-        }
-        if let Some(url) = &style.playlist_url {
-            buttons.push(("Open the playlist".to_string(), url.clone()));
-        }
-        // Discord shows two at most: the song, then the profile or the app.
-        if let Some(url) = &style.profile_url {
-            buttons.push(("My Spotify profile".to_string(), url.clone()));
-        }
-        if buttons.len() < 2
-            && let Some(url) = &style.app_url
-        {
-            buttons.push((format!("Get {}", crate::build_info::DISPLAY_NAME), url.clone()));
+        for kind in style.picks {
+            let made = match kind {
+                1 => page.clone().map(|url| ("Open in chanceify".to_string(), url)),
+                2 => song_url.clone().map(|url| ("Open in Spotify".to_string(), url)),
+                3 => style.playlist_url.clone().map(|url| ("Open the playlist".to_string(), url)),
+                4 => style.profile_url.clone().map(|url| ("My Spotify profile".to_string(), url)),
+                5 => style
+                    .app_url
+                    .clone()
+                    .map(|url| (format!("Get {}", crate::build_info::DISPLAY_NAME), url)),
+                _ => None,
+            };
+            if let Some(button) = made
+                && !buttons.iter().any(|(_, url)| *url == button.1)
+            {
+                buttons.push(button);
+            }
         }
     }
     buttons.truncate(2);
+    let large_url = if is_file {
+        None
+    } else {
+        song_link(&now.uri, &now.title, &now.subtitle)
+            .filter(|_| style.picks.contains(&1))
+            .or_else(|| song_url.clone())
+    };
     Some(Activity {
         details: now.title.clone(),
         state: if now.playing || now.subtitle.is_empty() {
@@ -248,6 +262,7 @@ pub fn activity_for(
             None => crate::build_info::DISPLAY_NAME.to_string(),
         },
         buttons,
+        large_url,
         start: timed.then_some(start),
         end: timed.then_some(start + i64::from(now.duration_ms / 1000)),
         join: (style.listen_along && timed && !is_file && !now.is_episode)
@@ -657,6 +672,9 @@ fn activity_json_level(activity: &Activity, level: u8) -> Value {
         assets.insert("small_image".into(), json!(image));
         assets.insert("small_text".into(), json!(line(&activity.small_text)));
     }
+    if level < 1 && !plain && let Some(url) = &activity.large_url {
+        assets.insert("large_url".into(), json!(url));
+    }
     if !assets.is_empty() {
         value["assets"] = Value::Object(assets);
     }
@@ -772,6 +790,7 @@ mod tests {
             small_image: Some(BADGE_KEY.into()),
             small_text: "chanceify".into(),
             buttons: vec![("Listen on Spotify".into(), "https://open.spotify.com/track/abc".into())],
+            large_url: None,
             start: Some(1_000),
             end: Some(1_200),
             join: None,
@@ -820,6 +839,7 @@ mod tests {
             profile_url: None,
             playlist_url: None,
             song_page: false,
+            picks: [2, 5],
             look: 0,
             buttons: true,
             links: true,
@@ -835,6 +855,7 @@ mod tests {
         let mut chosen = style();
         chosen.playlist = Some("Road trip".into());
         chosen.profile_url = Some("https://open.spotify.com/user/abc".into());
+        chosen.picks = [2, 4];
         let activity = activity_for(&playing(), &chosen, 0).unwrap();
         assert!(activity.large_text.ends_with("from Road trip"));
         assert_eq!(activity.small_text, "Playing from Road trip");

@@ -12411,7 +12411,8 @@ impl App {
         } else {
             None
         };
-        let playlist_url = if self.settings.discord_playlist_button {
+        let picks = [self.settings.discord_button_1.min(5), self.settings.discord_button_2.min(5)];
+        let playlist_url = if picks.contains(&3) {
             self.playing_context_uri()
                 .filter(|uri| uri.starts_with("spotify:playlist:"))
                 .and_then(|uri| util::uri_id(&uri).map(str::to_string))
@@ -12420,9 +12421,8 @@ impl App {
         } else {
             None
         };
-        let profile_url = self
-            .settings
-            .discord_profile
+        let profile_url = picks
+            .contains(&4)
             .then(|| self.user_id().map(str::to_string))
             .flatten()
             .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)))
@@ -12436,7 +12436,8 @@ impl App {
             profile_url,
             buttons: self.settings.discord_buttons,
             playlist_url,
-            song_page: self.settings.discord_song_page,
+            song_page: picks.contains(&1),
+            picks,
             look: self.settings.discord_look,
             links: self.settings.discord_links,
             hide_paused: self.settings.discord_hide_paused,
