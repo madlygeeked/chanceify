@@ -1,35 +1,36 @@
 # chanceify™
 
-*music reimagined .*
+*music reimagined*
 
-A small, fast Spotify player for your desktop. Needs Spotify Premium.
+needs spotify premium.
 
-- Plays your Spotify, queue, playlists, lyrics and visualizers
-- Music stats: top artists and songs for 7 days, 30 days or all time
-- Last.fm scrobbling and missing cover art
-- 16 themes, or pick your own colours
-- Full screen visualizer with swirl, bass jump, lyrics and a swaying title
-- Pop-out controls, columns you can lay out your way, mini player and calm mode
-- Every key can be changed, exported and shared
-- Everything it saves stays in one folder next to the app
+## get it
 
-## Get it
+1. download `chanceify.exe` from [releases](https://github.com/madlygeeked/chanceify/releases).
+2. run it, in its own folder. everything it saves stays beside it.
 
-Download `chanceify.exe` from [Releases](https://github.com/madlygeeked/chanceify/releases),
-put it in its own folder and run it.
+## what it does
 
-More help: [madlygeeked.github.io/chanceify](https://madlygeeked.github.io/chanceify)
+- listen to music from your spotify: queue, playlists, lyrics and visualizers.
+- scrobble to last.fm.
+- customize it, 16 themes or your own colours, and set your own keybinds.
 
-## Build it yourself
+more help: [madlygeeked.github.io/chanceify](https://madlygeeked.github.io/chanceify)
+
+<details>
+<summary>build it yourself</summary>
 
 ```
 cargo build --release
 ```
 
-Put your own Last.fm key and secret on two lines in `lastfm-keys.txt` first
+put your own last.fm key and secret on two lines in `lastfm-keys.txt` first
 (optional; the file is never committed).
+
+</details>
 
 ---
 
-Built with love by [chance](https://github.com/madlygeeked).
-Inspired by [Spotify](https://www.spotify.com), [Spotifast](https://github.com/crmne/spotifast) and [Spicetify](https://spicetify.app). Licensed AGPL-3.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE.md).
+Built with love by [chance](https://github.com/madlygeeked).<br>
+Inspired by [Spotify](https://www.spotify.com), [Spotifast](https://github.com/crmne/spotifast) and [Spicetify](https://spicetify.app).<br>
+Licensed AGPL-3.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE.md).

@@ -49,6 +49,22 @@ pub fn zoom_row(ui: &mut egui::Ui, app: &mut App, palette: &Palette) {
 fn idle_dim(ctx: &Context, panel_open: bool, floor: f32, over: bool) -> f32 {
     let seen_id = Id::new("views-disc-seen");
     let now_t = ctx.input(|input| input.time);
+    // Back after being away (a view without it, or the panel just closed):
+    // it shows in full again and fades only after a fresh few seconds.
+    let pass = ctx.cumulative_pass_nr();
+    let drawn_id = seen_id.with("drawn");
+    let open_id = seen_id.with("open");
+    let last_drawn: u64 = ctx.data(|data| data.get_temp(drawn_id)).unwrap_or(pass);
+    let was_open: bool = ctx.data(|data| data.get_temp(open_id)).unwrap_or(panel_open);
+    let returned = pass > last_drawn + 3 || (was_open && !panel_open);
+    ctx.data_mut(|data| {
+        data.insert_temp(drawn_id, pass);
+        data.insert_temp(open_id, panel_open);
+    });
+    if returned {
+        ctx.data_mut(|data| data.insert_temp(seen_id, now_t));
+        ctx.animate_value_with_time(seen_id.with("dim"), 1.0, 0.0);
+    }
     if over {
         ctx.data_mut(|data| data.insert_temp(seen_id, now_t));
     }
@@ -250,10 +266,18 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                 && let Some(now) = app.now_playing()
             {
                 let side = (outer.width() * 0.26).clamp(64.0, 120.0);
-                let gap = 8.0;
-                let top = (outer.top() - side - gap).max(screen.top() + 4.0);
-                let cover = Rect::from_min_size(egui::pos2(outer.left(), top), egui::vec2(side, side));
+                let pad = 8.0;
+                let top = (outer.top() - side - pad * 2.0 - 8.0).max(screen.top() + 4.0 + pad);
+                let cover = Rect::from_min_size(egui::pos2(outer.left() + pad, top), egui::vec2(side, side));
                 let palette = dark_palette(app);
+                // A backing, so the words read over any page.
+                ui.painter().rect(
+                    Rect::from_min_max(cover.min - egui::vec2(pad, pad), egui::pos2(outer.right(), cover.bottom() + pad)),
+                    12.0,
+                    Color32::from_rgba_unmultiplied(0x14, 0x16, 0x1a, 235),
+                    Stroke::new(1.0, palette.outline),
+                    egui::StrokeKind::Inside,
+                );
                 let loader = app.backend.art().clone();
                 super::widgets::paint_cover(
                     ui,
@@ -265,7 +289,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                     Some(&loader),
                 );
                 let text_left = cover.right() + 12.0;
-                let text_w = (outer.right() - text_left).max(40.0);
+                let text_w = (outer.right() - pad - text_left).max(40.0);
                 let title = crate::bidi::layout(
                     ui.painter(),
                     &now.title,
@@ -493,10 +517,6 @@ pub fn show(app: &mut App, ctx: &Context) {
                             on_top,
                         ],
                         _ => vec![
-                            ("Library only", false, Action::GoView(ViewKind::LibraryOnly)),
-                            ("Default view", false, Action::GoView(ViewKind::Default)),
-                            ("My view", false, Action::InDefaultView(Box::new(Action::ApplyMyView))),
-                            ("Save my view", false, Action::SaveMyView),
                             ("Library", app.settings.sidebar_visible, Action::InDefaultView(Box::new(Action::ToggleSidebar))),
                             ("Queue", app.show_queue_panel, Action::InDefaultView(Box::new(Action::ToggleQueuePanel))),
                             ("Side lyrics", app.show_lyrics_panel, Action::InDefaultView(Box::new(Action::ToggleLyricsPanel))),

@@ -277,10 +277,10 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let stacked = layout != 0;
     // The controls are their own panel, so the bar keeps no row for them: a
     // slim one for the song's name, none at all with big album art.
-    let strip_h = if lyrics_page || (popped_out && app.float_mode() == 1) {
+    // With the controls popped out the bar is only the visualizer: the song's
+    // name and cover sit above the controls instead.
+    let strip_h = if lyrics_page || popped_out {
         0.0
-    } else if popped_out {
-        46.0
     } else {
         (46.0 * controls_k).clamp(46.0, 84.0)
             * match layout {

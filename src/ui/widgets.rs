@@ -2185,11 +2185,13 @@ fn track_row_contents(
         .map(|added| util::format_relative_date(app.locale, added, jiff::Timestamp::now()));
     let ago_w = if ago_label.is_some() { 78.0 } else { 0.0 };
     // The reader's arrangement: every column, the title too, has a slot.
-    let region_right = rect.right() - right_fixed;
+    // The like button, plus, length and the menu button travel with the
+    // centred block, so they sit right after the last column, not at the edge.
+    let region_right = rect.right() - right_fixed - lone_shift;
     if app.settings.track_columns.spread && !bare {
         spread_columns(&mut cols, region_right - x);
     }
-    let slots = column_slots(x, region_right - lone_shift, app.settings.track_columns.order(), &cols);
+    let slots = column_slots(x, region_right, app.settings.track_columns.order(), &cols);
     let slot_at = |column: crate::model::SortColumn| {
         slots.iter().find(|(c, _, _)| *c == column).map(|(_, at, _)| *at)
     };
@@ -3636,7 +3638,7 @@ pub fn table_header(
     }
     if !columns.hide_duration {
     let clock = Rect::from_center_size(
-        pos2(rect.right() - 56.0 / 2.0 - 6.0, rect.center().y),
+        pos2(rect.right() - shift - 56.0 / 2.0 - 6.0, rect.center().y),
         Vec2::splat(15.0),
     );
     let duration_active = sort.and_then(|sort| sort.direction(SortColumn::Duration));
@@ -4378,7 +4380,7 @@ pub fn search_field(
         locale,
         egui::TextEdit::singleline(text)
             .id(id)
-            .hint_text(egui::RichText::new(hint).color(palette.dim))
+            .hint_text(egui::RichText::new(crate::i18n::ui_text(hint).into_owned()).color(palette.dim))
             .font(theme::regular(14.0))
             .text_color(palette.text)
             .frame(egui::Frame::NONE)
