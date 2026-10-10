@@ -12,5 +12,5 @@ title: what it does
 - **views.** right-click the round disc to switch parts of the screen on or off. save your view.
 - **mini player.** its own small window.
 - **calm mode.** a slow ocean, the song name and one play button.
-- **keys.** every key can be changed.
+- **keybinds.** every key can be changed.
 - **your files stay with you.** everything lives in the folder beside the app.

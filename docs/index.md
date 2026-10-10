@@ -9,7 +9,7 @@ needs spotify premium.
 ## get it
 
 1. download `chanceify.exe` from [releases](https://github.com/madlygeeked/chanceify/releases).
-2. run it. every release has a [virustotal](https://www.virustotal.com) scan in its notes.
+2. run it. [virustotal.](https://www.virustotal.com)
 
 ## what it does
 
