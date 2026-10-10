@@ -41,6 +41,8 @@ pub struct Activity {
     pub buttons: Vec<(String, String)>,
     /// Where pressing the big picture leads, when Discord allows it.
     pub large_url: Option<String>,
+    /// Where pressing the small badge leads: chanceify's own page.
+    pub small_url: Option<String>,
     /// Seconds since 1970 the song (would have) started, and ends. Both
     /// `None` while paused.
     pub start: Option<i64>,
@@ -70,6 +72,7 @@ impl Activity {
             && self.small_text == other.small_text
             && self.buttons == other.buttons
             && self.large_url == other.large_url
+            && self.small_url == other.small_url
             && self.join == other.join
             && self.small_text == other.small_text
             && near(self.start, other.start)
@@ -298,6 +301,9 @@ pub fn activity_for(
         },
         buttons,
         large_url,
+        small_url: style
+            .say[2]
+            .then(|| SITE_URL.to_string()),
         start: timed.then_some(start),
         end: timed.then_some(start + i64::from(now.duration_ms / 1000)),
         join: (style.listen_along && timed && !is_file && !now.is_episode)
@@ -394,6 +400,9 @@ pub const DEFAULT_APPLICATION_ID: &str = "1557925208906661998";
 static LINK: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
 /// The chanceify song page (worker/embed.js). Empty until it is deployed.
+/// Where the badge on the card leads: chanceify's own page.
+pub const SITE_URL: &str = "https://madlygeeked.github.io/";
+
 pub const EMBED_URL: &str = "https://chanceify-embed.chance-a10.workers.dev";
 
 /// The link "Copy the song for Discord" gives out for a Spotify track uri.
@@ -708,6 +717,9 @@ fn activity_json_level(activity: &Activity, level: u8) -> Value {
     if !plain && let Some(image) = &activity.small_image {
         assets.insert("small_image".into(), json!(image));
         assets.insert("small_text".into(), json!(line(&activity.small_text)));
+        if level < 1 && let Some(url) = &activity.small_url {
+            assets.insert("small_url".into(), json!(url));
+        }
     }
     if level < 1 && !plain && let Some(url) = &activity.large_url {
         assets.insert("large_url".into(), json!(url));
@@ -828,6 +840,7 @@ mod tests {
             small_text: "chanceify".into(),
             buttons: vec![("Listen on Spotify".into(), "https://open.spotify.com/track/abc".into())],
             large_url: None,
+            small_url: None,
             start: Some(1_000),
             end: Some(1_200),
             join: None,
