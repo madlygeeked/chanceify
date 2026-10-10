@@ -125,6 +125,8 @@ pub struct Style {
     pub playlist_line: Option<String>,
     /// The reader's Spotify profile address, when they want a button for it.
     pub profile_url: Option<String>,
+    /// The reader's Spotify name, for the profile button ("Larry's profile").
+    pub profile_name: Option<String>,
     pub buttons: bool,
     /// The two buttons the reader picked, in order: 0 none, 1 open in
     /// chanceify, 2 open in Spotify, 3 the playlist, 4 their profile, 5 get chanceify.
@@ -156,6 +158,17 @@ fn web_url(uri: &str) -> Option<String> {
     match kind {
         "track" | "episode" if clean => Some(format!("https://open.spotify.com/{kind}/{id}")),
         _ => None,
+    }
+}
+
+/// Discord allows 32 characters on a button; longer names end in "…".
+fn fit_label(text: &str) -> String {
+    if text.chars().count() <= 32 {
+        text.to_string()
+    } else {
+        let mut cut: String = text.chars().take(31).collect();
+        cut.push('…');
+        cut
     }
 }
 
@@ -214,8 +227,20 @@ pub fn activity_for(
             let made = match kind {
                 1 => page.clone().map(|url| ("Open in chanceify".to_string(), url)),
                 2 => song_url.clone().map(|url| ("Open in Spotify".to_string(), url)),
-                3 => style.playlist_url.clone().map(|url| ("Open the playlist".to_string(), url)),
-                4 => style.profile_url.clone().map(|url| ("My Spotify profile".to_string(), url)),
+                3 => style.playlist_url.clone().map(|url| {
+                    let label = match style.playlist.as_deref().filter(|name| !name.trim().is_empty()) {
+                        Some(name) => format!("Open {}", name.trim()),
+                        None => "Open the playlist".to_string(),
+                    };
+                    (fit_label(&label), url)
+                }),
+                4 => style.profile_url.clone().map(|url| {
+                    let label = match style.profile_name.as_deref().filter(|name| !name.trim().is_empty()) {
+                        Some(name) => format!("{}'s profile", name.trim()),
+                        None => "My Spotify profile".to_string(),
+                    };
+                    (fit_label(&label), url)
+                }),
                 5 => style
                     .app_url
                     .clone()
@@ -899,6 +924,7 @@ mod tests {
             playlist: None,
             playlist_line: None,
             profile_url: None,
+            profile_name: None,
             playlist_url: None,
             song_page: false,
             picks: [2, 5],

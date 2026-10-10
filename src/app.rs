@@ -12435,12 +12435,18 @@ impl App {
             .and_then(|uri| util::uri_id(&uri).map(str::to_string))
             .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric()))
             .and_then(|id| crate::discord::page_link('p', &id, playlist.as_deref().unwrap_or(""), ""));
+        // Their Spotify name, whatever their Discord name is.
+        let profile_name = self
+            .user
+            .as_ref()
+            .and_then(|user| user.display_name.clone())
+            .filter(|name| !name.trim().is_empty());
         let profile_url = picks
             .contains(&4)
             .then(|| self.user_id().map(str::to_string))
             .flatten()
             .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)))
-            .and_then(|id| crate::discord::page_link('u', &id, "", ""));
+            .and_then(|id| crate::discord::page_link('u', &id, &profile_name.clone().unwrap_or_default(), ""));
         let style = crate::discord::Style {
             // The name under "Listening to" is the first line that is on.
             status_line: 0,
@@ -12451,6 +12457,7 @@ impl App {
             playlist,
             playlist_line,
             profile_url,
+            profile_name,
             buttons: true,
             playlist_url,
             song_page: picks.contains(&1),
