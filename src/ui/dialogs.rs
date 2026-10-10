@@ -148,8 +148,6 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     });
                 }
                 Dialog::Shortcuts => {
-                    theme::text(ui, gettext(locale, "Keybinds"), theme::bold(20.0), palette.text);
-                    ui.add_space(4.0);
                     // Only while a key is waiting for its new key.
                     if super::keys::rebinding(ui.ctx()).is_some() {
                         theme::text(
@@ -170,7 +168,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     // (it used to spring back to the full screen height).
                     let list_height = app
                         .dialog_rect
-                        .map_or(ctx.content_rect().height() - 330.0, |rect| rect.height() - 130.0)
+                        .map_or(ctx.content_rect().height() - 330.0, |rect| rect.height() - 215.0)
                         .max(100.0);
                     egui::ScrollArea::vertical()
                         .max_height(list_height)
@@ -313,15 +311,19 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     });
                         });
                     ui.add_space(12.0);
-                    ui.horizontal(|ui| {
-                        theme::subtle(
-                            ui,
-                            &palette,
-                            "Ctrl+click a song queues it. Shift+Ctrl+click plays it next. Or bind a key under Playback.",
-                        );
-                    });
+                    // Wrapping rows, so a narrow window never has to grow to
+                    // fit the footer.
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new("Ctrl+click a song queues it. Shift+Ctrl+click plays it next. Or bind a key under Playback.")
+                                .font(theme::regular(13.0))
+                                .color(palette.secondary),
+                        )
+                        .wrap()
+                        .selectable(false),
+                    );
                     ui.add_space(6.0);
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         if theme::pill_button(ui, &palette, "Reset", false).clicked() {
                             app.settings.key_bindings.clear();
                             app.actions.push(Action::SettingsChanged);
@@ -335,11 +337,9 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                         if theme::pill_button(ui, &palette, "Save as the default for everyone", false).clicked() {
                             app.actions.push(Action::SaveKeysAsDefault);
                         }
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            if theme::pill_button(ui, &palette, &gettext(locale, "Done"), true).clicked() {
-                                app.actions.push(Action::CloseDialog);
-                            }
-                        });
+                        if theme::pill_button(ui, &palette, &gettext(locale, "Done"), true).clicked() {
+                            app.actions.push(Action::CloseDialog);
+                        }
                     });
                 }
                 Dialog::Views => {
@@ -417,7 +417,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                 (screen.width() - 160.0).clamp(420.0, 1200.0),
                 (screen.height() - 200.0).max(240.0),
             ])
-            .min_size([300.0, 200.0])
+            .min_size([300.0, 330.0])
             .resizable(true)
             .collapsible(false)
             .show(ctx, body);
