@@ -125,23 +125,23 @@ ${id ? `<div class="row stack"><a class="btn" href="chanceify://track/${esc(id)}
   if(bear)bear.src=icons[Math.floor(Math.random()*icons.length)];
   var cv=document.getElementById("swirl");
   var gl=cv.getContext("webgl",{antialias:false});
-  var url=${JSON.stringify(id ? "/c/" + id : "")};
-  if(!gl||!url)return;
+  var urls=${JSON.stringify(id ? ["/c/" + id, image || ""].filter(Boolean) : [])};
+  if(!gl)return;
   var still=matchMedia("(prefers-reduced-motion: reduce)").matches;
   function sh(type,src){var o=gl.createShader(type);gl.shaderSource(o,src);gl.compileShader(o);return o}
   var vs="attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
   var fs="precision mediump float;uniform sampler2D tex;uniform float t;uniform vec2 res;"+
   "vec3 mir(vec2 p){return texture2D(tex,0.5-0.5*cos(6.2831853*p)).rgb;}"+
   "void main(){vec2 uv=gl_FragCoord.xy/res;uv.y=1.-uv.y;uv.x*=res.x/res.y*0.62;"+
-  "float tau=6.2831853;float rise=0.55;"+
+  "float tau=6.2831853;float rise=0.8;"+
   "float w1=sin(tau*(-2.*uv.x-uv.y)+0.7+t*0.30);"+
   "float w2=sin(tau*(uv.x-uv.y)+2.1+t*0.21);"+
   "float a=atan(-0.316,-0.949);vec2 off=vec2(sin(a),-cos(a));"+
   "vec2 p=uv+w1*off*0.55*rise+vec2(w2*0.12*rise,-w2*0.09*rise);"+
   "vec3 c=vec3(0.);float tw=0.;"+
   "for(int i=-2;i<=2;i++)for(int j=-2;j<=2;j++){float w=exp(-float(i*i+j*j)/3.);c+=mir(p+vec2(float(i),float(j))*0.006)*w;tw+=w;}"+
-  "c/=tw;float l=dot(c,vec3(.299,.587,.114));c=l+(c-l)*1.5;c=(c-0.5)*1.25+0.5;"+
-  "gl_FragColor=vec4(clamp(c*0.55,0.,1.),1.);}";
+  "c/=tw;float l=dot(c,vec3(.299,.587,.114));c=l+(c-l)*1.45;c=(c-0.5)*1.2+0.5;"+
+  "float v=smoothstep(1.1,0.2,length(gl_FragCoord.xy/res-0.5)*1.5);gl_FragColor=vec4(clamp(c*(0.55+0.3*v),0.,1.),1.);}";
   var pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);
   if(!gl.getProgramParameter(pr,gl.LINK_STATUS))return;
   gl.useProgram(pr);
@@ -151,10 +151,9 @@ ${id ? `<div class="row stack"><a class="btn" href="chanceify://track/${esc(id)}
   var uT=gl.getUniformLocation(pr,"t"),uR=gl.getUniformLocation(pr,"res");
   function size(){cv.width=Math.max(2,innerWidth>>1);cv.height=Math.max(2,innerHeight>>1);gl.viewport(0,0,cv.width,cv.height)}
   size();addEventListener("resize",size);
-  var im=new Image();im.crossOrigin="anonymous";
-  im.onload=function(){
+  function start(src){
     var tx=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tx);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,im);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
     var t0=performance.now();
@@ -164,8 +163,26 @@ ${id ? `<div class="row stack"><a class="btn" href="chanceify://track/${esc(id)}
       if(!still)requestAnimationFrame(frame);
     }
     frame();
-  };
-  im.src=url;
+  }
+  // No cover to read (or it would not load): a purple and blue picture, so
+  // there is always a swirl.
+  function fallback(){
+    var c=document.createElement("canvas");c.width=c.height=128;var x=c.getContext("2d");
+    var g2=x.createLinearGradient(0,0,128,128);
+    g2.addColorStop(0,"#6d28d9");g2.addColorStop(0.5,"#2563eb");g2.addColorStop(1,"#db2777");
+    x.fillStyle=g2;x.fillRect(0,0,128,128);
+    x.fillStyle="rgba(255,255,255,.18)";x.beginPath();x.arc(40,50,26,0,7);x.fill();
+    x.fillStyle="rgba(0,0,0,.25)";x.beginPath();x.arc(92,86,30,0,7);x.fill();
+    start(c);
+  }
+  function load(i){
+    if(i>=urls.length){fallback();return}
+    var im=new Image();im.crossOrigin="anonymous";
+    im.onload=function(){try{start(im)}catch(e){load(i+1)}};
+    im.onerror=function(){load(i+1)};
+    im.src=urls[i];
+  }
+  load(0);
 })();
 </script>
 </body></html>`;

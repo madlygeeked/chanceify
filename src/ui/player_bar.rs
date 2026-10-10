@@ -1344,106 +1344,77 @@ pub(super) fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
     // Above the spot that was right-clicked; with no click on record (the V
     // key), the old place at the right.
     let clicked_x = ctx.data(|data| data.get_temp::<f32>(egui::Id::new("vis-click-x")));
-    // Normal view and full screen each remember their own place and width.
-    let mut panel = egui::Window::new("visualizer-panel")
-        .id(egui::Id::new(if floating { "visualizer-panel-full" } else { "visualizer-panel" }))
-        .title_bar(false)
-        .collapsible(false);
-    // Wherever the panel is shown it can be dragged about and made wider;
-    // its height is exactly what is in it (what does not fit scrolls), so
-    // there is never empty room.
+    // The panel is as big as what is on its tab, and when the window is too
+    // small for that it is drawn smaller, all of it, instead of being cut off.
     let screen = ctx.content_rect();
-    let max_h = (screen.height() - 20.0).max(180.0);
+    let win_id = egui::Id::new(if floating { "visualizer-panel-full" } else { "visualizer-panel" });
     let default_x = match (floating, clicked_x) {
         (false, Some(x)) => x - 180.0,
         _ => screen.right() - (screen.width() * 0.5).min(560.0) - 14.0,
     };
-    let want_w = app.settings.vis_panel_w;
-    let want_h = app.settings.vis_panel_h;
-    let fixed_w = want_w > 0.0;
-    let fixed_h = want_h > 0.0;
-    // Never wider than what is in it: three columns on the shapes tab, one
-    // on the others.
-    let tab_now = ctx.data(|data| data.get_temp::<u8>(egui::Id::new("vis-menu-tab"))).unwrap_or(0);
-    let col_now = vis_col_w(screen.width());
-    let content_w = if tab_now == 0 && screen.width() >= 700.0 { 3.0 * col_now + 36.0 } else { col_now } + 28.0;
-    let panel_w = want_w
-        .clamp(260.0, (screen.width() - 16.0).max(260.0))
-        .min(content_w.max(260.0));
-    let panel_h = want_h.clamp(160.0, max_h);
-    panel = panel
+    let tab_now = ctx.data(|data| data.get_temp::<u8>(egui::Id::new("vis-menu-tab"))).unwrap_or(0).min(3);
+    let natural_w = if tab_now == 0 { 3.0 * vis_col_w(0.0) + 36.0 + 28.0 } else { 300.0 };
+    let height_id = egui::Id::new(("vis-panel-natural-h", tab_now));
+    let natural_h = ctx.data(|data| data.get_temp::<f32>(height_id)).unwrap_or(440.0).max(120.0);
+    let fit = ((screen.width() - 16.0) / natural_w)
+        .min((screen.height() - 16.0) / natural_h)
+        .clamp(0.35, 1.0);
+    let scaled = fit < 0.999;
+    let fixed_pos = egui::pos2(
+        screen.left() + 8.0,
+        (screen_h - above - natural_h * fit)
+            .clamp(screen.top() + 8.0, (screen.bottom() - 8.0 - natural_h * fit).max(screen.top() + 8.0)),
+    );
+    let mut panel = egui::Window::new("visualizer-panel")
+        .id(win_id)
+        .title_bar(false)
+        .collapsible(false)
         .resizable(false)
-        .default_width(if floating { (screen.width() * 0.4).clamp(300.0, 460.0) } else { 360.0 })
-        .min_width(260.0)
-        .movable(true)
-        .constrain(true)
-        .default_pos(egui::pos2(
-            default_x.clamp(screen.left() + 8.0, (screen.right() - 380.0).max(screen.left() + 8.0)),
+        .min_width(natural_w)
+        .max_width(natural_w);
+    panel = if scaled {
+        panel.movable(false).constrain(false).fixed_pos(fixed_pos)
+    } else {
+        panel.movable(true).constrain(true).default_pos(egui::pos2(
+            default_x.clamp(screen.left() + 8.0, (screen.right() - natural_w).max(screen.left() + 8.0)),
             if floating {
                 screen.bottom() - (screen.height() * 0.55).min(520.0) - 14.0
             } else {
                 (screen_h - above - 440.0).max(screen.top() + 8.0)
             },
-        ));
-    if fixed_w {
-        panel = panel.min_width(panel_w).max_width(panel_w);
-    } else {
-        panel = panel.max_width(content_w.max(260.0));
-    }
+        ))
+    };
+    let layer = egui::LayerId::new(egui::Order::Middle, win_id);
+    ctx.set_transform_layer(
+        layer,
+        if scaled {
+            egui::emath::TSTransform::new(fixed_pos.to_vec2() * (1.0 - fit), fit)
+        } else {
+            egui::emath::TSTransform::IDENTITY
+        },
+    );
     let window = panel.show(ctx, |ui| {
-        let mut area = egui::ScrollArea::both().auto_shrink([!fixed_w, !fixed_h]);
-        area = area.max_height(if fixed_h { panel_h } else { max_h - 24.0 });
-        if fixed_h {
-            area = area.min_scrolled_height(panel_h);
-        }
-        area.show(ui, |ui| vis_menu_body(app, ui));
+        egui::ScrollArea::vertical()
+            .auto_shrink([true, true])
+            .max_height(f32::INFINITY)
+            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+            .show(ui, |ui| vis_menu_body(app, ui));
     });
-    if let Some(window) = &window {
-        // Grips on the right edge, the bottom edge and the corner.
-        let rect = window.response.rect;
-        let grip = |name: &str, pos: egui::Pos2, size: egui::Vec2, cursor: egui::CursorIcon| {
-            egui::Area::new(egui::Id::new(name))
-                .order(egui::Order::Foreground)
-                .fixed_pos(pos)
-                .show(ctx, |ui| {
-                    let (strip, response) = ui.allocate_exact_size(size, egui::Sense::drag());
-                    if response.hovered() || response.dragged() {
-                        ctx.set_cursor_icon(cursor);
-                        ui.painter().rect_filled(
-                            egui::Rect::from_center_size(strip.center(), if size.x > size.y { egui::vec2(28.0, 3.0) } else { egui::vec2(3.0, 28.0) }),
-                            1.5,
-                            Color32::from_white_alpha(90),
-                        );
-                    }
-                    response
-                })
-                .inner
+    let window = window.map(|window| {
+        let local = window.response.rect;
+        ctx.data_mut(|data| data.insert_temp(height_id, local.height()));
+        // Where it really is on the screen.
+        let shown = if scaled {
+            egui::Rect::from_min_size(local.min, local.size() * fit)
+        } else {
+            local
         };
-        let right = grip("vis-panel-edge-r", egui::pos2(rect.right() - 6.0, rect.top() + 10.0), egui::vec2(10.0, (rect.height() - 30.0).max(10.0)), egui::CursorIcon::ResizeHorizontal);
-        let bottom = grip("vis-panel-edge-b", egui::pos2(rect.left() + 10.0, rect.bottom() - 6.0), egui::vec2((rect.width() - 30.0).max(10.0), 10.0), egui::CursorIcon::ResizeVertical);
-        let corner = grip("vis-panel-edge-c", egui::pos2(rect.right() - 16.0, rect.bottom() - 16.0), egui::vec2(20.0, 20.0), egui::CursorIcon::ResizeNwSe);
-        let mut dx = 0.0;
-        let mut dy = 0.0;
-        if right.dragged() { dx += right.drag_delta().x; }
-        if bottom.dragged() { dy += bottom.drag_delta().y; }
-        if corner.dragged() { dx += corner.drag_delta().x; dy += corner.drag_delta().y; }
-        if dx != 0.0 || dy != 0.0 {
-            let w = if fixed_w { want_w } else { rect.width() };
-            let h = if fixed_h { want_h } else { rect.height() };
-            app.settings.vis_panel_w = (w + dx).clamp(260.0, (screen.width() - 16.0).max(260.0));
-            app.settings.vis_panel_h = (h + dy).clamp(160.0, max_h);
-            app.mark_settings_dirty();
-        }
-        if right.double_clicked() || bottom.double_clicked() || corner.double_clicked() {
-            app.settings.vis_panel_w = 0.0;
-            app.settings.vis_panel_h = 0.0;
-            app.mark_settings_dirty();
-        }
-    }
+        (window, shown)
+    });
     // A click anywhere outside the panel closes it. (A right-click on the
     // visualizer toggles it, so only the primary button counts here.)
     crate::crash::stage("visualizer panel: close check");
-    if let Some(window) = window {
+    if let Some((_window, shown)) = window {
         // Each question is asked on its own, never one inside another's
         // closure. `Popup::is_any_open` takes the context's lock, and taking
         // it again while `ctx.input` still held it could wait forever the
@@ -1458,7 +1429,7 @@ pub(super) fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
             }
         });
         if let Some(at) = pressed_at {
-            let inside = window.response.rect.expand(8.0).contains(at);
+            let inside = shown.expand(8.0).contains(at);
             if !inside && !egui::Popup::is_any_open(ctx) {
                 app.vis_panel = false;
             }
@@ -1829,19 +1800,18 @@ fn audio_menu_body(app: &mut App, ui: &mut egui::Ui) {
 }
 
 /// How wide one column of the visualizer menu is for a window this wide.
-fn vis_col_w(screen_w: f32) -> f32 {
-    if screen_w >= 700.0 {
-        ((screen_w - 136.0) / 3.0).clamp(200.0, 240.0)
-    } else {
-        (screen_w - 64.0).clamp(180.0, 240.0)
-    }
+fn vis_col_w(_screen_w: f32) -> f32 {
+    240.0
 }
+
+/// Width of the one column on the tabs that have only one.
+const VIS_SINGLE_W: f32 = 272.0;
 
 fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
     {
         {
-            ui.set_max_width((3.0 * vis_col_w(ui.ctx().content_rect().width()) + 36.0).min(ui.ctx().content_rect().width() - 24.0).max(180.0));
+            ui.set_max_width(3.0 * vis_col_w(0.0) + 36.0);
             ui.spacing_mut().item_spacing.y = 3.0;
             // Three independent switches: any mix, or none (which closes
             // the visualizer down to the song-length bar).
@@ -1852,7 +1822,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             let screen_w = ui.ctx().content_rect().width();
             // Two columns from a modest width when the swirl's column is
             // not open, so the panel is shorter and fits one screen.
-            let columns_fit = screen_w >= 700.0;
+            let columns_fit = true;
             let col_w = vis_col_w(screen_w);
             // The settings sit in four tabs, one open at a time, so the
             // panel is only as big as what is in front of you.
@@ -1861,7 +1831,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 for (index, label) in ["Shapes", "Bass and colour", "Title", "Lyrics"].iter().enumerate() {
-                    let width = if index == 1 { 130.0 } else { 90.0 };
+                    let width = [64.0, 104.0, 50.0, 58.0][index];
                     if chip(ui, &palette, label, tab == index as u8, width).clicked() {
                         ui.ctx().data_mut(|data| data.insert_temp(tab_id, index as u8));
                     }
@@ -2136,7 +2106,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             let mut shared = |ui: &mut egui::Ui| {
             ui.spacing_mut().item_spacing.x = 18.0;
             if tab == 1 { ui.vertical(|ui| {
-            ui.set_width(col_w);
+            ui.set_width(VIS_SINGLE_W);
             theme::subtle(ui, &palette, &gettext(app.locale, "BASS JUMP"));
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
@@ -2244,7 +2214,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             }
             }); }
             if tab == 2 { ui.vertical(|ui| {
-            ui.set_width(col_w);
+            ui.set_width(VIS_SINGLE_W);
             theme::subtle(ui, &palette, &gettext(app.locale, "TITLE"));
             if chip(
                 ui,
@@ -2356,7 +2326,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             font_grid(app, ui);
             }); }
             if tab == 3 { ui.vertical(|ui| {
-            ui.set_width(col_w);
+            ui.set_width(VIS_SINGLE_W);
             theme::subtle(ui, &palette, &gettext(app.locale, "FULL-SCREEN LYRICS"));
             let on_page = app.lyrics_fullscreen.is_some();
             // These two belong to the lyrics drawn over the visualizer, so the
