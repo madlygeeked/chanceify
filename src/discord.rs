@@ -229,7 +229,7 @@ pub fn activity_for(
                 2 => song_url.clone().map(|url| ("Open in Spotify".to_string(), url)),
                 3 => style.playlist_url.clone().map(|url| {
                     let label = match style.playlist.as_deref().filter(|name| !name.trim().is_empty()) {
-                        Some(name) => format!("Open {}", name.trim()),
+                        Some(name) => name.trim().to_string(),
                         None => "Open the playlist".to_string(),
                     };
                     (fit_label(&label), url)
@@ -448,6 +448,22 @@ pub fn page_link(kind: char, id: &str, title: &str, artist: &str) -> Option<Stri
     }
     if !artist.is_empty() {
         link.push_str(&format!("{sep}a={}", enc(artist)));
+    }
+    Some(link)
+}
+
+/// The profile page, with the account's own picture handed over (the worker has no way to look it up).
+pub fn profile_link(id: &str, name: &str, image: Option<&str>) -> Option<String> {
+    let mut link = page_link('u', id, name, "")?;
+    if let Some(image) = image.filter(|image| image.starts_with("https://") && image.len() < 500) {
+        let encoded: String = image
+            .bytes()
+            .map(|b| match b {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
+                _ => format!("%{b:02X}"),
+            })
+            .collect();
+        link.push_str(&format!("{}i={encoded}", if link.contains('?') { '&' } else { '?' }));
     }
     Some(link)
 }

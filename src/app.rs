@@ -12446,7 +12446,14 @@ impl App {
             .then(|| self.user_id().map(str::to_string))
             .flatten()
             .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)))
-            .and_then(|id| crate::discord::page_link('u', &id, &profile_name.clone().unwrap_or_default(), ""));
+            .and_then(|id| {
+                let image = self
+                    .user
+                    .as_ref()
+                    .and_then(|user| crate::api::models::pick_image(&user.images, 300))
+                    .map(str::to_string);
+                crate::discord::profile_link(&id, &profile_name.clone().unwrap_or_default(), image.as_deref())
+            });
         let style = crate::discord::Style {
             // The name under "Listening to" is the first line that is on.
             status_line: 0,
