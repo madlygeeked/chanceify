@@ -4,7 +4,7 @@ use chanceify::{app, backend, paths, settings, single_instance};
 
 use clap::{CommandFactory, FromArgMatches, Parser};
 
-/// music reimagined .
+/// chanceify™ - music reimagined
 #[derive(Debug, Parser)]
 #[command(name = env!("CARGO_BIN_NAME"), version, about)]
 struct Cli {

@@ -77,8 +77,8 @@ fn main() {
         let mut resource = winresource::WindowsResource::new();
         resource
             .set_icon("assets/chanceify.ico")
-            .set("ProductName", "chanceify")
-            .set("FileDescription", "music reimagined .");
+            .set("ProductName", "chanceify™")
+            .set("FileDescription", "chanceify™ - music reimagined");
         if let Err(error) = resource.compile() {
             println!("cargo:warning=Windows resources not embedded: {error}");
         }

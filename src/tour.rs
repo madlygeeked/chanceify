@@ -60,7 +60,7 @@ impl Default for Tour {
             steps: vec![
                 step(
                     "welcome to chanceify™",
-                    "music reimagined .\nwatch what a right click does .",
+                    "music reimagined\nwatch what a right click does",
                     "none",
                     &[],
                 ),
