@@ -1657,7 +1657,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         ui.add_space(4.0);
                         theme::text(
                             ui,
-                            &gettext(app.locale, "Pick the two buttons under the song. The top one shows first."),
+                            gettext(app.locale, "Pick the two buttons under the song. The top one shows first.").as_ref(),
                             theme::regular(12.5),
                             palette.secondary,
                         );
@@ -1673,7 +1673,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                             ui.add_space(2.0);
                             theme::text(
                                 ui,
-                                &if slot == 0 { gettext(app.locale, "First button") } else { gettext(app.locale, "Second button") },
+                                if slot == 0 { gettext(app.locale, "First button") } else { gettext(app.locale, "Second button") }.as_ref(),
                                 theme::bold(13.0),
                                 palette.text,
                             );
