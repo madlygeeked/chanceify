@@ -22,6 +22,8 @@ needs spotify premium.
 
 more help: [madlygeeked.github.io/chanceify](https://madlygeeked.github.io/chanceify)
 
+---
+
 <details>
 <summary>build it yourself</summary>
 
