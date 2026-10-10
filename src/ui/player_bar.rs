@@ -196,7 +196,11 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     // The bar is one fixed dark colour; the cover's colour lives in the
     // visualizer, not in the bar behind it.
     let lyrics_page = false;
-    let fill = if palette.dark {
+    let popped_out = app.float_slot(super::views_panel::default_float(ui.ctx())).is_some() && !app.mini_active;
+    let fill = if popped_out {
+        // The controls are out on their own panel: the bar's background goes.
+        Color32::TRANSPARENT
+    } else if palette.dark {
         Color32::from_rgb(0x11, 0x12, 0x13)
     } else {
         palette.panel
@@ -5502,4 +5506,49 @@ pub(super) fn big_art_missing_mark(app: &App, ui: &egui::Ui, art: Rect, id: &str
     ui.interact(badge, egui::Id::new(("big-art-missing", id)), Sense::hover()).on_hover_text(
         "Last.fm has no cover for this album. It is saved in the lastfm-art folder, ready to upload.",
     );
+}
+
+/// A compact volume bar with its percentage, for the pop-out controls panel.
+pub(super) fn volume_row(app: &mut App, ui: &mut egui::Ui, rect: Rect) {
+    let palette = app.palette;
+    let now = app.now_playing();
+    let volume = now
+        .as_ref()
+        .map(|now| now.volume_percent)
+        .unwrap_or_else(|| crate::app::volume_to_percent(app.local.volume));
+    let shown = match app.volume_preview {
+        Some(fraction) => (fraction * 100.0).round() as u8,
+        None => volume,
+    };
+    let adjustable = now.as_ref().is_none_or(|now| now.can_set_volume);
+    let mut child = ui.new_child(
+        UiBuilder::new()
+            .max_rect(rect)
+            .layout(Layout::left_to_right(Align::Center)),
+    );
+    child.add_enabled_ui(adjustable, |ui| {
+        match thin_slider_scaled(
+            ui,
+            &palette,
+            egui::Id::new("pop-volume-slider"),
+            &gettext(app.locale, "Volume (%)"),
+            shown as f32 / 100.0,
+            (rect.width() - 54.0).max(60.0),
+            Some(0.05),
+            app.settings.controls_scale_value(),
+        ) {
+            SliderEvent::Dragging(value) => {
+                app.volume_preview = Some(value);
+                if now.as_ref().is_none_or(|now| now.local) {
+                    app.actions.push(Action::PreviewVolume((value * 100.0).round() as u8));
+                }
+            }
+            SliderEvent::Committed(value) => {
+                app.volume_preview = None;
+                app.actions.push(Action::SetVolume((value * 100.0).round() as u8));
+            }
+            SliderEvent::None => {}
+        }
+    });
+    child.label(egui::RichText::new(format!("{shown}%")).color(palette.secondary).size(12.0));
 }

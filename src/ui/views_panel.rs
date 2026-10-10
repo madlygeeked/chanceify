@@ -206,7 +206,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
     let Some([x, y, width]) = app.float_slot(default_float(ctx)) else {
         return;
     };
-    if app.fullscreen_vis || app.calm_mode {
+    if app.fullscreen_vis || app.calm_mode || app.mini_active {
         return;
     }
     let screen = ctx.content_rect();

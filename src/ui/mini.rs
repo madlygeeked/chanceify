@@ -76,7 +76,11 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             // Right-click anywhere that is not a control for the mini
             // player's options. (Added first, so every control drawn after it
             // keeps its own clicks.)
-            let page = ui.interact(area, egui::Id::new("mini-page"), Sense::click());
+            let page = ui.interact(area, egui::Id::new("mini-page"), Sense::click_and_drag());
+            // Drag the little player by any bare spot.
+            if page.drag_started() {
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
+            }
             options_menu(app, &page);
             // The top strip holds three small buttons, and is already the
             // place that drags the window (`show` registers that for the

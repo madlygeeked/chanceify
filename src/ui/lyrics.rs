@@ -1434,7 +1434,8 @@ pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egu
     let left = if centred { top_left.x - width / 2.0 } else { top_left.x };
     let buttons_h = 36.0 * kc;
     let seek_h = 26.0 * k;
-    let outer = Rect::from_min_size(pos2(left, top_left.y), vec2(width, 10.0 + buttons_h + 4.0 + seek_h + 8.0));
+    let volume_h = 26.0 * k;
+    let outer = Rect::from_min_size(pos2(left, top_left.y), vec2(width, 10.0 + buttons_h + 4.0 + seek_h + 2.0 + volume_h + 8.0));
     ui.painter()
         .rect_filled(outer, 14.0, palette.panel.gamma_multiply(0.94));
     ui.painter().rect_stroke(
@@ -1457,6 +1458,11 @@ pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egu
         outer.center().x - controls_w / 2.0,
         (outer.left() + 54.0, outer.right() - 14.0),
     );
+    let volume_row = Rect::from_min_size(
+        pos2(outer.left() + 20.0, seek_row.bottom() + 2.0),
+        vec2(width - 40.0, volume_h),
+    );
+    super::player_bar::volume_row(app, ui, volume_row);
     if now.playing {
         ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
     }
