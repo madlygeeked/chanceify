@@ -11,7 +11,7 @@ needs spotify premium.
 1. download `chanceify.exe` from [releases](https://github.com/madlygeeked/chanceify/releases).
 2. run it. [virustotal.](https://www.virustotal.com)
 
-## what it does
+## features
 
 - listen to music from your spotify.
 - scrobble to last.fm.

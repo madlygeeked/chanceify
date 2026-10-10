@@ -15,7 +15,7 @@ needs spotify premium.
 - **music stats.** top artists and songs, plus recommended.
 - **last.fm.** scrobbling, love, and missing cover art saved for you.
 - **looks.** themes, make your own, or let it follow the album cover.
-- **visualizer.** comes with three modes: bars, flow and swirl. mix them. full screen, in an extra window, or behind the lyrics. multi-monitor setups, stuff like that.
+- **visualizer.** bars, flow and swirl, full screen, in its own window or behind the lyrics.
 - **views.** click the disc to switch parts of the screen on or off.
 - **keybinds.** every key can be changed.
 - **your files stay with you.** everything lives in the folder beside the app.
@@ -25,12 +25,38 @@ more help: [madlygeeked.github.io/chanceify](https://madlygeeked.github.io/chanc
 <details>
 <summary>build it yourself</summary>
 
+this is for windows. it takes about 15 minutes, most of it waiting.
+
+**1. install the tools (once)**
+
+- [rust](https://rustup.rs): download and run `rustup-init.exe`, press enter to accept the defaults.
+- [build tools for visual studio](https://visualstudio.microsoft.com/downloads/): scroll to "tools for visual studio", install "build tools", and tick **desktop development with c++**. rust needs it.
+- restart your computer (or at least close and reopen any terminal).
+
+**2. get the code**
+
+on the [github page](https://github.com/madlygeeked/chanceify), click **code**, then **download zip**. unzip it somewhere simple, like `C:\chanceify-source`. the folder you want is the one with `Cargo.toml` in it.
+
+**3. last.fm (optional)**
+
+the code points at the author's own last.fm helper, so you should point it at yours (or leave scrobbling out). first get your own key at [last.fm/api/account/create](https://www.last.fm/api/account/create): you get an api key and a shared secret. never share the secret, post it or commit it. then pick one:
+
+- *easy:* make a file called `lastfm-keys.txt` in the folder with `Cargo.toml`. put the key on the first line and the secret on the second, nothing else. then open `src/lastfm.rs` in notepad, find the line `pub const PROXY_URL: &str = "https://...";` and change the address to `""` (two quotes, nothing between). the keys are built into your copy and git never uploads the file.
+- *safer, if you will share your build:* keep the secret off your computer's app entirely with a free [cloudflare worker](https://dash.cloudflare.com). open [`worker/README.md`](worker/README.md) and follow it (about 5 minutes: make a worker, paste in `worker/lastfm-proxy.js`, add two secrets called `LASTFM_KEY` and `LASTFM_SECRET`). then in `src/lastfm.rs` change the `PROXY_URL` address to your own worker's.
+
+**4. build it**
+
+open the folder with `Cargo.toml` in it, click the address bar at the top of the window, type `cmd` and press enter. a black window opens in that folder. type:
+
 ```
 cargo build --release
 ```
 
-put your own last.fm key and secret on two lines in `lastfm-keys.txt` first
-(optional; the file is never committed).
+the first build downloads and compiles a lot, so give it a while (10 minutes is normal). it fetches the right rust version by itself.
+
+**5. run it**
+
+your app is `target\release\chanceify.exe`. copy it into a folder of its own, like `C:\chanceify`, and run it from there. everything it saves stays in that folder.
 
 </details>
 
