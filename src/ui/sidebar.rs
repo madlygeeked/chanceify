@@ -1303,10 +1303,10 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
             app.actions.push(Action::Forward);
         }
         // The library's own button and filter live up here with the page
-        // buttons. The field says "Filter your library" so it is never mistaken
+        // buttons. The field says "Search your library" so it is never mistaken
         // for the global search in the top bar.
         ui.add_space(10.0);
-        let icon_label = gettext(locale, "Filter your library");
+        let icon_label = gettext(locale, "Search your library");
         let icon = theme::icon_button(
             ui,
             Icon::Library,
@@ -1331,7 +1331,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                 locale,
                 field_id,
                 &mut app.library.filter,
-                "Filter",
+                "Search",
                 room,
             );
             super::widgets::drag_window_from_field(ui, &filter_response, "library-filter");
@@ -1348,7 +1348,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                 locale,
                 field_id,
                 &mut app.library.filter,
-                "Filter",
+                "Search",
                 room,
             );
             super::widgets::drag_window_from_field(ui, &filter_response, "library-filter");

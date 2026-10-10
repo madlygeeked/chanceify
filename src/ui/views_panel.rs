@@ -816,8 +816,8 @@ pub fn show(app: &mut App, ctx: &Context) {
                             for (label, on, action) in chips {
                                 let icon = match label {
                                     "Library" => Icon::Grid3x3,
-                                    "Side lyrics" => Icon::LayoutList,
-                                    "Queue" => Icon::Menu,
+                                    "Side lyrics" => Icon::Menu,
+                                    "Queue" => Icon::LayoutList,
                                     "Big album art" | "Album art" => Icon::Square,
                                     "Visualizer" | "Visualizer behind" => Icon::AudioLines,
                                     "Visualizer settings" => Icon::Settings,

@@ -217,7 +217,7 @@ impl TrackColumns {
     }
 
     /// The narrowest a column may be dragged before it is treated as hidden.
-    pub const MIN: f32 = 38.0;
+    pub const MIN: f32 = 64.0;
     /// The widest, so one drag cannot swallow the song names.
     pub const MAX: f32 = 640.0;
 

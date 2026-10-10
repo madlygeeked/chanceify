@@ -831,6 +831,8 @@ pub(super) fn lyrics_backdrop(
         // Whatever the visualizer settings say: the same shapes, colours
         // and sliders as the bar's and the full-screen visualizer's.
         3 => visualizer(app, ui, rect, now),
+        // Just the bars along the edges, with no cover or words.
+        4 => fullscreen_edge_bars(app, ui, rect, now),
         1 => visualizer_shape(app, ui, rect, now, PlayerBarVis::Flow),
         2 => {
             let art = app.swirl_art(ui.ctx());

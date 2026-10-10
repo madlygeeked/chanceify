@@ -3515,7 +3515,7 @@ fn column_divider(
         } else if response.hovered() {
             palette.secondary
         } else {
-            palette.outline.gamma_multiply(0.85)
+            palette.outline
         };
         // A soft band behind the grip on hover gives the pointer somewhere
         // obvious to land, wider than the two dots and the rule.
@@ -3765,7 +3765,7 @@ pub fn table_header(
             // resized from its left edge, one before it from its right edge.
             match title_at {
                 Some(title) if index < title => edges.push((at + room, *column, true)),
-                _ => edges.push((*at, *column, false)),
+                _ => edges.push((*at - 7.0, *column, false)),
             }
         }
     }
