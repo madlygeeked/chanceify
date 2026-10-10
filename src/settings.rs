@@ -850,6 +850,8 @@ pub struct Settings {
     pub float_controls: Option<[f32; 3]>,
     /// Where the controls panel sits while the album art is big, and in full-screen lyrics.
     pub float_hide_bar: bool,
+    /// Width of the Views panel.
+    pub views_width: f32,
     /// The full window's size before the mini player, kept between launches.
     pub mini_restore_size: Option<[f32; 2]>,
     pub float_big: Option<[f32; 3]>,
@@ -1273,6 +1275,7 @@ impl Default for Settings {
             calm_look: 0,
             float_controls: None,
             float_hide_bar: false,
+            views_width: 316.0,
             mini_restore_size: None,
             float_big: None,
             float_lyrics: None,

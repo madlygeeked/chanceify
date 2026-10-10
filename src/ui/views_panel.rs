@@ -210,7 +210,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
         return;
     }
     let screen = ctx.content_rect();
-    let width = width.clamp(300.0, 460.0);
+    let width = super::lyrics::controls_width(app, width);
     let mut change: Option<Option<[f32; 3]>> = None;
     let mut top_left = egui::pos2(x, y);
     egui::Area::new(Id::new("pop-out-controls"))
@@ -218,11 +218,14 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
         .fixed_pos(egui::pos2(0.0, 0.0))
         .interactable(true)
         .show(ctx, |ui| {
+            // The whole panel is a handle: this is registered first, so the
+            // buttons and bars drawn over it still take their own clicks.
+            let body = Rect::from_min_size(top_left, egui::vec2(width, super::lyrics::controls_height(app)));
+            let grip_response = ui.interact(body, Id::new("pop-out-grip"), egui::Sense::click_and_drag());
             let Some(outer) = super::lyrics::controls_box_inner(app, ui, top_left, width, false) else {
                 return;
             };
             let grip = Rect::from_min_size(outer.min, egui::vec2(outer.width(), 12.0));
-            let grip_response = ui.interact(grip, Id::new("pop-out-grip"), egui::Sense::click_and_drag());
             let dots = Rect::from_center_size(egui::pos2(grip.center().x, grip.center().y + 1.0), egui::vec2(22.0, 4.0));
             for i in 0..3 {
                 ui.painter().circle_filled(
@@ -243,15 +246,15 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                 change = Some(Some([top_left.x, top_left.y, width]));
             }
             let edge = Rect::from_min_max(
-                egui::pos2(outer.right() - 6.0, outer.top() + 14.0),
-                egui::pos2(outer.right(), outer.bottom() - 4.0),
+                egui::pos2(outer.right() - 12.0, outer.top() + 14.0),
+                egui::pos2(outer.right() + 4.0, outer.bottom() - 4.0),
             );
             let edge_response = ui.interact(edge, Id::new("pop-out-edge"), egui::Sense::drag());
             if edge_response.hovered() || edge_response.dragged() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
             }
             if edge_response.dragged() {
-                let wider = (width + edge_response.drag_delta().x).clamp(300.0, 460.0);
+                let wider = (width + edge_response.drag_delta().x).clamp(300.0, 620.0);
                 change = Some(Some([top_left.x, top_left.y, wider]));
             }
             grip_response.context_menu(|ui| {
@@ -302,66 +305,101 @@ pub fn show(app: &mut App, ctx: &Context) {
         });
     let close = false;
     let current = current_view(app);
-    egui::Window::new("Views")
+    // The panel fades to almost nothing when the pointer is away from it,
+    // and comes straight back when it returns.
+    let rect_id = Id::new("views-panel-rect");
+    let last_rect: Option<Rect> = ctx.data(|data| data.get_temp(rect_id));
+    let over = last_rect.is_some_and(|rect| {
+        ctx.input(|input| input.pointer.hover_pos().is_some_and(|p| rect.expand(10.0).contains(p)) || input.pointer.any_down() && input.pointer.interact_pos().is_some_and(|p| rect.expand(30.0).contains(p)))
+    });
+    let dim = panel_dim(ctx, over);
+    let frame = frame.multiply_with_opacity(dim);
+    let width = app.settings.views_width.clamp(260.0, 520.0);
+    let shown = egui::Window::new("Views")
         .id(Id::new("views-panel-v3"))
         .title_bar(false)
         .order(egui::Order::Foreground)
         .frame(frame)
         .default_pos(egui::pos2(60.0, 60.0))
-        .default_width(316.0)
+        .min_width(width)
+        .max_width(width)
         .resizable(false)
         .collapsible(false)
         .constrain(true)
         .show(ctx, |ui| {
+            ui.set_opacity(dim);
             ui.visuals_mut().override_text_color = Some(palette.text);
             ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
             let screen_h = ctx.content_rect().height();
             egui::ScrollArea::vertical()
                 .max_height((screen_h - 120.0).max(200.0))
-                .auto_shrink([true, true])
+                .auto_shrink([false, true])
                 .show(ui, |ui| {
-                    // The four views. Exactly one is on at a time.
+                    // The five views. Exactly one is on at a time.
                     let half = (ui.available_width() - 6.0) / 2.0;
                     let views = [
-                        ("Mini player", ViewKind::Mini),
-                        ("Visualizer", ViewKind::Visualizer),
-                        ("Full screen visualizer", ViewKind::FullVisualizer),
-                        ("Full screen lyrics", ViewKind::FullLyrics),
+                        (Icon::Shrink, "Mini player", ViewKind::Mini),
+                        (Icon::PanelLeft, "Normal", ViewKind::Visualizer),
+                        (Icon::AudioLines, "Full screen visualizer", ViewKind::FullVisualizer),
+                        (Icon::Mic, "Full screen lyrics", ViewKind::FullLyrics),
                     ];
                     for pair in views.chunks(2) {
                         ui.horizontal(|ui| {
-                            for (label, kind) in pair {
-                                if theme::soft_button_tall(ui, &palette, label, current == *kind, half, 34.0).clicked() {
+                            for (icon, label, kind) in pair {
+                                let on = current == *kind || (*kind == ViewKind::Visualizer && current == ViewKind::Default);
+                                if view_button(ui, &palette, *icon, label, on, half).clicked() {
                                     app.actions.push(Action::GoView(*kind));
                                 }
                             }
                         });
                     }
-                    // Calm mode is a fifth view of its own.
                     let full = ui.available_width();
-                    if theme::soft_button_tall(ui, &palette, "Calm mode", current == ViewKind::Calm, full, 34.0).clicked() {
+                    if view_button(ui, &palette, Icon::Moon, "Calm mode", current == ViewKind::Calm, full).clicked() {
                         app.actions.push(Action::GoView(ViewKind::Calm));
                     }
                     ui.add_space(4.0);
-                    // Other ways to see it.
                     let float_on = app.float_slot(default_float(ctx)).is_some();
-                    ui.horizontal_wrapped(|ui| {
-                        let chips = [
+                    let on_top = ("Always on top", app.settings.mini_on_top, Action::ToggleMiniOnTop);
+                    let flag = |bit: u8, label: &'static str, inverted: bool, app: &App| {
+                        (label, app.settings.lyrics_flag(bit) != inverted, Action::ToggleLyricsFlag(bit))
+                    };
+                    use crate::settings::Settings as S;
+                    // Only what belongs to the view you are in.
+                    let chips: Vec<(&str, bool, Action)> = match current {
+                        ViewKind::Mini => vec![
+                            ("Queue", app.settings.mini_queue, Action::ToggleMiniQueue),
+                            ("Volume", app.settings.mini_volume, Action::ToggleMiniVolume),
+                            ("Nothing moving", app.settings.mini_vis_mode() == 0, Action::SetMiniVis(0)),
+                            ("Bars", app.settings.mini_vis_mode() == 1, Action::SetMiniVis(1)),
+                            ("Flow", app.settings.mini_vis_mode() == 2, Action::SetMiniVis(2)),
+                            ("Swirl", app.settings.mini_vis_mode() == 3, Action::SetMiniVis(3)),
+                            on_top,
+                        ],
+                        ViewKind::Calm => Vec::new(),
+                        ViewKind::FullVisualizer => vec![
+                            ("Lyrics on it", app.settings.vis_lyrics, Action::ToggleVisLyrics),
+                            ("Artist name", !app.settings.vis_text_no_artist, Action::ToggleVisArtist),
+                            ("Visualizer settings", app.vis_panel, Action::ToggleVisPanel),
+                            (if app.extra_vis { "Close visualizer window" } else { "New visualizer window" }, app.extra_vis, Action::ToggleExtraWindow),
+                            on_top,
+                        ],
+                        ViewKind::FullLyrics => vec![
+                            flag(S::LYRICS_HIDE_ART, "Album art", true, app),
+                            flag(S::LYRICS_FLOAT_ART, "Floating art", false, app),
+                            flag(S::LYRICS_BOUNCE_ART, "Art bounces", false, app),
+                            flag(S::LYRICS_HIDE_STAMPS, "Timestamps", true, app),
+                            flag(S::LYRICS_COUNTDOWN, "Countdown", false, app),
+                            flag(S::LYRICS_HIDE_ARTIST, "Artist name", true, app),
+                            ("Visualizer behind", app.settings.lyrics_vis, Action::ToggleLyricsVis),
+                            ("Visualizer settings", app.vis_panel, Action::ToggleVisPanel),
+                            ("Pop-out controls", float_on, Action::SetFloatControls(if float_on { None } else { Some(default_float(ctx)) })),
+                            on_top,
+                        ],
+                        _ => vec![
                             ("Library only", false, Action::GoView(ViewKind::LibraryOnly)),
                             ("Default view", false, Action::GoView(ViewKind::Default)),
                             ("My view", false, Action::InDefaultView(Box::new(Action::ApplyMyView))),
                             ("Save my view", false, Action::SaveMyView),
-                        ];
-                        for (label, on, action) in chips {
-                            if theme::soft_button(ui, &palette, None, label, on).clicked() {
-                                app.actions.push(action);
-                            }
-                        }
-                    });
-                    ui.add_space(4.0);
-                    // What is shown, each one a plain on/off.
-                    ui.horizontal_wrapped(|ui| {
-                        let chips = [
                             ("Library", app.settings.sidebar_visible, Action::InDefaultView(Box::new(Action::ToggleSidebar))),
                             ("Queue", app.show_queue_panel, Action::InDefaultView(Box::new(Action::ToggleQueuePanel))),
                             ("Side lyrics", app.show_lyrics_panel, Action::InDefaultView(Box::new(Action::ToggleLyricsPanel))),
@@ -370,20 +408,24 @@ pub fn show(app: &mut App, ctx: &Context) {
                             ("Clean screen", app.settings.float_hide_bar, Action::SetFloatHideBar(!app.settings.float_hide_bar)),
                             ("Visualizer settings", app.vis_panel, Action::ToggleVisPanel),
                             (if app.extra_vis { "Close visualizer window" } else { "New visualizer window" }, app.extra_vis, Action::ToggleExtraWindow),
-                            ("Always on top", app.settings.mini_on_top, Action::ToggleMiniOnTop),
-                        ];
-                        for (label, on, action) in chips {
-                            let response = theme::soft_button(ui, &palette, None, label, on);
-                            let response = if label == "Clean screen" {
-                                response.on_hover_text("With the controls popped out, hides the whole bottom bar too")
-                            } else {
-                                response
-                            };
-                            if response.clicked() {
-                                app.actions.push(action);
+                            on_top,
+                        ],
+                    };
+                    if !chips.is_empty() {
+                        ui.horizontal_wrapped(|ui| {
+                            for (label, on, action) in chips {
+                                let response = theme::soft_button(ui, &palette, None, label, on);
+                                let response = if label == "Clean screen" {
+                                    response.on_hover_text("With the controls popped out, hides the whole bottom bar too")
+                                } else {
+                                    response
+                                };
+                                if response.clicked() {
+                                    app.actions.push(action);
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                     ui.add_space(2.0);
                     egui::CollapsingHeader::new(
                         egui::RichText::new("More").color(palette.secondary).font(theme::medium(13.0)),
@@ -438,10 +480,73 @@ pub fn show(app: &mut App, ctx: &Context) {
                     });
                 });
         });
+    if let Some(window) = shown {
+        let rect = window.response.rect;
+        ctx.data_mut(|data| data.insert_temp(rect_id, rect));
+        // A strip on the right edge: drag it to make the panel wider or narrower.
+        egui::Area::new(Id::new("views-panel-edge"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(egui::pos2(rect.right() - 7.0, rect.top() + 10.0))
+            .show(ctx, |ui| {
+                let (strip, response) = ui.allocate_exact_size(egui::vec2(10.0, (rect.height() - 20.0).max(10.0)), egui::Sense::drag());
+                if response.hovered() || response.dragged() {
+                    ctx.set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+                    ui.painter().rect_filled(
+                        egui::Rect::from_center_size(strip.center(), egui::vec2(3.0, 28.0)),
+                        1.5,
+                        Color32::from_white_alpha(90),
+                    );
+                }
+                if response.dragged() {
+                    app.settings.views_width = (width + response.drag_delta().x).clamp(260.0, 520.0);
+                    app.mark_settings_dirty();
+                }
+            });
+    }
     if close {
         app.actions.push(Action::ToggleViewsPanel);
     }
     bug_guide(app, ctx);
+}
+
+/// How visible the Views panel is: full while the pointer is near it, and
+/// almost gone (5%) a couple of seconds after it leaves.
+fn panel_dim(ctx: &Context, over: bool) -> f32 {
+    let seen_id = Id::new("views-panel-seen");
+    let now_t = ctx.input(|input| input.time);
+    if over {
+        ctx.data_mut(|data| data.insert_temp(seen_id, now_t));
+    }
+    let last_seen: f64 = ctx.data(|data| data.get_temp(seen_id)).unwrap_or(now_t);
+    let away = now_t - last_seen > 2.0;
+    if !away {
+        ctx.request_repaint_after(std::time::Duration::from_millis(500));
+    }
+    ctx.animate_value_with_time(seen_id.with("dim"), if away { 0.05 } else { 1.0 }, 0.4)
+}
+
+/// A pill for one of the views: its icon, its name, a lit fill when it is on.
+fn view_button(ui: &mut egui::Ui, palette: &Palette, icon: Icon, label: &str, on: bool, width: f32) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 36.0), egui::Sense::click());
+    if ui.is_rect_visible(rect) {
+        let fill = if on {
+            palette.text
+        } else if response.hovered() {
+            palette.surface_hover
+        } else {
+            palette.surface
+        };
+        ui.painter().rect_filled(rect, rect.height() / 2.0, fill);
+        let color = if on { palette.window } else { palette.text };
+        let galley = crate::bidi::layout_line(ui.painter(), label, theme::medium(13.0), color);
+        let icon_box = Rect::from_min_size(egui::pos2(rect.left() + 12.0, rect.center().y - 9.0), egui::vec2(18.0, 18.0));
+        theme::paint_icon(ui, icon, icon_box, 16.0, color);
+        let text_room = rect.right() - 10.0 - (icon_box.right() + 8.0);
+        let clip = Rect::from_min_max(egui::pos2(icon_box.right() + 8.0, rect.top()), egui::pos2(rect.right() - 8.0, rect.bottom()));
+        let x = icon_box.right() + 8.0 + ((text_room - galley.size().x) / 2.0).max(0.0);
+        ui.painter().with_clip_rect(clip).galley(egui::pos2(x, rect.center().y - galley.size().y / 2.0), galley, color);
+    }
+    response
 }
 
 /// Which of the exclusive views is on now: the mini player, a full screen,

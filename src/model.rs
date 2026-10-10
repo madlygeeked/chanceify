@@ -1416,6 +1416,8 @@ pub enum Action {
     GoView(ViewKind),
     /// With the controls popped out, hide the whole bottom bar too.
     SetFloatHideBar(bool),
+    /// Opens the Views panel (never closes it: only the disc does that).
+    OpenViewsPanel,
     /// Run an action from the normal window: any special view is left first.
     InDefaultView(Box<Action>),
     SetLyricsCtlOff([f32; 2]),

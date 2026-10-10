@@ -111,7 +111,7 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "visualizer", label: "Visualizer settings", default: Key::B, action: || Action::ToggleVisPanel },
     Bindable { id: "art", label: "Big album art", default: UNSET, action: || Action::ToggleArtExpanded },
     Bindable { id: "normalview", label: "Normal view", default: UNSET, action: || Action::NormalView },
-    Bindable { id: "views", label: "Views", default: Key::Z, action: || Action::ToggleViewsPanel },
+    Bindable { id: "views", label: "Open the Views panel", default: Key::Z, action: || Action::OpenViewsPanel },
     Bindable { id: "mini", label: "Mini player", default: Key::M, action: || Action::ToggleMiniPlayer },
     // Fullscreen.
     Bindable { id: "fullscreen", label: "Full-screen visualizer", default: Key::V, action: || Action::ToggleFullscreenVis },

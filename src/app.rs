@@ -11002,11 +11002,8 @@ impl App {
                 if !already {
                     match kind {
                         V::Mini => self.apply(Action::ToggleMiniPlayer, ctx),
-                        V::Visualizer => {
-                            if self.settings.vis_shapes_value() == 0 {
-                                self.apply(Action::ToggleVisShapes, ctx);
-                            }
-                        }
+                        // Normal: the ordinary window, exactly as it was left.
+                        V::Visualizer => {}
                         V::FullVisualizer => self.apply(Action::ToggleFullscreenVis, ctx),
                         V::FullLyrics => self.apply(Action::ToggleLyricsFullscreen, ctx),
                         V::LibraryOnly => self.apply(Action::LibraryOnlyView, ctx),
@@ -11062,7 +11059,6 @@ impl App {
             Action::ToggleCalm => {
                 self.calm_mode = !self.calm_mode;
                 if self.calm_mode {
-                    self.views_panel = false;
                     self.vis_panel = false;
                     self.leave_lyrics_fullscreen(ctx);
                     self.fullscreen_vis = false;
@@ -11280,6 +11276,7 @@ impl App {
             Action::ImportSettings => self.import_settings_file("chanceify-settings.json"),
             Action::LoadDefaultSettings => self.import_settings_file("defaults.json"),
             Action::ToggleViewsPanel => self.views_panel = !self.views_panel,
+            Action::OpenViewsPanel => self.views_panel = true,
             Action::RegisterLinks => match crate::link::register_links() {
                 Ok(()) => self.toast("chanceify:// links now open chanceify"),
                 Err(error) => self.toast_error(format!("Could not set that up: {error}")),

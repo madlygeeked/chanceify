@@ -1420,6 +1420,20 @@ fn controls_slim(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: 
     }
 }
 
+/// How wide the pop-out controls panel is, for the width asked for.
+pub(super) fn controls_width(app: &App, width: f32) -> f32 {
+    let k = app.settings.controls_scale_value();
+    let kc = 1.0 + (k - 1.0) * 0.5;
+    width.max(218.0 * kc + 40.0).clamp(300.0, 620.0)
+}
+
+/// How tall the pop-out controls panel is: buttons, song bar, volume.
+pub(super) fn controls_height(app: &App) -> f32 {
+    let k = app.settings.controls_scale_value();
+    let kc = 1.0 + (k - 1.0) * 0.5;
+    10.0 + 36.0 * kc + 4.0 + 26.0 * k + 4.0 + 24.0 * kc + 10.0
+}
+
 pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f32, centred: bool) -> Option<Rect> {
     let Some(now) = app.now_playing() else {
         return None;
@@ -1430,12 +1444,12 @@ pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egu
     let k = app.settings.controls_scale_value();
     let kc = 1.0 + (k - 1.0) * 0.5;
     let controls_w = 218.0 * kc;
-    let width = width.max(controls_w + 40.0).clamp(300.0, 460.0);
+    let width = controls_width(app, width);
     let left = if centred { top_left.x - width / 2.0 } else { top_left.x };
     let buttons_h = 36.0 * kc;
     let seek_h = 26.0 * k;
-    let volume_h = 26.0 * k;
-    let outer = Rect::from_min_size(pos2(left, top_left.y), vec2(width, 10.0 + buttons_h + 4.0 + seek_h + 2.0 + volume_h + 8.0));
+    let volume_h = 24.0 * kc;
+    let outer = Rect::from_min_size(pos2(left, top_left.y), vec2(width, controls_height(app)));
     ui.painter()
         .rect_filled(outer, 14.0, palette.panel.gamma_multiply(0.94));
     ui.painter().rect_stroke(
@@ -1459,7 +1473,7 @@ pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egu
         (outer.left() + 54.0, outer.right() - 14.0),
     );
     let volume_row = Rect::from_min_size(
-        pos2(outer.left() + 20.0, seek_row.bottom() + 2.0),
+        pos2(outer.left() + 20.0, seek_row.bottom() + 4.0),
         vec2(width - 40.0, volume_h),
     );
     super::player_bar::volume_row(app, ui, volume_row);

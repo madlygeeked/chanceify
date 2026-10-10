@@ -557,8 +557,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     } else {
                         palette.dim
                     };
-                    for dx in [3.0, 8.0] {
-                        for dy in [3.0, 6.0, 9.0] {
+                    for dx in [2.0, 7.0, 12.0] {
+                        for dy in [6.0] {
                             ui.painter().circle_filled(pos2(x - 2.0 + dx, top + 1.0 + dy), 1.2, color);
                         }
                     }
@@ -639,8 +639,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     let handle = Rect::from_min_size(pos2(x - 2.0, y + h / 2.0 - 6.0), vec2(14.0, 12.0));
                     let drag = ui.interact(handle, egui::Id::new("seek-handle"), Sense::drag());
                     let color = if drag.hovered() || drag.dragged() { palette.text } else { palette.dim };
-                    for dx in [3.0, 8.0] {
-                        for dy in [3.0, 6.0, 9.0] {
+                    for dx in [2.0, 7.0, 12.0] {
+                        for dy in [6.0] {
                             ui.painter().circle_filled(pos2(x - 2.0 + dx, y + h / 2.0 - 6.0 + dy), 1.2, color);
                         }
                     }
@@ -703,6 +703,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     .max_rect(blocks[2])
                     .layout(Layout::left_to_right(Align::Center)),
             );
+            if popped {
+                right_ui.set_invisible();
+            }
             extras(app, &mut right_ui, now.as_ref(), &presets);
             blocks[0] = Rect::from_min_max(
                 pos2(blocks[0].left(), band.top()),
@@ -4764,8 +4767,8 @@ fn transport_impl(
         let handle = Rect::from_min_size(pos2(slider_left - 2.0, row.top() + 1.0), vec2(14.0, 12.0));
         let drag = ui.interact(handle, egui::Id::new(("block-handle", 1u8)), Sense::drag());
         let color = if drag.hovered() || drag.dragged() { palette.text } else { palette.dim };
-        for dx in [3.0, 8.0] {
-            for dy in [3.0, 6.0, 9.0] {
+        for dx in [2.0, 7.0, 12.0] {
+            for dy in [6.0] {
                 ui.painter().circle_filled(pos2(slider_left - 2.0 + dx, row.top() + 1.0 + dy), 1.2, color);
             }
         }
@@ -4847,8 +4850,8 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
         } else {
             app.palette.dim
         };
-        for dx in [2.5, 8.5] {
-            for dy in [4.0, 9.0, 14.0] {
+        for dx in [1.5, 6.5, 11.5] {
+            for dy in [9.0] {
                 ui.painter().circle_filled(grip.min + vec2(dx, dy), 1.4, colour);
             }
         }
@@ -5527,7 +5530,9 @@ pub(super) fn big_art_missing_mark(app: &App, ui: &egui::Ui, art: Rect, id: &str
     );
 }
 
-/// A compact volume bar with its percentage, for the pop-out controls panel.
+/// A compact volume bar for the pop-out controls panel: a small speaker, a
+/// slim bar with a round knob, and the percentage in a fixed column on the
+/// right, all centred on one line.
 pub(super) fn volume_row(app: &mut App, ui: &mut egui::Ui, rect: Rect) {
     let palette = app.palette;
     let now = app.now_playing();
@@ -5540,34 +5545,59 @@ pub(super) fn volume_row(app: &mut App, ui: &mut egui::Ui, rect: Rect) {
         None => volume,
     };
     let adjustable = now.as_ref().is_none_or(|now| now.can_set_volume);
-    let mut child = ui.new_child(
-        UiBuilder::new()
-            .max_rect(rect)
-            .layout(Layout::left_to_right(Align::Center)),
+    let k = app.settings.controls_scale_value().clamp(0.8, 1.6);
+    let mid = rect.center().y;
+    let icon_box = Rect::from_center_size(pos2(rect.left() + 10.0 * k, mid), vec2(18.0 * k, 18.0 * k));
+    let icon = if shown == 0 {
+        Icon::VolumeX
+    } else if shown < 50 {
+        Icon::Volume1
+    } else {
+        Icon::Volume2
+    };
+    theme::paint_icon(ui, icon, icon_box, 16.0 * k, palette.secondary);
+    let text_w = 40.0 * k;
+    let track = Rect::from_min_max(
+        pos2(icon_box.right() + 8.0, rect.top()),
+        pos2(rect.right() - text_w - 6.0, rect.bottom()),
     );
-    child.add_enabled_ui(adjustable, |ui| {
-        match thin_slider_scaled(
-            ui,
-            &palette,
-            egui::Id::new("pop-volume-slider"),
-            &gettext(app.locale, "Volume (%)"),
-            shown as f32 / 100.0,
-            (rect.width() - 54.0).max(60.0),
-            Some(0.05),
-            app.settings.controls_scale_value(),
-        ) {
-            SliderEvent::Dragging(value) => {
-                app.volume_preview = Some(value);
-                if now.as_ref().is_none_or(|now| now.local) {
-                    app.actions.push(Action::PreviewVolume((value * 100.0).round() as u8));
-                }
+    if track.width() < 30.0 {
+        return;
+    }
+    let response = ui.interact(track.expand2(vec2(6.0, 0.0)), egui::Id::new("pop-volume-slider"), Sense::click_and_drag());
+    let at = |x: f32| ((x - track.left()) / track.width()).clamp(0.0, 1.0);
+    if adjustable && let Some(p) = response.interact_pointer_pos().filter(|_| response.dragged() || response.clicked()) {
+        let value = at(p.x);
+        if response.dragged() {
+            app.volume_preview = Some(value);
+            if now.as_ref().is_none_or(|now| now.local) {
+                app.actions.push(Action::PreviewVolume((value * 100.0).round() as u8));
             }
-            SliderEvent::Committed(value) => {
-                app.volume_preview = None;
-                app.actions.push(Action::SetVolume((value * 100.0).round() as u8));
-            }
-            SliderEvent::None => {}
         }
-    });
-    child.label(egui::RichText::new(format!("{shown}%")).color(palette.secondary).size(12.0));
+    }
+    if adjustable && response.drag_stopped() {
+        let value = app.volume_preview.take().unwrap_or(shown as f32 / 100.0);
+        app.actions.push(Action::SetVolume((value * 100.0).round() as u8));
+    } else if adjustable && response.clicked() && let Some(p) = response.interact_pointer_pos() {
+        app.volume_preview = None;
+        app.actions.push(Action::SetVolume((at(p.x) * 100.0).round() as u8));
+    }
+    let fraction = shown as f32 / 100.0;
+    let line = Rect::from_center_size(pos2(track.center().x, mid), vec2(track.width(), 4.0 * k));
+    ui.painter().rect_filled(line, 2.0 * k, palette.dim.gamma_multiply(0.6));
+    let filled = Rect::from_min_max(line.min, pos2(line.left() + line.width() * fraction, line.bottom()));
+    let hot = response.hovered() || response.dragged();
+    ui.painter().rect_filled(filled, 2.0 * k, if hot { palette.accent } else { palette.text });
+    let knob = pos2(line.left() + line.width() * fraction, mid);
+    ui.painter().circle_filled(knob, if hot { 6.5 * k } else { 5.0 * k }, palette.text);
+    ui.painter().text(
+        pos2(rect.right(), mid),
+        egui::Align2::RIGHT_CENTER,
+        format!("{shown}%"),
+        theme::regular(12.5 * k),
+        palette.secondary,
+    );
+    if hot {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
 }
