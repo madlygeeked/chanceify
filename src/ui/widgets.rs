@@ -1810,13 +1810,14 @@ pub(crate) fn column_slots(
     end: f32,
     order: [u8; 6],
     laid: &Columns,
+    centre_lone_title: bool,
 ) -> Vec<(crate::model::SortColumn, f32, f32)> {
     use crate::model::SortColumn as Sc;
     let others = laid.playlists + laid.album + laid.added + laid.release + laid.bpm;
     let mut title = (end - start - others).max(0.0);
     let mut x = start;
     // The song name alone in a wide list sits in the middle, not hard left.
-    if others == 0.0 && title > 560.0 {
+    if centre_lone_title && others == 0.0 && title > 560.0 {
         let narrow = 460.0;
         x += (title - narrow) / 2.0;
         title = narrow;
@@ -2043,6 +2044,12 @@ fn track_row_contents(
         .data(|data| data.get_temp::<bool>(egui::Id::new("queue-rows")))
         .unwrap_or(false);
     let mut cols = columns(width, &row, &app.settings.track_columns, bare);
+    // With no date column there is no "7 hours ago" either: a list with
+    // nothing switched on shows the cover and the name, and nothing else.
+    let mut row = row;
+    if !bare && cols.added == 0.0 {
+        row.added_at = None;
+    }
     if bare
         && ui
             .data(|data| data.get_temp::<bool>(egui::Id::new("queue-hide-numbers")))
@@ -2061,7 +2068,15 @@ fn track_row_contents(
             Stroke::new(1.0, palette.outline.gamma_multiply(0.35)),
         );
     };
-    let mut x = rect.left() + 8.0;
+    // The song name alone in a wide list sits in the middle, and the number
+    // and cover go with it, so the cover stays next to the name.
+    let lone_shift = {
+        let others = cols.playlists + cols.album + cols.added + cols.release + cols.bpm;
+        let right_fixed = cols.heart + if row.show_time { cols.duration } else { 0.0 } + cols.more + 8.0;
+        let region = rect.right() - right_fixed - (rect.left() + 8.0 + cols.number + cols.cover);
+        if others == 0.0 && !bare && region > 560.0 { (region - 460.0) / 2.0 } else { 0.0 }
+    };
+    let mut x = rect.left() + 8.0 + lone_shift;
 
     // Number / play.
     if cols.number > 0.0 {
@@ -2168,7 +2183,7 @@ fn track_row_contents(
     if app.settings.track_columns.spread && !bare {
         spread_columns(&mut cols, region_right - x);
     }
-    let slots = column_slots(x, region_right, app.settings.track_columns.order(), &cols);
+    let slots = column_slots(x, region_right, app.settings.track_columns.order(), &cols, false);
     let slot_at = |column: crate::model::SortColumn| {
         slots.iter().find(|(c, _, _)| *c == column).map(|(_, at, _)| *at)
     };
@@ -2207,7 +2222,8 @@ fn track_row_contents(
         .unwrap_or(false);
     let hide_artist = ui
         .data(|data| data.get_temp::<bool>(egui::Id::new("queue-hide-artist")))
-        .unwrap_or(false);
+        .unwrap_or(false)
+        || (!bare && app.settings.track_columns.hide_artist);
     // Outside the queue the playlist icons live in the PLAYLISTS column and
     // nowhere else: a table with that column off shows none beside the
     // song name.
@@ -2695,7 +2711,7 @@ fn track_row_contents(
 
     // Duration. Off in the queue panel when the reader has traded it for the
     // song name, which is what that panel is for.
-    if row.show_time {
+    if row.show_time && cols.duration > 0.0 {
         let duration_rect =
             Rect::from_min_size(pos2(x, rect.top()), vec2(cols.duration, row_height));
         painter.text(
@@ -2948,6 +2964,12 @@ pub fn drag_ghost(ctx: &egui::Context, palette: &Palette, locale: Locale) {
 }
 
 pub fn explicit_badge(ui: &mut Ui, palette: &Palette) {
+    // The explicit mark is not shown anywhere.
+    let _ = (ui, palette);
+}
+
+#[allow(dead_code)]
+fn explicit_badge_unused(ui: &mut Ui, palette: &Palette) {
     let (rect, _) = ui.allocate_exact_size(vec2(15.0, 15.0), Sense::hover());
     ui.painter()
         .rect_filled(rect, CornerRadius::same(2), palette.secondary);
@@ -3500,7 +3522,7 @@ pub fn table_header(
     }
     // The headings must be drawn in exactly the order `track_row` draws the
     // cells (both use `column_slots`), or every heading sits over the wrong data.
-    let slots = column_slots(x, rect.right() - right_fixed, columns.order(), &laid);
+    let slots = column_slots(x, rect.right() - right_fixed, columns.order(), &laid, true);
     let title_at = slots.iter().position(|(c, _, _)| *c == SortColumn::Title);
     // (edge, column, whether dragging right makes the column wider)
     let mut edges: Vec<(f32, SortColumn, bool)> = Vec::new();
@@ -3665,6 +3687,9 @@ pub fn table_header(
                         !widths.hide_duration,
                     ) {
                         widths.hide_duration = !widths.hide_duration;
+                    }
+                    if checkbox_row(ui, palette, &gettext(locale, "ARTIST"), !widths.hide_artist) {
+                        widths.hide_artist = !widths.hide_artist;
                     }
                     if checkbox_row(ui, palette, &gettext(locale, "LIKED"), !widths.hide_heart) {
                         widths.hide_heart = !widths.hide_heart;

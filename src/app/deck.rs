@@ -31,6 +31,37 @@ impl App {
         })
     }
 
+    /// The screen jumps by itself when the music does what the visualizer
+    /// settings ask: a rise in loudness, in the bass, or a beat.
+    pub fn auto_jump(&mut self) {
+        let mode = self.settings.vis_jump_react;
+        if mode > 2 || !self.now_playing().is_some_and(|now| now.playing && now.local) {
+            return;
+        }
+        let energy = if mode == 1 {
+            self.music_bass_level_raw()
+        } else {
+            let window = self.winamp.tap.window(1536, 0);
+            if window.is_empty() {
+                return;
+            }
+            (window.iter().map(|x| x * x).sum::<f32>() / window.len() as f32).sqrt() * 2.0
+        };
+        if !energy.is_finite() {
+            return;
+        }
+        let ratio = match mode {
+            0 => 1.5,
+            1 => 1.35,
+            _ => 1.25,
+        };
+        let rested = self.jump_at.is_none_or(|at| at.elapsed().as_secs_f32() > 0.32);
+        if rested && energy > 0.08 && energy > self.jump_avg * ratio + 0.02 {
+            self.jump_at = Some(Instant::now());
+        }
+        self.jump_avg += (energy - self.jump_avg) * 0.05;
+    }
+
     fn music_bass_level_raw(&self) -> f32 {
         if !self.now_playing().is_some_and(|now| now.playing) {
             return 0.0;

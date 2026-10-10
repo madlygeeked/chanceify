@@ -1352,53 +1352,35 @@ pub(super) fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
     let mut panel = egui::Window::new("visualizer-panel")
         .title_bar(false)
         .collapsible(false);
-    if floating {
-        // Full screen: a panel you can drag about, so the picture stays
-        // visible while settings change. It is exactly as big as what is in
-        // it: it grows and shrinks as sections open and close, never has
-        // empty room, and is never taller than the screen (what does not fit
-        // scrolls).
-        let screen = ctx.content_rect();
-        panel = panel
-            .resizable(true)
-            .default_size(vec2(
-                (screen.width() * 0.4).clamp(300.0, 460.0),
-                (screen.height() * 0.7).clamp(240.0, 640.0),
-            ))
-            .min_size(vec2(260.0, 160.0))
-            .movable(true)
-            .constrain(true)
-            .default_pos(egui::pos2(
-                screen.right() - (screen.width() * 0.5).min(560.0) - 14.0,
-                screen.bottom() - (screen.height() * 0.55).min(520.0) - 14.0,
-            ))
-            .max_size((screen.size() - vec2(20.0, 20.0)).max(vec2(260.0, 180.0)));
-    } else {
-        panel = panel
-            .resizable(true)
-            .default_size(vec2(360.0, (screen_h - above - 12.0).clamp(160.0, 560.0)))
-            .min_size(vec2(260.0, 160.0))
-            .max_size(vec2(900.0, (screen_h - above - 12.0).max(160.0)));
-        panel = match clicked_x {
-            Some(x) => panel
-                .pivot(egui::Align2::CENTER_BOTTOM)
-                .fixed_pos(egui::pos2(x, screen_h - above)),
-            None => panel.anchor(egui::Align2::RIGHT_BOTTOM, vec2(-14.0, -above)),
-        };
-    }
-    let fullscreen = floating;
+    // Wherever the panel is shown it can be dragged about and made wider;
+    // its height is exactly what is in it (what does not fit scrolls), so
+    // there is never empty room.
+    let screen = ctx.content_rect();
+    let max_h = (screen.height() - 20.0).max(180.0);
+    let default_x = match (floating, clicked_x) {
+        (false, Some(x)) => x - 180.0,
+        _ => screen.right() - (screen.width() * 0.5).min(560.0) - 14.0,
+    };
+    panel = panel
+        .resizable([true, false])
+        .default_width(if floating { (screen.width() * 0.4).clamp(300.0, 460.0) } else { 360.0 })
+        .min_width(260.0)
+        .movable(true)
+        .constrain(true)
+        .default_pos(egui::pos2(
+            default_x.clamp(screen.left() + 8.0, (screen.right() - 380.0).max(screen.left() + 8.0)),
+            if floating {
+                screen.bottom() - (screen.height() * 0.55).min(520.0) - 14.0
+            } else {
+                (screen_h - above - 440.0).max(screen.top() + 8.0)
+            },
+        ))
+        .max_size(vec2(900.0, max_h));
     let window = panel.show(ctx, |ui| {
-        if fullscreen {
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .show(ui, |ui| vis_menu_body(app, ui));
-        } else {
-            // However small the window, the panel is never taller than the
-            // room above the bar: what does not fit scrolls.
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .show(ui, |ui| vis_menu_body(app, ui));
-        }
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, true])
+            .max_height(max_h - 24.0)
+            .show(ui, |ui| vis_menu_body(app, ui));
     });
     // A click anywhere outside the panel closes it. (A right-click on the
     // visualizer toggles it, so only the primary button counts here.)
@@ -2075,6 +2057,31 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             ui.spacing_mut().item_spacing.x = 18.0;
             ui.vertical(|ui| {
             ui.set_width(col_w);
+            theme::subtle(ui, &palette, &gettext(app.locale, "BASS JUMP"));
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                for (value, glyph, tip) in [
+                    (0u8, Glyph::Icon(Icon::Volume2), "Jumps with the loudness"),
+                    (1, Glyph::Icon(Icon::Speaker), "Jumps with the bass"),
+                    (2, Glyph::Icon(Icon::Zap), "Jumps on the beat"),
+                    (3, Glyph::Nothing, "Only the bass jump key"),
+                ] {
+                    if glyph_button(ui, &palette, glyph, tip, app.settings.vis_jump_react.min(3) == value).clicked() {
+                        app.actions.push(Action::SetJumpReact(value));
+                    }
+                }
+            });
+            slider_row(
+                ui,
+                &palette,
+                &gettext(app.locale, "Jump strength"),
+                0.2..=3.0,
+                app.settings.jump_shake,
+                |value| {
+                    app.actions.push(Action::SetJumpShake(value));
+                },
+            );
+            ui.add_space(6.0);
             theme::subtle(ui, &palette, &gettext(app.locale, "COLOUR (ALL SHAPES)"));
             if chip(
                 ui,

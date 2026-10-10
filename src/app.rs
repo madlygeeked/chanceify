@@ -561,6 +561,7 @@ pub struct App {
     taps: Vec<Instant>,
     /// When the bass-jump key was last pressed.
     pub jump_at: Option<Instant>,
+    pub jump_avg: f32,
     /// Songs in the user's playlists that can no longer be played.
     pub unavailable: crate::unavailable::Store,
     /// The scan in progress, if any.
@@ -1191,6 +1192,7 @@ impl App {
             live: live_analysis::LiveAnalysis::default(),
             taps: Vec::new(),
             jump_at: None,
+            jump_avg: 0.0,
             unavailable: crate::unavailable::Store::load(&dirs_cache_unavailable),
             unavailable_scan: None,
             optimistic_user,
@@ -11447,6 +11449,16 @@ impl App {
                     self.mark_settings_dirty();
                 }
             }
+            Action::SetJumpShake(value) => {
+                if value.is_finite() {
+                    self.settings.jump_shake = value.clamp(0.2, 3.0);
+                    self.mark_settings_dirty();
+                }
+            }
+            Action::SetJumpReact(mode) => {
+                self.settings.vis_jump_react = mode.min(3);
+                self.mark_settings_dirty();
+            }
             Action::SetSwirlReact(mode) => {
                 self.settings.swirl_react_mode = mode.min(3);
                 self.mark_settings_dirty();
@@ -12904,6 +12916,7 @@ impl App {
             crate::ui::show(self, ui);
         }
         // The bass jump: everything drawn this frame shakes for a moment.
+        self.auto_jump();
         let jump = self.jump_level();
         if jump > 0.0 {
             let t = ctx.input(|input| input.time) as f32;

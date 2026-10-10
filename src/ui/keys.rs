@@ -138,8 +138,6 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "likehover", label: "Like the song under the pointer", default: UNSET, action: || Action::LikeHovered },
     Bindable { id: "likeplaying", label: "Like the playing song", default: UNSET, action: || Action::LikePlaying },
     Bindable { id: "tap", label: "Bass jump", default: UNSET, action: || Action::TapTempo },
-    Bindable { id: "tap2", label: "Bass jump (second key)", default: UNSET, action: || Action::TapTempo },
-    Bindable { id: "tap3", label: "Bass jump (third key)", default: UNSET, action: || Action::TapTempo },
     Bindable { id: "cyclevis", label: "Next visualizer style", default: UNSET, action: || Action::CycleVisualiser },
     Bindable { id: "visgradient", label: "Gradient on or off", default: UNSET, action: || Action::ToggleVisGradient },
     Bindable { id: "visreverse", label: "Reverse the visualizer", default: UNSET, action: || Action::ToggleVisReverse },
@@ -220,13 +218,13 @@ pub const CATEGORIES: &[(&str, &[&str])] = &[
     ("Panels", &["sidebar", "queuelyrics", "queue", "lyrics", "visualizer", "scenes"]),
     ("Playback", &["playpause", "playspace", "playonly", "pauseonly", "next", "previous", "shuffle", "repeat", "lastfmlove", "sharediscord", "queuehover", "queuehovertop", "likehover", "likeplaying"]),
     ("Volume", &["mute", "volup", "voldown"]),
-    ("Fun", &["tap", "tap2", "tap3", "cyclevis", "visgradient", "visreverse"]),
+    ("Fun", &["tap", "cyclevis", "visgradient", "visreverse"]),
     ("Jump in the song", &["back10", "forward10", "seekback5", "seekfwd5", "seekwidth", "tenth0", "tenth1", "tenth2", "tenth3", "tenth4", "tenth5", "tenth6", "tenth7", "tenth8", "tenth9"]),
     ("Going places", &["search", "home", "liked", "settings", "pageback", "pageforward", "artistpage", "albumpage", "tutorial"]),
 ];
 
 /// Shortcuts that may share one key, because they are the same thing.
-const BASS_JUMP_KEYS: [&str; 3] = ["tap", "tap2", "tap3"];
+const BASS_JUMP_KEYS: [&str; 1] = ["tap"];
 
 /// The id of the shortcut waiting for its new key, if any.
 pub fn rebinding(ctx: &egui::Context) -> Option<String> {

@@ -1463,6 +1463,8 @@ pub enum Action {
     SetSwirlPreset(usize),
     /// What the swirl moves with: 0 loudness, 1 bass, 2 beat, 3 nothing.
     SetSwirlReact(u8),
+    SetJumpReact(u8),
+    SetJumpShake(f32),
     /// Opacity of the bars (true) or the flow (false), 0.1 to 1.
     SetVisOpacity(bool, f32),
     SetSwirlArtEdge(f32),

@@ -97,6 +97,8 @@ pub struct TrackColumns {
     pub hide_heart: bool,
     /// The "+" (add to a playlist) button is switched off.
     pub hide_plus: bool,
+    /// The artist's name under the song name is switched off.
+    pub hide_artist: bool,
     /// Songs as a grid of covers, whatever columns are on.
     pub grid: bool,
     /// Where each column sits, left to right: 0 title, 1 playlists, 2 album,
@@ -122,6 +124,7 @@ impl Default for TrackColumns {
             hide_duration: false,
             hide_heart: false,
             hide_plus: false,
+            hide_artist: false,
             grid: false,
             order: Self::DEFAULT_ORDER,
             spread: false,
@@ -983,6 +986,9 @@ pub struct Settings {
     /// What the swirl's speed follows: 0 loudness, 1 bass, 2 beat, 3 nothing.
     #[serde(default)]
     pub swirl_react_mode: u8,
+    /// What makes the screen jump by itself: 0 loudness, 1 bass, 2 beat,
+    /// 3 nothing (only the bass-jump key).
+    pub vis_jump_react: u8,
     #[serde(default)]
     pub vis_flow_opacity: f32,
     /// The volume shortcut buttons; never set means 50 and 100.
@@ -1384,6 +1390,7 @@ impl Default for Settings {
             lyrics_vis_dark: 0.0,
             vis_bars_opacity: 0.0,
             swirl_react_mode: 0,
+            vis_jump_react: 3,
             vis_flow_opacity: 0.0,
             volume_presets: None,
             hint_seen: false,
@@ -1718,20 +1725,27 @@ impl Settings {
 
     /// Ready-made swirl looks: a name and a value for each of the sliders
     /// in `SWIRL_TUNE`, in the same order. Every slider stays editable.
-    pub const SWIRL_PRESETS: [(&'static str, [f32; 13]); 12] = [
+    pub const SWIRL_PRESETS: [(&'static str, [f32; 13]); 18] = [
         ("Default", [2.0, 10.0, 100.0, 0.0, 0.0, 7.0, 140.0, 120.0, 100.0, 100.0, 100.0, 100.0, 1.8]),
-        ("Default bright", [2.0, 10.0, 100.0, 0.0, 0.0, 7.0, 170.0, 130.0, 100.0, 100.0, 100.0, 100.0, 1.8]),
         ("Default fast", [3.0, 14.0, 110.0, 0.0, 0.0, 6.0, 150.0, 125.0, 170.0, 180.0, 100.0, 100.0, 2.2]),
         ("Default deep", [2.0, 16.0, 120.0, 0.0, 10.0, 9.0, 160.0, 150.0, 80.0, 90.0, 85.0, 110.0, 2.0]),
-        ("Club", [4.0, 45.0, 160.0, 15.0, 0.0, 4.0, 200.0, 160.0, 180.0, 220.0, 100.0, 120.0, 3.0]),
-        ("Club strobe", [5.0, 55.0, 180.0, 20.0, 0.0, 3.0, 220.0, 175.0, 220.0, 250.0, 100.0, 130.0, 3.5]),
-        ("Club slow", [3.0, 35.0, 140.0, 10.0, 0.0, 5.0, 190.0, 150.0, 110.0, 150.0, 100.0, 115.0, 2.5]),
+        ("Default bright", [2.0, 10.0, 100.0, 0.0, 0.0, 7.0, 170.0, 130.0, 100.0, 100.0, 100.0, 100.0, 1.8]),
+        ("Default soft", [2.0, 8.0, 90.0, 0.0, 5.0, 11.0, 125.0, 110.0, 80.0, 90.0, 100.0, 90.0, 1.6]),
+        ("Default drift", [2.0, 12.0, 110.0, 10.0, 0.0, 8.0, 150.0, 120.0, 130.0, 140.0, 95.0, 105.0, 2.0]),
+        ("Club", [3.0, 32.0, 130.0, 10.0, 0.0, 5.0, 195.0, 155.0, 180.0, 220.0, 100.0, 120.0, 2.8]),
+        ("Club slow", [3.0, 28.0, 120.0, 8.0, 0.0, 5.0, 190.0, 150.0, 150.0, 190.0, 100.0, 115.0, 2.5]),
         ("Club wide", [4.0, 40.0, 200.0, -15.0, 30.0, 4.0, 210.0, 165.0, 170.0, 210.0, 100.0, 125.0, 3.2]),
+        ("Club glow", [3.0, 30.0, 120.0, 0.0, 10.0, 8.0, 220.0, 150.0, 150.0, 200.0, 100.0, 130.0, 2.6]),
+        ("Club smooth", [2.0, 24.0, 110.0, 5.0, 0.0, 9.0, 185.0, 140.0, 140.0, 180.0, 100.0, 115.0, 2.2]),
+        ("Club pulse", [3.0, 34.0, 140.0, 0.0, 0.0, 5.0, 205.0, 160.0, 120.0, 270.0, 100.0, 125.0, 2.8]),
         ("Ocean", [3.0, 25.0, 140.0, -20.0, 20.0, 12.0, 160.0, 115.0, 70.0, 60.0, 90.0, 90.0, 2.0]),
         ("Ocean deep", [3.0, 30.0, 150.0, -25.0, 25.0, 14.0, 170.0, 125.0, 55.0, 50.0, 80.0, 95.0, 2.2]),
         ("Ocean calm", [2.0, 18.0, 120.0, -10.0, 15.0, 16.0, 150.0, 110.0, 45.0, 40.0, 90.0, 85.0, 1.8]),
         ("Ocean rolling", [4.0, 32.0, 160.0, -30.0, 30.0, 10.0, 175.0, 120.0, 90.0, 80.0, 90.0, 95.0, 2.4]),
+        ("Ocean tide", [2.0, 22.0, 130.0, -15.0, 40.0, 13.0, 155.0, 112.0, 60.0, 70.0, 90.0, 88.0, 2.0]),
+        ("Ocean storm", [5.0, 40.0, 180.0, -35.0, 20.0, 8.0, 190.0, 140.0, 120.0, 130.0, 85.0, 100.0, 2.8]),
     ];
+
     /// Whether every slider sits exactly on preset `index`.
     pub fn swirl_preset_active(&self, index: usize) -> bool {
         Self::SWIRL_PRESETS.get(index).is_some_and(|(_, values)| {
@@ -1794,7 +1808,7 @@ impl Settings {
         "swirl_scale", "swirl_tune", "swirl_warp", "swirl_waves", "theme", "theme_from_cover", "custom_bg", "custom_accent",
         "track_columns", "tracklist_compact", "vis", "vis_bar_sides", "vis_shapes",
         "vis_shapes_last", "vis_shapes_set", "volume_presets", "zoom",
-        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_sway", "vis_sway_amount", "vis_text_no_outline", "vis_text_back", "vis_back_alpha", "vis_back_round", "vis_back_pad", "vis_back_block", "vis_live_preview", "vis_font_random", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "lyrics_vis_mode", "window_opacity", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "bar_layout", "bar_free", "bar_free_pos", "bar_free_seek", "lyrics_ctl_off", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode",
+        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_sway", "vis_sway_amount", "vis_text_no_outline", "vis_text_back", "vis_back_alpha", "vis_back_round", "vis_back_pad", "vis_back_block", "vis_live_preview", "vis_font_random", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "lyrics_vis_mode", "window_opacity", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "bar_layout", "bar_free", "bar_free_pos", "bar_free_seek", "lyrics_ctl_off", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode", "vis_jump_react",
     ];
 
     /// The shareable part of the settings, as the text of a file.
