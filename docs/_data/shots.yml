@@ -1,0 +1,35 @@
+# One entry per screenshot. Save the picture as docs/shots/<file> (png, about 1600 px wide, no private info).
+# A missing picture is hidden automatically, so you can add them one by one.
+
+panels:
+  - { file: home.png,            title: "Home",                 text: "Your library, recent music and stats." }
+  - { file: playlist-list.png,   title: "Playlist, list view",  text: "Columns you can switch on and off." }
+  - { file: playlist-grid.png,   title: "Playlist, grid view",  text: "Big covers with a number badge." }
+  - { file: now-playing.png,     title: "Bottom bar",           text: "Controls, song bar and volume. Right-click to rearrange." }
+  - { file: queue.png,           title: "Queue (E)",            text: "Up next and recently played." }
+  - { file: lyrics-side.png,     title: "Lyrics panel (W)",     text: "Timestamps, click a line to jump." }
+  - { file: lyrics-full.png,     title: "Full-screen lyrics (F)", text: "With an optional visualizer behind." }
+  - { file: vis-full.png,        title: "Full-screen visualizer (D)", text: "Bars, flow and swirl on the whole screen." }
+  - { file: vis-settings.png,    title: "Visualizer settings (V)", text: "Every slider." }
+  - { file: views-panel.png,     title: "Views panel",          text: "Right-click the round disc to switch parts of the screen on or off." }
+  - { file: stats.png,           title: "Music stats",          text: "7 days, 30 days or all time." }
+  - { file: recap.png,           title: "Recap picture",        text: "Save it and share it." }
+  - { file: mini-player.png,     title: "Mini player",          text: "Its own small window." }
+  - { file: extra-window.png,    title: "Extra visualizer window", text: "Drag it to another monitor." }
+  - { file: keys.png,            title: "Keyboard shortcuts (T)", text: "Click a key, press a new one." }
+
+settings:
+  - { file: settings-audio.png,   title: "Audio",          text: "Output buffer, audio cache, network proxy." }
+  - { file: settings-themes.png,  title: "Themes",         text: "16 themes, or your own colours. Point at one to preview." }
+  - { file: settings-album.png,   title: "Match the album cover", text: "Colours follow the song." }
+  - { file: settings-window.png,  title: "See-through window", text: "Slide to let the desktop show through." }
+  - { file: settings-lastfm.png,  title: "Last.fm",        text: "Scrobbling, love, missing pictures." }
+  - { file: settings-discord.png, title: "Discord",        text: "Rich presence, with a live preview." }
+  - { file: settings-keys.png,    title: "Keys",           text: "Rebind, export, import." }
+  - { file: settings-files.png,   title: "Files and index", text: "Where everything is saved." }
+  - { file: settings-export.png,  title: "Export and import", text: "Share your look with friends." }
+  - { file: settings-unavailable.png, title: "Unavailable songs", text: "Songs Spotify removed from your playlists." }
+  - { file: vis-bars.png,         title: "Visualizer: bars",  text: "Count, height, gap." }
+  - { file: vis-flow.png,         title: "Visualizer: flow",  text: "Sheets, depth, speed, direction." }
+  - { file: vis-swirl.png,        title: "Visualizer: swirl", text: "Sliders and colours." }
+  - { file: bottom-bar-menu.png,  title: "Bottom bar menu",   text: "Layout, song bar styles, volume presets, equalizer." }
