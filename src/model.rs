@@ -1501,6 +1501,9 @@ pub enum Action {
     SetVisSwayAmount(f32),
     ToggleVisTextOutline,
     ToggleVisTextBack,
+    /// The panel behind the title: 0 solidity, 1 roundness, 2 padding, 3 one block (0 or 1).
+    SetVisBack(u8, f32),
+    SetVisLivePreview(bool),
     /// Pick the full-screen title font (index into VIS_FONTS).
     SetVisFont(u8),
     ToggleVisArtist,

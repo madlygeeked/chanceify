@@ -11544,6 +11544,21 @@ impl App {
                 self.settings.vis_text_back = !self.settings.vis_text_back;
                 self.mark_settings_dirty();
             }
+            Action::SetVisBack(which, value) => {
+                if value.is_finite() {
+                    match which {
+                        0 => self.settings.vis_back_alpha = value.clamp(0.1, 1.0),
+                        1 => self.settings.vis_back_round = value.clamp(0.0, 30.0),
+                        2 => self.settings.vis_back_pad = value.clamp(0.0, 40.0),
+                        _ => self.settings.vis_back_block = value >= 0.5,
+                    }
+                    self.mark_settings_dirty();
+                }
+            }
+            Action::SetVisLivePreview(on) => {
+                self.settings.vis_live_preview = on;
+                self.mark_settings_dirty();
+            }
             Action::SetVisFont(index) => {
                 let count = crate::system_fonts::VIS_FONTS.len() as u8;
                 self.settings.vis_text_font = index.min(count.saturating_sub(1));

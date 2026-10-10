@@ -433,9 +433,7 @@ fn lyrics_menu(app: &mut App, page: &egui::Response, side: bool) {
             for (value, label) in [
                 (0u8, "Left"),
                 (2, "Right"),
-                (3, "Focus, current line at the bottom"),
-                (4, "Focus, current line in the middle"),
-                (5, "Focus, current line at the top"),
+                (4, "Focus on the current line"),
             ] {
                 if widgets::menu_item(
                     ui,
@@ -965,6 +963,12 @@ pub fn vis_overlay(app: &mut App, ui: &mut egui::Ui) {
     let base = (region.height() * 0.11).clamp(22.0, 52.0).min(region.width() * 0.07);
     let pitch = base * 1.5;
     let centre_y = region.center().y;
+    // The same anchoring and timestamps as the full-screen lyrics page.
+    let align = app.settings.lyrics_align_value();
+    let stamps_on = !app.settings.lyrics_flag(crate::settings::Settings::LYRICS_HIDE_STAMPS);
+    let stamp_w = if stamps_on { 56.0 } else { 0.0 };
+    let text_left = region.left() + stamp_w;
+    let text_w = (region.width() - stamp_w).max(60.0);
     let first = (place.floor() as isize - 3).max(0) as usize;
     let last = ((place.ceil() as isize + 4).max(0) as usize).min(lyrics.lines.len());
     for index in first..last {
@@ -980,12 +984,29 @@ pub fn vis_overlay(app: &mut App, ui: &mut egui::Ui) {
             text,
             theme::bold(size),
             Color32::WHITE.gamma_multiply(alpha.clamp(0.0, 1.0)),
-            region.width(),
+            text_w,
             1,
             Some(crate::bidi::ELLIPSIS),
         );
         let y = centre_y + d * pitch + d.signum() * near * base * 0.2 - galley.size().y / 2.0;
-        painter.galley(pos2(region.left(), y), galley, Color32::WHITE);
+        let x = match align {
+            2 => region.right() - galley.size().x,
+            4 => text_left + (text_w - galley.size().x) / 2.0,
+            _ => text_left,
+        };
+        if stamps_on
+            && let Some(at) = line.at_ms
+        {
+            let secs = (at / 1000) as u64;
+            painter.text(
+                pos2(region.left(), y + galley.size().y / 2.0),
+                egui::Align2::LEFT_CENTER,
+                format!("{}:{:02}", secs / 60, secs % 60),
+                theme::bold((base * 0.4).max(11.0)),
+                Color32::WHITE.gamma_multiply((alpha * 0.55).clamp(0.0, 1.0)),
+            );
+        }
+        painter.galley(pos2(x, y), galley, Color32::WHITE);
     }
     if now.playing {
         ui.ctx().request_repaint();
@@ -1057,7 +1078,7 @@ fn fullscreen_contents(app: &mut App, ui: &mut egui::Ui) {
     // returns to the sung line when the next line starts.
     let following = app.lyrics_following;
     let follow = following && app.lyrics_line_shown != Some(active);
-    let animation = egui::style::ScrollAnimation::duration(0.45);
+    let animation = egui::style::ScrollAnimation::duration(0.26);
     // Big enough to read from across a room.
     // Scaled by the height too, so a short page still shows several lines.
     let size = (ui.available_width() * 0.06)
@@ -1136,7 +1157,7 @@ fn fullscreen_contents(app: &mut App, ui: &mut egui::Ui) {
                 let lit = ui.ctx().animate_bool_with_time(
                     egui::Id::new("lyric-line").with(("fullscreen", &now.uri, index)),
                     is_active,
-                    0.3,
+                    0.18,
                 );
                 let color = if lyrics.synced {
                     blend(quiet, palette.text, lit)
@@ -1160,7 +1181,7 @@ fn fullscreen_contents(app: &mut App, ui: &mut egui::Ui) {
                     ui.ctx().animate_value_with_time(
                         egui::Id::new("lyric-scale").with(("fullscreen", &now.uri, index)),
                         target,
-                        0.35,
+                        0.2,
                     )
                 } else {
                     1.0
