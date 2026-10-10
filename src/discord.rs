@@ -380,10 +380,18 @@ pub fn set_log_file(path: std::path::PathBuf) {
     *LOG_FILE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(path);
 }
 
-fn write_log(text: &str) {
+static LOG_TEXT: Mutex<String> = Mutex::new(String::new());
+static FIRST_REFUSAL: Mutex<Option<String>> = Mutex::new(None);
+
+fn write_log_entry(entry: &str, fresh: bool) {
+    let mut text = LOG_TEXT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if fresh {
+        text.clear();
+    }
+    text.push_str(entry);
     let path = LOG_FILE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone();
     if let Some(path) = path {
-        let _ = std::fs::write(path, text);
+        let _ = std::fs::write(path, text.as_str());
     }
 }
 
@@ -495,17 +503,20 @@ fn run(rx: mpsc::Receiver<Message>) {
             LINK.store(0, std::sync::atomic::Ordering::Relaxed);
             continue;
         };
-        let sent = match set_activity(pipe.as_mut(), activity.as_ref(), false) {
-            // Discord did not take the whole thing (an older Discord may not
-            // know a newer field): say it again with only the basics.
-            Ok(false) => set_activity(pipe.as_mut(), activity.as_ref(), true),
-            other => other,
-        };
+        // Discord did not take the whole thing (an older Discord may not
+        // know a newer field): say it again with a little less each time,
+        // so the most that Discord will accept is what shows.
+        let mut level = 0;
+        let mut sent = set_activity(pipe.as_mut(), activity.as_ref(), level);
+        while matches!(sent, Ok(false)) && level < 4 && activity.is_some() {
+            level += 1;
+            sent = set_activity(pipe.as_mut(), activity.as_ref(), level);
+        }
         match sent {
             Ok(taken) => {
                 pending = None;
                 LINK.store(2, std::sync::atomic::Ordering::Relaxed);
-                if taken {
+                if taken && level == 0 {
                     note_error(String::new());
                 }
             }
@@ -618,6 +629,14 @@ fn line(text: &str) -> String {
 /// The activity as Discord's JSON. `plain` leaves out everything but the two
 /// lines, the times and the big picture.
 fn activity_json(activity: &Activity, plain: bool) -> Value {
+    activity_json_level(activity, if plain { 4 } else { 0 })
+}
+
+/// The same, at a level of simplicity: 0 everything; 1 without the newer
+/// fields (links on the lines, the status line choice); 2 also without the
+/// listen-along party; 3 also without the buttons; 4 only the basics.
+fn activity_json_level(activity: &Activity, level: u8) -> Value {
+    let plain = level >= 4;
     let mut value = json!({
         // 2 is "Listening to".
         "type": 2,
@@ -647,21 +666,23 @@ fn activity_json(activity: &Activity, plain: bool) -> Value {
         value["assets"] = Value::Object(assets);
     }
     if !plain {
-        value["status_display_type"] = json!(activity.status_display.min(2));
-        if let Some(url) = &activity.details_url {
-            value["details_url"] = json!(url);
+        if level < 1 {
+            value["status_display_type"] = json!(activity.status_display.min(2));
+            if let Some(url) = &activity.details_url {
+                value["details_url"] = json!(url);
+            }
+            if let Some(url) = &activity.state_url {
+                value["state_url"] = json!(url);
+            }
         }
-        if let Some(url) = &activity.state_url {
-            value["state_url"] = json!(url);
-        }
-        if let Some(secret) = &activity.join {
+        if level < 2 && let Some(secret) = &activity.join {
             value["party"] = json!({
                 "id": format!("chanceify-{}", std::process::id()),
                 "size": [1, 10],
             });
             value["secrets"] = json!({ "join": secret });
         }
-        if !activity.buttons.is_empty() {
+        if level < 3 && !activity.buttons.is_empty() {
             let buttons: Vec<Value> = activity
                 .buttons
                 .iter()
@@ -684,14 +705,14 @@ fn activity_json(activity: &Activity, plain: bool) -> Value {
 fn set_activity(
     pipe: &mut dyn Pipe,
     activity: Option<&Activity>,
-    plain: bool,
+    level: u8,
 ) -> std::io::Result<bool> {
     let nonce = next_nonce();
     let payload = json!({
         "cmd": "SET_ACTIVITY",
         "args": {
             "pid": std::process::id(),
-            "activity": activity.map(|activity| activity_json(activity, plain)),
+            "activity": activity.map(|activity| activity_json_level(activity, level)),
         },
         "nonce": nonce,
     });
@@ -700,14 +721,40 @@ fn set_activity(
     let nonce = payload["nonce"].as_str().unwrap_or_default().to_string();
     let answer = read_answer(pipe, &nonce)?;
     let refused = answer.get("evt").and_then(Value::as_str) == Some("ERROR");
-    write_log(&format!(
-        "sent (plain: {plain}):\n{}\n\nDiscord answered:\n{}\n",
+    let entry = format!(
+        "--- try {} (0 is the full card, 4 the plainest): {}\nsent:\n{}\nDiscord answered:\n{}\n\n",
+        level + 1,
+        if refused { "REFUSED" } else { "accepted" },
         serde_json::to_string_pretty(&payload["args"]["activity"]).unwrap_or_default(),
         serde_json::to_string_pretty(&answer).unwrap_or_default()
-    ));
+    );
+    // The first try starts the log afresh; the simpler tries add to it.
+    write_log_entry(&entry, level == 0);
+    let reason = answer
+        .get("data")
+        .and_then(|d| d.get("message"))
+        .and_then(Value::as_str)
+        .unwrap_or("no reason given")
+        .to_string();
     if refused {
         log::debug!("discord presence: refused: {answer}");
-        note_error(format!("Discord refused the song: {}", answer.get("data").and_then(|d| d.get("message")).and_then(Value::as_str).unwrap_or("no reason given")));
+        if level == 0 {
+            FIRST_REFUSAL.lock().unwrap_or_else(|p| p.into_inner()).replace(reason.clone());
+        }
+        note_error(format!("Discord refused the song: {reason}"));
+    } else if level > 0 {
+        let first = FIRST_REFUSAL
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
+            .unwrap_or_default();
+        let dropped = match level {
+            1 => "the links on the lines and the status choice",
+            2 => "the links, the status choice and listen-along",
+            3 => "the links, listen-along and the buttons",
+            _ => "everything but the song, the cover and the times",
+        };
+        note_error(format!("Discord only took a simpler card, without {dropped}. Discord said: {first}"));
     }
     Ok(!refused)
 }

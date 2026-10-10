@@ -1803,12 +1803,13 @@ pub(crate) fn spread_columns(laid: &mut Columns, region: f32) {
 }
 
 /// How far the whole table moves right to sit in the middle of the list: the
-/// song name keeps a fixed 460 and everything grows out from the centre.
+/// song name never grows past 460 (longer names are cut short) and the
+/// whole table always sits in the middle, growing out from the centre.
 /// Nothing moves when the table is locked to the left, spread evenly, or
 /// too narrow to have room to spare.
 fn centred_shift(room: f32, others: f32, columns: &crate::settings::TrackColumns) -> f32 {
     let title = room - others;
-    if columns.lock_left || (columns.spread && others > 0.0) || title <= 520.0 {
+    if columns.lock_left || (columns.spread && others > 0.0) || title <= 460.0 {
         0.0
     } else {
         (title - 460.0) / 2.0
