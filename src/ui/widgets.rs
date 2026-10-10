@@ -1789,8 +1789,14 @@ pub(crate) fn column_slots(
 ) -> Vec<(crate::model::SortColumn, f32, f32)> {
     use crate::model::SortColumn as Sc;
     let others = laid.playlists + laid.album + laid.added + laid.release + laid.bpm;
-    let title = (end - start - others).max(0.0);
+    let mut title = (end - start - others).max(0.0);
     let mut x = start;
+    // The song name alone in a wide list sits in the middle, not hard left.
+    if others == 0.0 && title > 560.0 {
+        let narrow = 460.0;
+        x += (title - narrow) / 2.0;
+        title = narrow;
+    }
     let mut out = Vec::new();
     for code in order {
         let (column, width) = match code {
@@ -3544,60 +3550,6 @@ pub fn table_header(
         clicked = Some(SortColumn::Duration);
     }
     anchors.push(hover);
-    }
-    // A small "?" at the right end of the header explains every option in
-    // the columns menu.
-    {
-        let centre = pos2(rect.right() - 18.0, rect.center().y);
-        let help = ui.interact(
-            Rect::from_center_size(centre, Vec2::splat(24.0)),
-            ui.id().with("table-header-help"),
-            Sense::click(),
-        );
-        let ink = if help.hovered() { palette.text } else { color };
-        ui.painter()
-            .circle_stroke(centre, 8.0, Stroke::new(1.0, ink));
-        ui.painter().text(
-            centre,
-            egui::Align2::CENTER_CENTER,
-            "?",
-            theme::semibold(11.0),
-            ink,
-        );
-        let help = help.on_hover_text("What do these options do?");
-        egui::Popup::menu(&help)
-            .frame(menu_frame(palette))
-            .show(|ui| {
-                ui.set_width(320.0);
-                theme::text(ui, "The columns menu", theme::semibold(14.0), palette.text);
-                ui.add_space(4.0);
-                for (name, what) in [
-                    ("GRID VIEW", "Switches between a list and a grid of covers."),
-                    ("NUMBER", "Shows or hides the song number."),
-                    ("PLAYLISTS", "A column with the icons of your playlists that hold the song. Click its heading to sort by it."),
-                    ("ALBUM", "Shows or hides the album name."),
-                    ("DATE ADDED", "When the song was added to this list."),
-                    ("BPM", "The song's tempo, beats a minute."),
-                    ("RELEASE DATE", "When the album came out."),
-                    ("LENGTH", "Shows or hides the song length."),
-                    ("RESET COLUMN WIDTHS", "Puts every column back to its starting width."),
-                    ("Dragging", "Drag a column edge to resize it (Shift makes them all equal), double-click it to reset, drag to the far left to hide it. Drag a heading sideways to move the column; the song names can go anywhere, even in the middle."),
-                    ("Sorting", "Click a heading to sort. Click again to reverse, once more for the list's own order."),
-                ] {
-                    ui.horizontal_wrapped(|ui| {
-                        theme::text(ui, name, theme::semibold(12.5), palette.text);
-                        ui.add(
-                            egui::Label::new(
-                                egui::RichText::new(what)
-                                    .font(theme::regular(12.5))
-                                    .color(palette.secondary),
-                            )
-                            .wrap(),
-                        );
-                    });
-                    ui.add_space(2.0);
-                }
-            });
     }
     // Drawn after the headings, so a handle sits over the column edge
     // rather than under its text. A right-click on a handle opens the same

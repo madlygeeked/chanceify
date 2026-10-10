@@ -271,10 +271,6 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                     change = Some(Some(default_float(ui.ctx())));
                     ui.close();
                 }
-                if ui.button("Put the controls away").clicked() {
-                    change = Some(None);
-                    ui.close();
-                }
             });
         });
     if let Some(place) = change {
@@ -358,7 +354,6 @@ pub fn show(app: &mut App, ctx: &Context) {
                         }
                     });
                     ui.add_space(4.0);
-                    let float_on = app.float_slot(default_float(ctx)).is_some();
                     let on_top = ("Always on top", app.settings.mini_on_top, Action::ToggleMiniOnTop);
                     let flag = |bit: u8, label: &'static str, inverted: bool, app: &App| {
                         (label, app.settings.lyrics_flag(bit) != inverted, Action::ToggleLyricsFlag(bit))
@@ -383,7 +378,6 @@ pub fn show(app: &mut App, ctx: &Context) {
                             flag(S::LYRICS_HIDE_ARTIST, "Artist name", true, app),
                             ("Visualizer behind", app.settings.lyrics_vis, Action::ToggleLyricsVis),
                             ("Visualizer settings", app.vis_panel, Action::ToggleVisPanel),
-                            ("Pop-out controls", float_on, Action::SetFloatControls(if float_on { None } else { Some(default_float(ctx)) })),
                             on_top,
                         ],
                         _ => vec![
@@ -395,7 +389,6 @@ pub fn show(app: &mut App, ctx: &Context) {
                             ("Queue", app.show_queue_panel, Action::InDefaultView(Box::new(Action::ToggleQueuePanel))),
                             ("Side lyrics", app.show_lyrics_panel, Action::InDefaultView(Box::new(Action::ToggleLyricsPanel))),
                             ("Big album art", app.settings.art_expanded, Action::InDefaultView(Box::new(Action::ToggleArtExpanded))),
-                            ("Pop-out controls", float_on, Action::SetFloatControls(if float_on { None } else { Some(default_float(ctx)) })),
                             ("Clean screen", app.settings.float_hide_bar, Action::SetFloatHideBar(!app.settings.float_hide_bar)),
                             ("Visualizer settings", app.vis_panel, Action::ToggleVisPanel),
                             (if app.extra_vis { "Close visualizer window" } else { "New visualizer window" }, app.extra_vis, Action::ToggleExtraWindow),

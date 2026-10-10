@@ -628,19 +628,9 @@ pub fn table(app: &mut App, ui: &mut egui::Ui, table: Table<'_>) {
         .pagination
         .filter(|page| page.total > 0 && !sorted && needle.is_empty());
     let rows = finite.map_or(entry.visible.len(), |page| page.total as usize);
-    let grid_now = {
-        let cfg = app.settings.track_columns;
-        rows > 0
-            && (cfg.grid
-                || ((!table.show_album || !cfg.shown(SortColumn::Album))
-                    && (!table.show_added || !cfg.shown(SortColumn::Added))
-                    && !table.show_added_by
-                    && !cfg.shown(SortColumn::Bpm)
-                    && !cfg.shown(SortColumn::Release)
-                    && !cfg.shown(SortColumn::Genre)
-                    && !cfg.shown(SortColumn::Playlists)
-                    && cfg.hide_duration))
-    };
+    // The grid is only ever the reader's choice; switching columns off
+    // leaves the list as it is.
+    let grid_now = rows > 0 && app.settings.track_columns.grid;
     if rows > 0 {
         let asked = widgets::table_header(
             ui,
@@ -830,19 +820,8 @@ pub fn table(app: &mut App, ui: &mut egui::Ui, table: Table<'_>) {
     let mut row_responses = Vec::new();
     let mut missing = None;
     let mut retry_shown = false;
-    // Only the song name switched on: the list becomes a grid of covers,
-    // left to right and top to bottom. Turning any other column on brings
-    // the ordinary list back.
-    let cfg = app.settings.track_columns;
-    let only_title = (!table.show_album || !cfg.shown(SortColumn::Album))
-        && (!table.show_added || !cfg.shown(SortColumn::Added))
-        && !table.show_added_by
-        && !cfg.shown(SortColumn::Bpm)
-        && !cfg.shown(SortColumn::Release)
-        && !cfg.shown(SortColumn::Genre)
-        && !cfg.shown(SortColumn::Playlists)
-        && cfg.hide_duration;
-    let grid = rows > 0 && (cfg.grid || only_title);
+    // The grid is a toggle in the columns menu, never automatic.
+    let grid = rows > 0 && app.settings.track_columns.grid;
     if grid {
         let card_height = widgets::card_row_height(ui);
         widgets::virtual_wrapped_cards(ui, rows, card_height, |ui, row| {

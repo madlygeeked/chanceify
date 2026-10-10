@@ -257,7 +257,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     // One row above the visualizer holds everything you press: the play
     // buttons, then the song-length bar, then the volume. The row grows with
     // the controls' size setting, so nothing is drawn over the picture.
-    let controls_k = app.settings.controls_scale_value();
+    // One size for the controls now: the bar's own row no longer resizes.
+    let controls_k = 1.0_f32;
     // However the reader set it, a narrow window stacks the controls: two
     // rows when it is getting tight, three when it is small, so the buttons
     // always sit together instead of spreading across the bar.
@@ -274,8 +275,12 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         chosen => chosen.max(auto_layout),
     };
     let stacked = layout != 0;
-    let strip_h = if lyrics_page {
+    // The controls are their own panel, so the bar keeps no row for them: a
+    // slim one for the song's name, none at all with big album art.
+    let strip_h = if lyrics_page || (popped_out && app.float_mode() == 1) {
         0.0
+    } else if popped_out {
+        46.0
     } else {
         (46.0 * controls_k).clamp(46.0, 84.0)
             * match layout {
@@ -376,43 +381,15 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             // For the guided tour: the row of controls (not the visualizer).
             ui.ctx()
                 .data_mut(|data| data.insert_temp(egui::Id::new("tour-player"), row));
-            // Dragging the empty space of the row up or down resizes the
-            // controls, the song bar and the row with them. It is registered
-            // before any of the row's widgets, and egui gives a click to the
-            // last widget drawn over it, so the buttons, the bar and the
-            // volume keep their own drags and only the empty space is left
-            // for this one.
-            {
-                let background = ui.interact(
-                    row,
-                    ui.id().with("row-background-drag"),
-                    Sense::drag(),
-                );
-                if background.hovered() || background.dragged() {
-                    ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeVertical);
-                }
-                if background.dragged() {
-                    // Dragging up grows the row, one for one with the pointer.
-                    let wanted = controls_k - background.drag_delta().y / 46.0;
-                    app.actions.push(Action::SetControlsScale(wanted));
-                }
-            }
-            // A handle on the row's top edge while the pointer is over it:
-            // drag the empty space to make the row taller or shorter.
-            if ui.rect_contains_pointer(row) {
-                ui.painter().rect_filled(
-                    Rect::from_center_size(pos2(row.center().x, row.top() + 3.0), vec2(56.0, 4.0)),
-                    2.0,
-                    palette.text.gamma_multiply(0.45),
-                );
-            }
             // The cover and the song's name at the left of the row.
             {
                 let region = Rect::from_min_max(
                     pos2(grown.left(), row.top()),
                     pos2(grown.left() + side, row.bottom()),
                 );
-                now_playing_block(app, ui, region, now.as_ref());
+                if region.height() >= 20.0 {
+                    now_playing_block(app, ui, region, now.as_ref());
+                }
             }
             // Then the media controls, the song-length bar, and the volume,
             // all in the same row, in the order the reader chose: the groups
@@ -692,26 +669,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 )
             };
             blocks[1] = seek_rect;
-            // Right-click the buttons: the controls pop out into a panel you
-            // can move, like the disc. Right-click them there to put away.
-            {
-                let buttons = Rect::from_min_max(
-                    pos2(blocks[0].left(), band.top()),
-                    pos2(blocks[0].left() + block_w[0], band.bottom()),
-                );
-                let pressed = ui.input(|input| {
-                    input.pointer.secondary_clicked()
-                        && input.pointer.interact_pos().is_some_and(|at| buttons.contains(at))
-                });
-                if pressed {
-                    let place = if popped && app.float_mode() == 0 {
-                        None
-                    } else {
-                        Some(super::views_panel::default_float(ui.ctx()))
-                    };
-                    app.actions.push(Action::SetFloatControls(place));
-                }
-            }
             let mut right_ui = ui.new_child(
                 UiBuilder::new()
                     .max_rect(blocks[2])

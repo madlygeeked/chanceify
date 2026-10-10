@@ -9869,7 +9869,9 @@ impl App {
         match self.float_mode() {
             2 => Some(self.settings.float_lyrics.unwrap_or(default)),
             1 => Some(self.settings.float_big.unwrap_or(default)),
-            _ => self.settings.float_controls,
+            // The controls are always their own panel now; there is no
+            // control row in the bar.
+            _ => Some(self.settings.float_controls.unwrap_or(default)),
         }
     }
 
