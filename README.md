@@ -1,12 +1,21 @@
-# chanceify™
+<p align="center">
+  <img src="https://madlygeeked.github.io/assets/chanceify.png" alt="" width="120">
+</p>
 
-*music reimagined*
+<h1 align="center">chanceify™</h1>
+<p align="center"><i>music reimagined</i></p>
 
-needs spotify premium.
+<p align="center">
+  <a href="https://github.com/madlygeeked/chanceify/releases">download</a> &nbsp;·&nbsp;
+  <a href="https://madlygeeked.github.io/chanceify/">more info</a> &nbsp;·&nbsp;
+  <a href="https://github.com/madlygeeked/chanceify/issues">issues</a>
+</p>
+
+a small, fast spotify player for windows. needs spotify premium.
 
 ## get it
 
-1. download `chanceify.exe` from [releases](https://github.com/madlygeeked/chanceify/releases).
+1. download `chanceify.exe` from [releases](https://github.com/madlygeeked/chanceify/releases)
 2. run it, in its own folder. everything it saves stays beside it.
 
 ## features
@@ -14,13 +23,16 @@ needs spotify premium.
 - **plays your spotify.** no, really.
 - **music stats.** top artists and songs, plus recommended.
 - **last.fm.** scrobbling, love, and missing cover art saved for you.
+- **lyrics.** a floating card that follows the song.
 - **looks.** themes, make your own, or let it follow the album cover.
 - **visualizer.** bars, flow and swirl, full screen, in its own window or behind the lyrics.
 - **views.** click the disc to switch parts of the screen on or off.
 - **keybinds.** every key can be changed.
-- **your files stay with you.** everything lives in the folder beside the app.
+- **discord.** shows what you're playing.
 
-more help: [chanceify](https://madlygeeked.github.io/chanceify)
+it streams with [librespot](https://github.com/librespot-org/librespot). it doesn't download songs, and it doesn't collect data ([privacy](PRIVACY.md)).
+
+more help: [chanceify](https://madlygeeked.github.io/chanceify/)
 
 ---
 
@@ -66,6 +78,8 @@ your app is `target\release\chanceify.exe`. copy it into a folder of its own, li
 
 ---
 
-Built with love by [chance](https://madlygeeked.github.io/).<br>
-Inspired by [Spotify](https://www.spotify.com), [Spotifast](https://spotifast.rocks/) and [Spicetify](https://spicetify.app).<br>
-Licensed AGPL-3.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE.md).
+<p align="center">
+  built with love by <a href="https://madlygeeked.github.io/">chance</a> <img src="https://madlygeeked.github.io/assets/bears/v01.png" alt="" width="18"><br>
+  inspired by <a href="https://www.spotify.com">Spotify</a>, <a href="https://spotifast.rocks/">Spotifast</a> and <a href="https://spicetify.app">Spicetify</a><br>
+  licensed AGPL-3.0, see <a href="LICENSE">LICENSE</a> and <a href="NOTICE.md">NOTICE</a>
+</p>
