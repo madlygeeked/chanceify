@@ -263,6 +263,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
             // The small album art mode: the cover and the song's name sit
             // just above the controls and travel with them.
             if !app.settings.art_expanded
+                && app.lyrics_fullscreen.is_none()
                 && let Some(now) = app.now_playing()
             {
                 let side = (outer.width() * 0.26).clamp(64.0, 120.0);
@@ -289,7 +290,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                     Some(&loader),
                 );
                 let text_left = cover.right() + 12.0;
-                let text_w = (outer.right() - pad - text_left).max(40.0);
+                let text_w = (outer.right() - pad - text_left - 28.0).max(40.0);
                 let title = crate::bidi::layout(
                     ui.painter(),
                     &now.title,
@@ -311,7 +312,18 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                 let block = title.size().y + 4.0 + artist.size().y;
                 let y = cover.center().y - block / 2.0;
                 let title_h = title.size().y;
+                let title_w = title.size().x;
+                let first_row = title_h / title.rows.len().max(1) as f32;
                 ui.painter().galley(egui::pos2(text_left, y), title, Color32::WHITE);
+                // The like heart, right after the song's name.
+                super::player_bar::like_heart(
+                    app,
+                    ui,
+                    "pop-out-card",
+                    egui::pos2(text_left + title_w.min(text_w) + 16.0, y + first_row / 2.0),
+                    18.0,
+                    &now.uri,
+                );
                 ui.painter().galley(egui::pos2(text_left, y + title_h + 4.0), artist, Color32::WHITE);
             }
             let grip = Rect::from_min_size(outer.min, egui::vec2(outer.width(), 12.0));

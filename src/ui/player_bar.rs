@@ -932,13 +932,8 @@ fn fullscreen_edge_bars(
     // the two sets never draw over each other.
     // A little room is kept clear at every corner (the disc sits in the
     // top-left one), so the two sets part with a gap instead of touching.
-    let corner_cap = |from_corner: f32, cell: f32| {
-        if from_corner < 60.0 {
-            0.0
-        } else {
-            (from_corner - cell * 0.5 - 8.0).max(2.0)
-        }
-    };
+    // The bars run right into the corner; the disc is drawn over them.
+    let corner_cap = |_from_corner: f32, _cell: f32| f32::MAX;
     for (i, level) in merged_x.iter().enumerate() {
         let mut h = (soft_height(level * height) * reach).max(2.0);
         let x = rect.left() + i as f32 * step_x;
@@ -4171,7 +4166,7 @@ fn heart_colour(app: &App) -> Color32 {
 
 /// A heart for the playing song, drawn at `centre`. Filled in the cover's
 /// colour when the song is in Liked Songs; a click saves or removes it.
-fn like_heart(app: &mut App, ui: &mut egui::Ui, id: &str, centre: egui::Pos2, size: f32, uri: &str) {
+pub(super) fn like_heart(app: &mut App, ui: &mut egui::Ui, id: &str, centre: egui::Pos2, size: f32, uri: &str) {
     let saved = app.is_saved(uri) == Some(true);
     let rect = Rect::from_center_size(centre, Vec2::splat(size + 10.0));
     let response = ui

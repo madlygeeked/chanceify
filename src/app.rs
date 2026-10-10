@@ -10921,6 +10921,13 @@ impl App {
             }
             Action::ToggleVisShape(bit) => {
                 let now = self.settings.vis_shapes_value() ^ (bit & 7);
+                // The full screen visualizer is the visualizer: the last shape
+                // cannot be switched off while it is open.
+                let now = if self.fullscreen_vis && now == 0 {
+                    self.settings.vis_shapes_value()
+                } else {
+                    now
+                };
                 self.settings.vis_shapes = now;
                 self.settings.vis_shapes_set = true;
                 // Keep the single mode in step for the code that still reads it.
@@ -10938,7 +10945,9 @@ impl App {
             }
             Action::ToggleVisShapes => {
                 let now = self.settings.vis_shapes_value();
-                let next = if now != 0 {
+                let next = if self.fullscreen_vis && now != 0 {
+                    now
+                } else if now != 0 {
                     self.settings.vis_shapes_last = now;
                     0
                 } else if self.settings.vis_shapes_last != 0 {
