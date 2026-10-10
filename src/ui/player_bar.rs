@@ -5597,26 +5597,6 @@ fn transport_impl(
             }
         }
     }
-    // A small grip on the bar's right end: drag it to make the bar longer or shorter.
-    let grip = Rect::from_center_size(
-        pos2(slider_left + slider_width + 6.0, row_cy),
-        vec2(10.0, 22.0 * k),
-    );
-    let grab = ui.interact(grip, egui::Id::new("seek-grip"), Sense::drag());
-    if grab.hovered() || grab.dragged() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
-    }
-    if grab.hovered() || grab.dragged() || ui.rect_contains_pointer(row) {
-        ui.painter().rect_filled(
-            Rect::from_center_size(grip.center(), vec2(4.0, 16.0)),
-            2.0,
-            palette.text.gamma_multiply(0.6),
-        );
-    }
-    if grab.dragged() {
-        let wanted = (slider_width + grab.drag_delta().x).clamp(100.0, full_width);
-        app.actions.push(Action::SetSeekWidth(wanted));
-    }
     let mut seek_right = slider_left + slider_width + 14.0;
     let after = match mode {
         0 => Some(end_text.clone()),
