@@ -634,7 +634,19 @@ impl SearchFilter {
     pub const ALL: [SearchFilter; 7] = [
         Self::All,
         Self::Songs,
+        Self::Albums,
+        Self::Playlists,
         Self::Artists,
+        Self::Podcasts,
+        Self::Episodes,
+    ];
+
+    /// The same pills, in the order Spotify shows them for a search that is
+    /// about an artist: Artists comes straight after All.
+    pub const ARTIST_FIRST: [SearchFilter; 7] = [
+        Self::All,
+        Self::Artists,
+        Self::Songs,
         Self::Albums,
         Self::Playlists,
         Self::Podcasts,

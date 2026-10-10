@@ -854,6 +854,8 @@ pub struct Settings {
     pub views_width: f32,
     /// The mini player window: x, y, width, height.
     pub mini_window: Option<[f32; 4]>,
+    /// The extra visualizer window: x, y, width, height.
+    pub extra_window: Option<[f32; 4]>,
     /// The full window's size before the mini player, kept between launches.
     pub mini_restore_size: Option<[f32; 2]>,
     pub float_big: Option<[f32; 3]>,
@@ -1279,6 +1281,7 @@ impl Default for Settings {
             float_hide_bar: false,
             views_width: 316.0,
             mini_window: None,
+            extra_window: None,
             mini_restore_size: None,
             float_big: None,
             float_lyrics: None,

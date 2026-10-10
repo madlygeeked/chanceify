@@ -138,6 +138,11 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "likehover", label: "Like the song under the pointer", default: UNSET, action: || Action::LikeHovered },
     Bindable { id: "likeplaying", label: "Like the playing song", default: UNSET, action: || Action::LikePlaying },
     Bindable { id: "tap", label: "Bass jump", default: UNSET, action: || Action::TapTempo },
+    Bindable { id: "tap2", label: "Bass jump (second key)", default: UNSET, action: || Action::TapTempo },
+    Bindable { id: "tap3", label: "Bass jump (third key)", default: UNSET, action: || Action::TapTempo },
+    Bindable { id: "cyclevis", label: "Next visualizer style", default: UNSET, action: || Action::CycleVisualiser },
+    Bindable { id: "visgradient", label: "Gradient on or off", default: UNSET, action: || Action::ToggleVisGradient },
+    Bindable { id: "visreverse", label: "Reverse the visualizer", default: UNSET, action: || Action::ToggleVisReverse },
     Bindable { id: "next", label: "Next song", default: UNSET, action: || Action::Next },
     Bindable { id: "previous", label: "Previous song", default: UNSET, action: || Action::Previous },
     Bindable { id: "volup", label: "Volume up", default: UNSET, action: || Action::VolumeBy(5) },
@@ -156,8 +161,6 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "playspace", label: "Play or pause (second key)", default: UNSET, action: || Action::TogglePlay },
     Bindable { id: "seekback5", label: "Seek back 5 seconds", default: UNSET, action: || Action::SeekBy(-5_000) },
     Bindable { id: "seekfwd5", label: "Seek forward 5 seconds", default: UNSET, action: || Action::SeekBy(5_000) },
-    Bindable { id: "volup5", label: "Volume up 5%", default: UNSET, action: || Action::VolumeBy(5) },
-    Bindable { id: "voldown5", label: "Volume down 5%", default: UNSET, action: || Action::VolumeBy(-5) },
     Bindable { id: "tenth0", label: "Jump to 0% of the song", default: UNSET, action: || Action::SeekToPercent(0) },
     Bindable { id: "tenth1", label: "Jump to 10% of the song", default: UNSET, action: || Action::SeekToPercent(10) },
     Bindable { id: "tenth2", label: "Jump to 20% of the song", default: UNSET, action: || Action::SeekToPercent(20) },
@@ -215,11 +218,15 @@ pub fn read_keys(text: &str) -> Option<std::collections::BTreeMap<String, String
 pub const CATEGORIES: &[(&str, &[&str])] = &[
     ("Views", &["views", "defaultview", "calmmode", "extrawindow", "closeextras", "normalview", "mini", "fullscreen", "lyricsfull", "visshapes", "art", "closewindow"]),
     ("Panels", &["sidebar", "queuelyrics", "queue", "lyrics", "visualizer", "scenes"]),
-    ("Playback", &["playpause", "playspace", "playonly", "pauseonly", "next", "previous", "shuffle", "repeat", "tap", "lastfmlove", "sharediscord", "queuehover", "queuehovertop", "likehover", "likeplaying"]),
-    ("Volume", &["mute", "volup", "voldown", "volup5", "voldown5"]),
+    ("Playback", &["playpause", "playspace", "playonly", "pauseonly", "next", "previous", "shuffle", "repeat", "lastfmlove", "sharediscord", "queuehover", "queuehovertop", "likehover", "likeplaying"]),
+    ("Volume", &["mute", "volup", "voldown"]),
+    ("Fun", &["tap", "tap2", "tap3", "cyclevis", "visgradient", "visreverse"]),
     ("Jump in the song", &["back10", "forward10", "seekback5", "seekfwd5", "seekwidth", "tenth0", "tenth1", "tenth2", "tenth3", "tenth4", "tenth5", "tenth6", "tenth7", "tenth8", "tenth9"]),
     ("Going places", &["search", "home", "liked", "settings", "pageback", "pageforward", "artistpage", "albumpage", "tutorial"]),
 ];
+
+/// Shortcuts that may share one key, because they are the same thing.
+const BASS_JUMP_KEYS: [&str; 3] = ["tap", "tap2", "tap3"];
 
 /// The id of the shortcut waiting for its new key, if any.
 pub fn rebinding(ctx: &egui::Context) -> Option<String> {
@@ -236,7 +243,7 @@ pub fn stop_rebinding(ctx: &egui::Context) {
 }
 
 /// While a shortcut waits for its key, the next key pressed becomes it,
-/// with Shift if Shift is held. Escape cancels. Returns true while
+/// with Shift if Shift is held. Escape unbinds the shortcut's keys. Returns true while
 /// capturing, so nothing else reacts.
 pub fn capture_rebind(app: &mut App, ctx: &egui::Context) -> bool {
     let Some(id) = rebinding(ctx) else {
@@ -263,12 +270,27 @@ pub fn capture_rebind(app: &mut App, ctx: &egui::Context) -> bool {
             app.toast("Ctrl+Q always quits. Pick another.");
         } else if is_reserved(key) {
             app.toast("That key is reserved (see Keys that never change). Pick another.");
-        } else if key != Key::Escape {
+        } else if key == Key::Escape {
+            // Escape clears the keys: all three for the bass jump.
+            let ids: Vec<String> = if BASS_JUMP_KEYS.contains(&id.as_str()) {
+                BASS_JUMP_KEYS.iter().map(|k| (*k).to_string()).collect()
+            } else {
+                vec![id.clone()]
+            };
+            for each in ids {
+                app.settings
+                    .key_bindings
+                    .insert(each, UNSET.name().to_string());
+            }
+            app.actions.push(Action::SettingsChanged);
+        } else {
             let text = chord_text(key, shift, ctrl);
             // A key already in use is taken from the shortcut that had it.
             let taken: Vec<&'static str> = BINDABLE
                 .iter()
-                .filter(|b| b.id != id && chord(app, b.id) == Some((key, shift, ctrl)))
+                .filter(|b| b.id != id
+                    && !(BASS_JUMP_KEYS.contains(&b.id) && BASS_JUMP_KEYS.contains(&id.as_str()))
+                    && chord(app, b.id) == Some((key, shift, ctrl)))
                 .map(|b| b.id)
                 .collect();
             for other in taken {

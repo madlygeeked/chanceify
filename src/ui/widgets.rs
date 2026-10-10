@@ -3155,7 +3155,23 @@ fn column_divider(
             // Hiding is a menu choice: a column that vanishes mid-drag
             // takes its handle with it, and there is then no way to drag it
             // back — the divider used to get stuck there for good.
-            columns.set(column, width.max(crate::settings::TrackColumns::MIN));
+            let width = width.max(crate::settings::TrackColumns::MIN);
+            columns.set(column, width);
+            // Shift held: every shown column takes the same width.
+            if ui.input(|input| input.modifiers.shift) {
+                use crate::model::SortColumn;
+                for other in [
+                    SortColumn::Album,
+                    SortColumn::Added,
+                    SortColumn::Bpm,
+                    SortColumn::Release,
+                    SortColumn::Playlists,
+                ] {
+                    if other != column && columns.shown(other) {
+                        columns.set(other, width);
+                    }
+                }
+            }
         }
     }
     if response.double_clicked() {
@@ -3211,7 +3227,7 @@ fn column_divider(
     let right_clicked = response.secondary_clicked();
     let response = response.on_hover_text(gettext(
         locale,
-        "Drag to resize, double-click to reset, drag to the far left to hide",
+        "Drag to resize (hold Shift to make every column the same width), double-click to reset, drag to the far left to hide",
     ));
     right_clicked.then_some(response)
 }

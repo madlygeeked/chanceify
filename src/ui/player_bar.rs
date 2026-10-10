@@ -1125,7 +1125,7 @@ fn swirl_wash(app: &App, time: f64) -> Option<(Color32, Color32)> {
 /// The two colours the bars and the flow run between, on the normal screen
 /// and in the full-screen visualizer alike, so a colour change in the panel
 /// moves both.
-fn vis_gradient(
+pub(super) fn vis_gradient(
     app: &mut App,
     ui: &egui::Ui,
     mode: crate::settings::PlayerBarVis,

@@ -19,7 +19,12 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         return;
     }
     ui.add_space(4.0);
-    let labels: Vec<_> = SearchFilter::ALL
+    // A search for an artist puts the Artists pill first, as Spotify does.
+    let about_artist = matches!(&app.search.results, Loadable::Loaded(results)
+        if results.artists.as_ref().and_then(|page| page.items.first())
+            .is_some_and(|artist| artist.name.to_lowercase() == app.search.committed.to_lowercase()));
+    let order = if about_artist { SearchFilter::ARTIST_FIRST } else { SearchFilter::ALL };
+    let labels: Vec<_> = order
         .iter()
         .map(|f| (*f, f.label(app.locale)))
         .collect();

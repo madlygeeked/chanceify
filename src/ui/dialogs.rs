@@ -257,7 +257,8 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                                             });
                                         });
                                         // How hard the bass jump shakes, right under its key.
-                                        if bindable.id == "tap" && super::keys::chord_label(app, "tap").is_some() {
+                                        if bindable.id == "tap3"
+                                            && ["tap", "tap2", "tap3"].iter().any(|id| super::keys::chord_label(app, id).is_some()) {
                                             ui.horizontal(|ui| {
                                                 ui.add_space(4.0);
                                                 ui.spacing_mut().slider_width = (lane_width - 150.0).max(60.0);

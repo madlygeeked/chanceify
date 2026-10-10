@@ -729,7 +729,7 @@ pub struct Queue {
     pub queue: Vec<PlayableItem>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct SearchResults {
     #[serde(default)]
     pub tracks: Option<Page<Track>>,

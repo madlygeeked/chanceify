@@ -930,6 +930,7 @@ fn tray_config() -> fastframe_tray::Config {
 impl App {
     pub fn new(waker: &Waker, dirs: AppDirs, mut settings: Settings, options: AppOptions) -> Self {
         let bpm_cache = dirs.cache.clone();
+        let search_cache_file = dirs.cache.join("search_cache.json");
         let bpm_store = crate::bpm::Store::load(&bpm_cache);
         let genre_store = crate::genres::Store::load(&bpm_cache);
         let dirs_cache_unavailable = dirs.cache.join("unavailable.json");
@@ -1141,7 +1142,10 @@ impl App {
                 .and_then(QueueTab::decode)
                 .unwrap_or_default(),
             search: SearchState::default(),
-            search_cache: HashMap::new(),
+            search_cache: std::fs::read(search_cache_file)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+                .unwrap_or_default(),
             playlist_pages: HashMap::new(),
             playlist_cache_write_in_flight: false,
             load_generation: 0,
@@ -6067,8 +6071,26 @@ impl App {
             && self.settings.search_history.iter().any(|entry| entry.to_lowercase() == query)
         {
             self.search_cache.insert(query, results.clone());
+            self.save_search_cache();
         }
         self.prune_search_cache();
+    }
+
+    /// Writes the kept searches beside the other caches, off the UI thread,
+    /// so they are still there after a restart.
+    fn save_search_cache(&self) {
+        let path = self.dirs.cache.join("search_cache.json");
+        let cache = self.search_cache.clone();
+        std::thread::spawn(move || {
+            if let Ok(bytes) = serde_json::to_vec(&cache) {
+                let temp = path.with_extension("tmp");
+                if std::fs::create_dir_all(path.parent().unwrap_or(std::path::Path::new("."))).is_ok()
+                    && std::fs::write(&temp, bytes).is_ok()
+                {
+                    let _ = std::fs::rename(&temp, &path);
+                }
+            }
+        });
     }
 
     fn prune_search_cache(&mut self) {
@@ -6078,7 +6100,11 @@ impl App {
             .iter()
             .map(|entry| entry.to_lowercase())
             .collect();
+        let before = self.search_cache.len();
         self.search_cache.retain(|key, _| kept.contains(key));
+        if self.search_cache.len() != before {
+            self.save_search_cache();
+        }
     }
 
     fn search_failed(&mut self, part: &str, error: impl std::fmt::Display) {
@@ -7869,6 +7895,11 @@ impl App {
         }
         let id = util::uri_id(&uri).unwrap_or_default().to_string();
         match util::uri_kind(&uri) {
+            Some("track") if crate::link::take_play_request(&uri) => {
+                // A chanceify:// song link plays the song.
+                self.pending_link = None;
+                self.actions.push(Action::PlayUris { uris: vec![uri.clone()], index: 0 });
+            }
             Some("track") => {
                 if let Some(track) = self.read_cached_track(&id) {
                     self.pending_link = None;

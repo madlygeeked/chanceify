@@ -115,8 +115,19 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let jump = app.jump_level();
     if jump > 0.0 {
         let screen = ctx.content_rect();
+        // The same two colours the bars and the flow run between.
+        let (low, high) = player_bar::vis_gradient(app, ui, crate::settings::PlayerBarVis::Flow);
+        let fade = 0.28 * jump;
+        let (top, bottom) = (high.gamma_multiply(fade), low.gamma_multiply(fade));
+        let mut mesh = egui::Mesh::default();
+        mesh.colored_vertex(screen.left_top(), top);
+        mesh.colored_vertex(screen.right_top(), top);
+        mesh.colored_vertex(screen.right_bottom(), bottom);
+        mesh.colored_vertex(screen.left_bottom(), bottom);
+        mesh.add_triangle(0, 1, 2);
+        mesh.add_triangle(0, 2, 3);
         ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("bass-jump")))
-            .rect_filled(screen, 0.0, app.cover_colour().unwrap_or(app.palette.accent).gamma_multiply(0.22 * jump));
+            .add(egui::Shape::mesh(mesh));
         ctx.request_repaint();
     }
     player_bar::show(app, ui);

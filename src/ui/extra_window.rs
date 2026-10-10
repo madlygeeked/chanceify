@@ -22,11 +22,19 @@ pub fn show(app: &mut App, ctx: &Context) {
         .extra_vis_since
         .get_or_insert_with(std::time::Instant::now);
     let id = ViewportId::from_hash_of("chanceify-extra-visualizer");
-    let builder = ViewportBuilder::default()
+    let saved = app.settings.extra_window;
+    let mut builder = ViewportBuilder::default()
         .with_title("chanceify visualizer")
         .with_decorations(false)
-        .with_inner_size([960.0, 540.0])
+        .with_inner_size(saved.map_or([960.0, 540.0], |s| [s[2].max(240.0), s[3].max(160.0)]))
         .with_min_inner_size([240.0, 160.0]);
+    if let Some(s) = saved
+        && s[0] > -20000.0
+        && s[1] > -20000.0
+    {
+        builder = builder.with_position([s[0], s[1]]);
+    }
+    let mut geometry: Option<[f32; 4]> = None;
     let mut close = false;
     let now = app.now_playing();
     let was_full = app.fullscreen_vis;
@@ -168,11 +176,23 @@ pub fn show(app: &mut App, ctx: &Context) {
                 );
             }
         }
+        // Remember where it sits and how big, unless it is full screen.
+        if !full {
+            let (outer, inner) = ctx.input(|input| (input.viewport().outer_rect, input.viewport().inner_rect));
+            if let (Some(outer), Some(inner)) = (outer, inner) {
+                geometry = Some([outer.min.x, outer.min.y, inner.width(), inner.height()]);
+            }
+        }
         ctx.request_repaint();
     });
     app.fullscreen_vis = was_full;
     if close {
         app.extra_vis = false;
         app.extra_vis_since = None;
+    } else if let Some(now) = geometry
+        && saved.is_none_or(|old| old.iter().zip(now).any(|(a, b)| (a - b).abs() > 1.0))
+    {
+        app.settings.extra_window = Some(now);
+        app.mark_settings_dirty();
     }
 }

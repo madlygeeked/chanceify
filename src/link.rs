@@ -6,6 +6,23 @@
 //! `spotify:<kind>:<id>` or `spotify:search:<encoded query>`, or nothing
 //! when it is not something the app can open.
 
+/// The song a `chanceify://` link asked to play, until the app takes it.
+fn play_request() -> &'static std::sync::Mutex<Option<String>> {
+    static REQUEST: std::sync::OnceLock<std::sync::Mutex<Option<String>>> = std::sync::OnceLock::new();
+    REQUEST.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+/// True once, if `uri` is the song a `chanceify://` link asked to play.
+pub fn take_play_request(uri: &str) -> bool {
+    let mut request = play_request().lock().unwrap_or_else(|e| e.into_inner());
+    if request.as_deref() == Some(uri) {
+        *request = None;
+        true
+    } else {
+        false
+    }
+}
+
 /// Resource pages. Search links carry text instead of a resource id.
 const KINDS: [&str; 6] = ["track", "album", "artist", "playlist", "show", "episode"];
 
@@ -34,9 +51,14 @@ pub fn canonical_context_uri(uri: &str) -> String {
 /// without a locale segment (`/intl-de/`), a query string, or the old
 /// `/user/NAME/playlist/ID` shape.
 pub fn parse(text: &str) -> Option<String> {
-    // chanceify://track/ID is the same link, handed to this app.
+    // chanceify://track/ID is the same link, handed to this app, and a song
+    // link of this kind plays when it opens.
     if let Some(rest) = text.trim().strip_prefix("chanceify://") {
-        return parse(&format!("spotify://{rest}"));
+        let uri = parse(&format!("spotify://{rest}"))?;
+        if uri.starts_with("spotify:track:") {
+            *play_request().lock().unwrap_or_else(|e| e.into_inner()) = Some(uri.clone());
+        }
+        return Some(uri);
     }
     if let Some(query) = search_query(text) {
         return Some(format!(
