@@ -1,17 +1,15 @@
 ---
-title: Questions
+title: questions
 ---
 
-# Questions
+# questions
 
-**Do I need Premium?** Yes. Spotify only lets third-party players play music for Premium accounts.
+**do i need premium?** yes. spotify only lets other players play music for premium accounts.
 
-**Does it download or rip songs?** No. It plays through Spotify and never saves Spotify audio as files.
+**does it download songs?** no. it plays through spotify and never saves spotify audio.
 
-**Does it collect data?** No telemetry. It talks to Spotify and, if you connect it, Last.fm. Read the [privacy notes](https://github.com/madlygeeked/chanceify/blob/main/PRIVACY.md).
+**does it collect data?** no telemetry. it talks to spotify and, if you connect it, last.fm. see the [privacy notes](https://github.com/madlygeeked/chanceify/blob/main/PRIVACY.md).
 
-**Where is everything saved?** In the folder beside `chanceify.exe`. See [Where your files live](files).
+**where is everything saved?** in the folder beside `chanceify.exe`. see [files](files).
 
-**Something broke.** [Open an issue](https://github.com/madlygeeked/chanceify/issues) and say what you pressed.
-
-[Back](./)
+**something broke.** [open an issue](https://github.com/madlygeeked/chanceify/issues) and say what you pressed.

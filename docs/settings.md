@@ -1,83 +1,21 @@
 ---
-title: Settings explained
+title: settings
 ---
 
-# Settings explained
+# settings
 
-**Output buffer (200 / 100 / 50 ms).** How much sound is queued before your speakers. 200 ms is a bigger cushion: least crackling, a slight delay when you pause or skip. 50 ms reacts faster but a busy computer may crackle. If it sounds fine, leave it.
+right-click almost anything to see what it can do.
 
-**Audio cache (GB).** The most disk space saved songs may use, inside the chanceify folder. It is disk only, not memory or processor. About 2 GB holds roughly 400 songs.
-
-**Network proxy.** Only for networks that force a proxy, such as some offices or schools. Most people never touch it.
-
-**Match the theme to the album cover.** The colours follow the song that is playing.
-
-**See-through window.** Slide it left and the desktop shows through chanceify. Frosted Glass is see-through on its own.
-
-**Controls bar layout.** Right-click the empty space on the bottom bar: all in one row, the song bar under or above the controls and volume, or each of the three on its own row. Right-clicking the controls, the song bar or the volume opens only that one's settings.
-
-**Full-screen lyrics.** Right-click the lyrics page and turn on "Visualizer behind the lyrics". Pick bars, flow or swirl and set how dark it is.
-
-**Last.fm missing pictures.** Settings lists album covers and artist pictures Last.fm lacks, side by side. Press Done once you have uploaded one. Pictures that were missing are checked again after a week.
-
-**Unavailable songs.** Songs Spotify removed from your playlists. You can copy or save the list, or remove them one at a time.
-
-[Back](./)
-
-- **Visualizer direction**: in the visualizer settings, "Scrolls left to right / right to left" mirrors the bars and flow.
-- **Missing-cover mark**: Last.fm settings. Shows the yellow ! on the small and big album art when Last.fm has no cover.
-- **Heart and + buttons**: right-click a column heading to hide the liked heart or the add-to-playlist + button.
-- **Full-screen lyrics** has no bottom bar; a small controls box sits under the album art.
-
-- **Check my whole library** (Last.fm settings): checks every saved album and artist picture, a few at a time. Press it again to stop.
-- **Row menu** (six dots): drag the top strip to move it, drag the <> corner to widen it.
-- **Lyrics site busy**: chanceify asks LRCLIB again by itself up to five times.
-
-- **Discord swirl**: the small picture on the cover is a swirl in the cover's colour (Settings > Discord). The pictures are in `docs/swirl` and are served from the chanceify GitHub page, so they show once that page is switched on.
-
-- **Discord playlist and profile**: "Say which playlist I'm playing from" adds the playlist name to the hover text, and "Add a button to my Spotify profile" adds a button (Discord shows two buttons at most, so it replaces "Get chanceify"). Both are off until you turn them on. Settings > Discord also shows a live preview of what is being sent.
-
-- **Themes** are a grid of small pictures. Point at one to see it on the whole window; the "Preview a theme when I point at it" switch turns that off.
-- **Proxy** (was Network proxy) has just Off, System, HTTP and SOCKS5 and their boxes.
-- **Views** (the disc): a bare disc with buttons for the mini player, visualizer, full screen visualizer, library only and the default view (library, queue and the visualizer along the bottom). The disc also sits in the mini player. The mini player has the same visualizer and the same Visualizer settings as everywhere else, and shows the volume number.
-
-- **Views disc**: a small disc on every screen for mouse-only use. Click it to open Views, drag it anywhere, double-click to put it back. Views also has **Always on top** (any view, not only the mini player), **Save my view** and **My view** (your panels and visualizer, brought back in one press). The theme grid has an All / Dark / Light filter.
-- **Tray**: the tray menu ends with "Quit chanceify completely". Ctrl+W hides to the tray; Ctrl+Q quits.
-
-## 0.76.0
-- Views panel: "Reset the disc" puts the disc back; "Calm mode" preset; "Pop-out controls" switch.
-- Pop-out controls: the buttons and song bar as a panel you drag by its top strip, widen from its right edge, snap onto the library sidebar (right-click the strip), or put away.
-- Queue and Recent tabs: right-click to show or hide "Song length".
-- Track lists: with many columns on, they now squeeze to fit instead of dropping.
-- Recently played times sit in their own column, same spot on every row.
-
-## 0.78.0
-- The sidebar disc is now the Views button (click or right-click). Local songs has a laptop icon.
-- Right-click the player bar's buttons to pop the controls out; right-click them there... use the panel's strip menu to put them away.
-- Themes: shorter names; Follow system, chanceify, dark themes, then light ones. "Preview a theme when I point at it" sits beside All/Dark/Light and is off by default.
-- See-through window works with every theme (Settings > Appearance).
-- Tick boxes and the live dot follow the theme's accent colour.
-- Genres are gone: no Genre column, no MusicBrainz look-ups.
-- Column menu: "LIKED" replaces "LIKED HEART"; the "ADD TO PLAYLIST +" row is gone. Headings shrink to fit.
-- Settings > Discord shows whether the Discord app was found.
-
-## 0.79.0
-- The six dots (or right-click the empty bar): "Spotify layout" (song bar above, controls in the middle, volume on the right) or "My own layout" (drag the dotted handle on the controls or the volume anywhere in the bar).
-- With the big album art on, the library list always ends above the art (grid mode too).
-- The Queue and Recent tabs are as tall as the window buttons.
-
-## 0.80.0
-- The disc is always on screen, on its own round back. Click it for Views, drag it anywhere, double-click to put it back. The sidebar no longer has a second disc.
-- Right-click the laptop (Local songs) to open your Last.fm profile.
-- Visualizer settings: Bars, Flow and Swirl each have their own column with the switch on top. Colour, Title and Full-screen lyrics sit in a second row.
-- Last.fm: Test connection, Refresh numbers and Love the playing song are gone from Settings. Numbers refresh by themselves every 10 songs. The missing lists show about 20 rows.
-- Right-click any song, cover or name: Open in Last.fm at the bottom.
-- Songs: no three dots (right-click instead). No heart or "+" while LIKED is off.
-- Keys: Ctrl+Z undoes a removal (fixed). "Close to the tray". New Play and Pause keys beside Play or pause. The speed-scene key is gone. Bass jump shakes the screen and flashes in the cover's colour.
-- My view also saves the zoom and the window size.
-
-## 0.81.0
-
-- Bass jump shake strength (Keys, under "Bass jump" once it has a key): `jump_shake`, 0.2 to 3.0.
-- Saved visualizer looks (bottom of the visualizer panel): `vis_presets`, each a name plus every visualizer setting.
-- Full-screen lyrics: small transparent button row, always on top, no song-length bar.
+- **audio.** output buffer: bigger is smoother, smaller reacts faster. leave it unless it crackles. audio cache: how much disk saved songs may use (2 gb is about 400 songs).
+- **network proxy.** only if your network forces one.
+- **themes.** a grid of pictures. point at one to preview it. filter all, dark or light.
+- **match the album cover.** colours follow the song that is playing.
+- **see-through window.** slide it to let your desktop show through.
+- **bottom bar.** right-click the empty space. spotify layout, or your own layout: drag the controls and volume anywhere.
+- **visualizer (b).** bars, flow and swirl each have their own column and switch. save looks you like at the bottom.
+- **lyrics.** right-click full-screen lyrics for a visualizer behind them.
+- **last.fm.** connect, see missing pictures, check your whole library.
+- **discord.** show what you play. playlist name and profile button are off until you turn them on. there is a live preview.
+- **unavailable songs.** songs spotify removed from your playlists. copy or save the list.
+- **views disc.** click it for views. drag it anywhere. double-click puts it back. always on top, save my view.
+- **tray.** ctrl+w hides to the tray. ctrl+q quits.

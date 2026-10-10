@@ -1,15 +1,12 @@
 ---
-title: Where your files live
+title: files
 ---
 
-# Where your files live
+# where your files live
 
-Everything chanceify saves goes in the folder beside `chanceify.exe`.
-Delete that folder to remove every trace.
+everything chanceify saves is in the folder beside `chanceify.exe`. delete that folder to remove every trace.
 
-- `index/settings` : your settings, themes and shortcuts
-- `index/stats.json` : your listening stats
-- `index/lastfm-art` : cover images fetched from Last.fm
-- `index/recaps` : your weekly recap pictures
-
-[Back](./)
+- `index/settings`: settings, themes, shortcuts
+- `index/stats.json`: listening stats
+- `index/lastfm-art`: cover images from last.fm
+- `index/recaps`: weekly recap pictures
