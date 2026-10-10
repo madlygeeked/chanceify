@@ -323,11 +323,17 @@ fn page_tint(app: &mut App) -> Option<Color32> {
         Page::LikedSongs => return Some(Color32::from_rgb(0x50, 0x38, 0xc8)),
         _ => None,
     };
-    if !app.settings.accent_from_art && image.is_some() {
+    // A playlist or album page always shows its own cover softly behind the
+    // header, whether or not the accent follows the song's cover.
+    let has_header_art = header_art(app).is_some();
+    if !app.settings.accent_from_art && image.is_some() && !has_header_art {
         return None;
     }
     match image {
-        Some(url) => app.tint_for(Some(&url)).or_else(|| app.now_playing_tint()),
+        Some(url) => app
+            .tint_for(Some(&url))
+            .or_else(|| app.now_playing_tint())
+            .or_else(|| has_header_art.then_some(app.palette.accent)),
         None => app.now_playing_tint(),
     }
 }

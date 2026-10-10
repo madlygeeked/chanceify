@@ -9868,9 +9868,13 @@ impl App {
 
     /// Where the pop-out controls are, if they are out.
     pub fn float_slot(&self, default: [f32; 3]) -> Option<[f32; 3]> {
+        // Each view remembers its own place, but the panel is the same size
+        // everywhere: changing the view never rescales it.
+        let width = self.settings.float_controls.map_or(default[2], |slot| slot[2]);
+        let sized = |slot: [f32; 3]| [slot[0], slot[1], width];
         match self.float_mode() {
-            2 => Some(self.settings.float_lyrics.unwrap_or(default)),
-            1 => Some(self.settings.float_big.unwrap_or(default)),
+            2 => Some(sized(self.settings.float_lyrics.unwrap_or(default))),
+            1 => Some(sized(self.settings.float_big.unwrap_or(default))),
             // The controls are always their own panel now; there is no
             // control row in the bar.
             _ => Some(self.settings.float_controls.unwrap_or(default)),
@@ -9932,10 +9936,19 @@ impl App {
                 self.fullscreen_vis = !self.fullscreen_vis;
                 // The full screen is the visualizer: with every shape off
                 // there would be nothing behind the controls, so one comes on.
-                if self.fullscreen_vis && self.settings.vis_shapes_value() == 0 {
-                    self.settings.vis_shapes = crate::settings::Settings::SHAPE_BARS;
-                    self.settings.vis_shapes_set = true;
-                    self.mark_settings_dirty();
+                // The album swirl comes on with it, so the picture is never bare.
+                if self.fullscreen_vis {
+                    let shapes = self.settings.vis_shapes_value();
+                    let wanted = if shapes == 0 {
+                        crate::settings::Settings::SHAPE_BARS
+                    } else {
+                        shapes
+                    } | crate::settings::Settings::SHAPE_SWIRL;
+                    if wanted != shapes || !self.settings.vis_shapes_set {
+                        self.settings.vis_shapes = wanted;
+                        self.settings.vis_shapes_set = true;
+                        self.mark_settings_dirty();
+                    }
                 }
             }
             Action::RevealSong { uri } => {
@@ -11017,6 +11030,14 @@ impl App {
                     2 => self.settings.float_lyrics = place,
                     1 => self.settings.float_big = place,
                     _ => self.settings.float_controls = place,
+                }
+                // One size for every view: the new width goes to all of them.
+                if let Some([_, _, width]) = place {
+                    for slot in [&mut self.settings.float_controls, &mut self.settings.float_big, &mut self.settings.float_lyrics] {
+                        if let Some(slot) = slot.as_mut() {
+                            slot[2] = width;
+                        }
+                    }
                 }
                 self.mark_settings_dirty();
             }

@@ -1808,7 +1808,7 @@ pub(crate) fn spread_columns(laid: &mut Columns, region: f32) {
 /// too narrow to have room to spare.
 fn centred_shift(room: f32, others: f32, columns: &crate::settings::TrackColumns) -> f32 {
     let title = room - others;
-    if columns.lock_left || columns.spread || title <= 520.0 {
+    if columns.lock_left || (columns.spread && others > 0.0) || title <= 520.0 {
         0.0
     } else {
         (title - 460.0) / 2.0
@@ -2971,7 +2971,7 @@ pub fn drag_ghost(ctx: &egui::Context, palette: &Palette, locale: Locale) {
 
 /// The list of columns, shared by the right-click menu and the button at
 /// the end of the heading row (which opens it with a plain left click).
-fn columns_menu(ui: &mut Ui, palette: &Palette, locale: crate::i18n::Locale, widths: &mut crate::settings::TrackColumns) {
+pub(crate) fn columns_menu(ui: &mut Ui, palette: &Palette, locale: crate::i18n::Locale, widths: &mut crate::settings::TrackColumns) {
     use crate::model::SortColumn;
     ui.set_width(220.0);
                     ui.spacing_mut().item_spacing.y = 1.0;
@@ -3715,25 +3715,6 @@ pub fn table_header(
             anchors.push(handle);
         }
         anchors.push(row);
-        // The same list opens with a plain left click on this button.
-        {
-            let spot = Rect::from_center_size(
-                pos2(rect.right() - right_fixed + 16.0, rect.center().y),
-                Vec2::splat(22.0),
-            );
-            let button = ui.interact(spot, ui.id().with("columns-button"), Sense::click());
-            theme::paint_icon(
-                ui,
-                Icon::Settings,
-                spot,
-                14.0,
-                if button.hovered() { palette.text } else { palette.dim },
-            );
-            let button = button.on_hover_text(gettext(locale, "Columns"));
-            egui::Popup::menu(&button)
-                .frame(menu_frame(palette))
-                .show(|ui| columns_menu(ui, palette, locale, &mut widths));
-        }
         for anchor in anchors {
             egui::Popup::context_menu(&anchor)
                 .frame(menu_frame(palette))

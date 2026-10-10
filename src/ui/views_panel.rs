@@ -8,7 +8,7 @@ use egui::{Color32, Context, CornerRadius, Frame, Id, Margin, Rect, Stroke};
 
 use crate::app::App;
 use crate::model::{Action, ViewKind};
-use crate::theme::{self, Icon, Palette};
+use crate::theme::{self, Palette};
 
 use super::widgets;
 
@@ -72,7 +72,7 @@ pub fn topbar_disc(ui: &mut egui::Ui, app: &mut App) {
     ui.set_opacity(dim);
     ui.painter().circle_filled(rect.center(), size / 2.0, Color32::from_black_alpha(if over { 190 } else { 140 }));
     ui.painter().circle_stroke(rect.center(), size / 2.0, Stroke::new(1.0, Color32::from_white_alpha(if over { 90 } else { 40 })));
-    theme::paint_icon(ui, Icon::Disc, rect, 20.0, if over { palette.text } else { Color32::from_white_alpha(150) });
+    mono_logo(ui, rect.center(), 20.0, if over { palette.text } else { Color32::from_white_alpha(150) });
     ui.set_opacity(1.0);
     if over {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -80,6 +80,26 @@ pub fn topbar_disc(ui: &mut egui::Ui, app: &mut App) {
     if response.clicked() || response.secondary_clicked() {
         app.actions.push(Action::ToggleViewsPanel);
     }
+}
+
+/// The chanceify logo (a record with a play triangle) in one colour, for the
+/// views button.
+fn mono_logo(ui: &egui::Ui, center: egui::Pos2, diameter: f32, colour: Color32) {
+    let radius = diameter / 2.0;
+    let painter = ui.painter();
+    painter.circle_stroke(center, radius, Stroke::new((diameter * 0.09).max(1.2), colour));
+    painter.circle_stroke(center, radius * 0.72, Stroke::new(1.0, colour.gamma_multiply(0.5)));
+    let w = radius * 0.46;
+    let h = radius * 0.5;
+    painter.add(egui::Shape::convex_polygon(
+        vec![
+            center + egui::vec2(-w * 0.55, -h),
+            center + egui::vec2(w * 1.05, 0.0),
+            center + egui::vec2(-w * 0.55, h),
+        ],
+        colour,
+        Stroke::NONE,
+    ));
 }
 
 pub fn corner_disc(app: &mut App, ctx: &Context) {
@@ -165,10 +185,9 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
                 (size + 12.0) / 2.0,
                 Stroke::new(1.0, Color32::from_white_alpha(if hot { 90 } else { 40 })),
             );
-            theme::paint_icon(
+            mono_logo(
                 ui,
-                Icon::Disc,
-                rect,
+                rect.center(),
                 size,
                 if hot { palette.text } else { Color32::from_white_alpha(if app.mini_active { 110 } else { 150 }) },
             );

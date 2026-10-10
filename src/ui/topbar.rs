@@ -539,23 +539,38 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     .show(|ui| {
                         ui.set_width(200.0);
                         ui.add_space(4.0);
+                        let product = app.user.as_ref().and_then(|user| user.product.clone());
                         ui.horizontal(|ui| {
                             ui.add_space(10.0);
                             theme::text(ui, &name, theme::semibold(14.0), palette.text);
-                        });
-                        if let Some(product) =
-                            app.user.as_ref().and_then(|user| user.product.clone())
-                        {
-                            ui.horizontal(|ui| {
-                                ui.add_space(10.0);
-                                theme::text(
-                                    ui,
-                                    capitalize(&product),
-                                    theme::regular(12.0),
-                                    palette.secondary,
+                            if let Some(product) = product {
+                                // Plan on the same line, right-anchored, in the
+                                // chanceify purple that melts into the theme accent.
+                                let label = product.to_lowercase();
+                                let font = theme::semibold(12.0);
+                                let from = egui::Color32::from_rgb(150, 90, 255);
+                                let to = palette.accent;
+                                let count = label.chars().count().max(2) - 1;
+                                let mut job = egui::text::LayoutJob::default();
+                                for (index, letter) in label.chars().enumerate() {
+                                    job.append(
+                                        &letter.to_string(),
+                                        0.0,
+                                        egui::text::TextFormat::simple(
+                                            font.clone(),
+                                            from.lerp_to_gamma(to, index as f32 / count as f32),
+                                        ),
+                                    );
+                                }
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        ui.add_space(10.0);
+                                        ui.add(egui::Label::new(job).selectable(false));
+                                    },
                                 );
-                            });
-                        }
+                            }
+                        });
                         super::widgets::menu_separator(ui, &palette);
                         if super::widgets::menu_item(
                             ui,
@@ -573,16 +588,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         ) {
                             app.actions
                                 .push(Action::ShowDialog(crate::model::Dialog::Shortcuts));
-                        }
-                        super::widgets::menu_separator(ui, &palette);
-                        super::views_panel::zoom_row(ui, app, &palette);
-                        if super::widgets::menu_item(
-                            ui,
-                            &palette,
-                            Some(Icon::Disc),
-                            "Views",
-                        ) {
-                            app.actions.push(Action::ToggleViewsPanel);
                         }
                         super::widgets::menu_separator(ui, &palette);
                         if super::widgets::menu_item(
@@ -649,14 +654,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             });
         },
     );
-}
-
-fn capitalize(text: &str) -> String {
-    let mut chars = text.chars();
-    match chars.next() {
-        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-        None => String::new(),
-    }
 }
 
 #[cfg(test)]

@@ -313,6 +313,26 @@ pub fn actions_row(
                 palette.text,
                 &gettext(locale, "More"),
             );
+            // The columns, beside the three dots: a left click opens the same
+            // list as a right click on the headings.
+            {
+                let gear = theme::icon_button(
+                    ui,
+                    Icon::Settings,
+                    26.0,
+                    palette.secondary,
+                    palette.text,
+                    &gettext(locale, "Columns"),
+                );
+                let mut columns = app.settings.track_columns;
+                egui::Popup::menu(&gear)
+                    .frame(widgets::menu_frame(&palette))
+                    .show(|ui| widgets::columns_menu(ui, &palette, locale, &mut columns));
+                if columns != app.settings.track_columns {
+                    app.settings.track_columns = columns;
+                    app.actions.push(Action::SettingsChanged);
+                }
+            }
             egui::Popup::menu(&more)
                 .frame(widgets::menu_frame(&palette))
                 .show(|ui| {

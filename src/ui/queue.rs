@@ -66,27 +66,47 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         );
         let header = ui.interact(header_rect, ui.id().with("queue-header"), Sense::click());
         let mut chip_responses = Vec::new();
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 8.0;
-            // Fill the whole row, as tall as the window buttons beside them.
+        {
+            // Fill the whole row, exactly as tall as the window buttons beside
+            // them, and level with them: both start the same distance below
+            // the top of the window.
+            let tall = 36.0;
+            let row_top = if beside {
+                ui.ctx().content_rect().top() + super::WINDOW_RESIZE_BORDER
+            } else {
+                ui.cursor().top()
+            };
+            let row_rect = egui::Rect::from_min_size(
+                egui::pos2(ui.cursor().left(), row_top),
+                egui::vec2(ui.available_width(), tall),
+            );
+            let flow_height = super::WINDOWS_WINDOW_CONTROLS_HEIGHT;
+            let flow_width = ui.available_width();
+            let mut row_ui = ui.new_child(
+                egui::UiBuilder::new()
+                    .max_rect(row_rect)
+                    .layout(egui::Layout::left_to_right(egui::Align::Center)),
+            );
+            row_ui.spacing_mut().item_spacing.x = 8.0;
             let each = if beside {
-                ((ui.available_width() - super::WINDOWS_WINDOW_CONTROLS_WIDTH - 8.0) / 2.0)
+                ((row_ui.available_width() - super::WINDOWS_WINDOW_CONTROLS_WIDTH - 8.0) / 2.0)
                     .max(40.0)
             } else {
-                ((ui.available_width() - 8.0) / 2.0).max(40.0)
+                ((row_ui.available_width() - 8.0) / 2.0).max(40.0)
             };
-            let tall = super::WINDOWS_WINDOW_CONTROLS_HEIGHT;
             for (value, label) in [
                 (QueueTab::Queue, gettext(app.locale, "Queue")),
                 (QueueTab::Recents, gettext(app.locale, "Recent")),
             ] {
-                let response = theme::soft_button_tall(ui, &palette, &label, value == tab, each, tall);
+                let response = theme::soft_button_tall(&mut row_ui, &palette, &label, value == tab, each, tall);
                 if response.clicked() {
                     picked = Some(value);
                 }
                 chip_responses.push(response);
             }
-        });
+            // The page below keeps the room the row always took.
+            ui.allocate_space(egui::vec2(flow_width, flow_height));
+        }
         // The panel always shows the full row, with the album art. Names
         // alone used to be a switch here, and it was the one that left rows
         // with a cover missing and a bar full of nothing, so it is gone. The

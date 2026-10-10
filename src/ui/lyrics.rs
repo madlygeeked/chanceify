@@ -988,15 +988,17 @@ pub fn vis_overlay(app: &mut App, ui: &mut egui::Ui) {
         let size = base * (1.0 - 0.38 * near) * if d.abs() > 2.0 { 0.9 } else { 1.0 };
         let fade = (1.0 - 0.3 * d.abs()).clamp(0.0, 1.0);
         let alpha = if d.abs() < 1.0 { 1.0 - 0.4 * d.abs() } else { 0.6 * fade };
-        let galley = crate::bidi::layout(
-            &painter,
-            text,
-            theme::bold(size),
-            Color32::WHITE.gamma_multiply(alpha.clamp(0.0, 1.0)),
-            text_w,
-            1,
-            Some(crate::bidi::ELLIPSIS),
-        );
+        // Never cut with dots: the line takes up to two rows, and a very long
+        // one shrinks until all of it fits.
+        let colour = Color32::WHITE.gamma_multiply(alpha.clamp(0.0, 1.0));
+        let mut fit = 1.0_f32;
+        let galley = loop {
+            let galley = crate::bidi::layout(&painter, text, theme::bold(size * fit), colour, text_w, 2, None);
+            if !galley.elided || fit < 0.4 {
+                break galley;
+            }
+            fit *= 0.88;
+        };
         let y = centre_y + d * pitch + d.signum() * near * base * 0.2 - galley.size().y / 2.0;
         let x = match align {
             2 => region.right() - galley.size().x,

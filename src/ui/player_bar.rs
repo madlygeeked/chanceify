@@ -2174,7 +2174,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             if chip(
                 ui,
                 &palette,
-                "Title sways like grass",
+                "Title sway",
                 !app.settings.vis_text_still,
                 ui.available_width().min(290.0),
             )
@@ -2286,6 +2286,13 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     app.actions.push(Action::ToggleVisLyricsBack);
                 }
             }
+            if !(on_page || app.settings.vis_lyrics) {
+                use crate::settings::Settings;
+                let on = app.settings.lyrics_flag(Settings::LYRICS_BOUNCE_ART);
+                if chip(ui, &palette, "Art bounces to the music", on, ui.available_width().min(290.0)).clicked() {
+                    app.actions.push(Action::ToggleLyricsFlag(Settings::LYRICS_BOUNCE_ART));
+                }
+            }
             // The lyrics options, one set for the page and for the lyrics over
             // the visualizer.
             if on_page || app.settings.vis_lyrics {
@@ -2299,7 +2306,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     (Settings::LYRICS_HIDE_ARTIST, "Artist name", true),
                 ] {
                     // The art options only mean something on the page.
-                    if !on_page && matches!(bit, Settings::LYRICS_HIDE_ART | Settings::LYRICS_FLOAT_ART | Settings::LYRICS_BOUNCE_ART | Settings::LYRICS_HIDE_ARTIST) {
+                    if !on_page && matches!(bit, Settings::LYRICS_HIDE_ART | Settings::LYRICS_FLOAT_ART | Settings::LYRICS_HIDE_ARTIST) {
                         continue;
                     }
                     let on = app.settings.lyrics_flag(bit) != inverted;
@@ -3331,7 +3338,19 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
     let Some(now) = now else {
         return;
     };
-    let cover = fullscreen_cover(rect, app.settings.vis_title_layout.min(3));
+    let resting = fullscreen_cover(rect, app.settings.vis_title_layout.min(3));
+    // The art bounces to the music, as the full screen lyrics' does, when
+    // that is switched on: the card swells a little with the bass while the
+    // words keep to its resting size.
+    let swell = if app.settings.lyrics_flag(crate::settings::Settings::LYRICS_BOUNCE_ART) {
+        let target = app.music_bass_level();
+        ui.ctx().request_repaint();
+        ui.ctx()
+            .animate_value_with_time(egui::Id::new("vis-cover-bounce"), target, 0.07)
+    } else {
+        0.0
+    };
+    let cover = Rect::from_center_size(resting.center(), resting.size() * (1.0 + 0.07 * swell));
     let loader = app.backend.art().clone();
     super::widgets::paint_cover(
         ui,
@@ -3343,6 +3362,8 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
         Some(&loader),
     );
     big_art_missing_mark(app, ui, cover, "fullscreen-vis");
+    // The words keep to the card's resting size.
+    let cover = resting;
     let ink = if app.swirl_art_is_light() {
         Color32::BLACK
     } else {
@@ -3571,25 +3592,39 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
         let whole_width = line_width(line);
         let mut x = line_left(whole_width);
         let line_top = top + row as f32 * line_h;
-        // Grass, but the whole line is one blade: it leans about the middle of
-        // its foot, all its letters together, and a long line leans less so
-        // its ends never swing far.
+        // Sway: the whole line leans about the middle of its foot (or, for the
+        // stalk styles, every letter leans about its own foot so only the
+        // tops move). A long line leans less so its ends never swing far.
         let line_pivot = pos2(x + whole_width / 2.0, line_top + line_h);
-        let angle = if still {
-            0.0
+        let back_on = app.settings.vis_text_back;
+        let back_pad = app.settings.vis_back_pad.clamp(0.0, 40.0);
+        // With a backing, the letters may not lean past it.
+        let max_lean = if back_on {
+            ((back_pad + 3.0) / line_h.max(1.0)).clamp(0.0, 1.0).asin()
         } else {
-            let phase = row as f32;
-            let damp = (420.0 / whole_width.max(1.0)).clamp(0.3, 1.0);
+            0.6
+        };
+        let lean_at = |phase: f32| -> f32 {
+            if still {
+                return 0.0;
+            }
+            let damp = if sway.stalk > 0.0 {
+                1.0
+            } else {
+                (420.0 / whole_width.max(1.0)).clamp(0.3, 1.0)
+            };
             let t = time * sway.speed;
             let bass_lean = 1.0 + 2.0 * bass * sway.bass;
-            ((0.05 * (t * 0.9 - phase * 0.6).sin() + 0.03 * (t * 1.7 - phase * 0.9 + 1.0).sin())
+            (((0.05 * (t * 0.9 - phase * 0.6).sin() + 0.03 * (t * 1.7 - phase * 0.9 + 1.0).sin())
                 * bass_lean
                 + 0.04 * bass * sway.bass * (t * 4.1 - phase * 0.7).sin())
                 * damp
                 * sway.lean
-                * strength
+                * strength)
+                .clamp(-max_lean, max_lean)
         };
-        if !still && (angle != 0.0 || sway.bob > 0.0) {
+        let angle = if sway.stalk > 0.0 { 0.0 } else { lean_at(row as f32) };
+        if !still && (sway.stalk > 0.0 || angle != 0.0 || sway.bob > 0.0) {
             moving = true;
         }
         let (sin, cos) = angle.sin_cos();
@@ -3597,30 +3632,62 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
             let d = p - line_pivot;
             line_pivot + vec2(d.x * cos - d.y * sin, d.x * sin + d.y * cos)
         };
+        let line_right = x + whole_width;
+        let line_left_edge = x;
         for i in line.0..line.1 {
             let glyph = &glyphs[i];
             let w = glyph.size().x;
             let h = glyph.size().y;
             // Each letter bobbing on its own, for the wave-like sways.
-            let bob = if still || sway.bob <= 0.0 {
+            let mut bob = if still || sway.bob <= 0.0 {
                 0.0
             } else {
                 (time * 3.0 * sway.speed - i as f32 * 0.55).sin() * sway.bob * h * strength
             };
+            if back_on {
+                bob = bob.clamp(-3.0, 3.0);
+            }
             let origin = pos2(x, line_top + (line_h - h) + bob);
+            // Stalk styles: this letter leans about its own foot, a little out
+            // of step with its neighbour so the line ripples like wheat.
+            let (angle, turn_here): (f32, Box<dyn Fn(egui::Pos2) -> egui::Pos2 + '_>) =
+                if sway.stalk > 0.0 {
+                    let a = lean_at(row as f32 + i as f32 * 0.22);
+                    let foot = pos2(x + w / 2.0, line_top + line_h + bob);
+                    let (s2, c2) = a.sin_cos();
+                    (
+                        a,
+                        Box::new(move |p: egui::Pos2| {
+                            let d = p - foot;
+                            foot + vec2(d.x * c2 - d.y * s2, d.x * s2 + d.y * c2)
+                        }),
+                    )
+                } else {
+                    (angle, Box::new(turn))
+                };
+            // Keep every letter on the line's own width when it has a backing.
+            let keep = |mut p: egui::Pos2| {
+                if back_on {
+                    p.x = p.x.clamp(
+                        line_left_edge - back_pad + 1.0,
+                        (line_right + back_pad - w - 1.0).max(line_left_edge - back_pad + 1.0),
+                    );
+                }
+                p
+            };
             if outline {
                 let reach = (h * 0.04).clamp(1.5, 4.0);
                 for step in 0..8 {
                     let around = step as f32 * std::f32::consts::TAU / 8.0;
                     let mut shape = egui::epaint::TextShape::new(origin, glyph.clone(), ink);
-                    shape.pos = turn(origin + vec2(around.cos() * reach, around.sin() * reach));
+                    shape.pos = keep(turn_here(origin + vec2(around.cos() * reach, around.sin() * reach)));
                     shape.angle = angle;
                     shape.override_text_color = Some(contrast.gamma_multiply(0.85));
                     painter.add(egui::Shape::Text(shape));
                 }
             }
             let mut shape = egui::epaint::TextShape::new(origin, glyph.clone(), ink);
-            shape.pos = turn(origin);
+            shape.pos = keep(turn_here(origin));
             shape.angle = angle;
             painter.add(egui::Shape::Text(shape));
             x += w;

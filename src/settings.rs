@@ -470,6 +470,9 @@ pub struct SwayPreset {
     pub speed: f32,
     pub bass: f32,
     pub bob: f32,
+    /// 1 anchors every letter at its foot so only the tops sway, like a
+    /// stalk of wheat; 0 turns the whole line about its middle.
+    pub stalk: f32,
 }
 
 impl ThemeChoice {
@@ -1697,14 +1700,19 @@ impl Settings {
     /// Ready-made sways for the full-screen title: a name, how far a line
     /// leans, how fast, how much the bass adds, and how far each letter
     /// bobs on its own (a fraction of its height).
-    pub const SWAY_PRESETS: [SwayPreset; 7] = [
-        SwayPreset { name: "Grass", lean: 1.0, speed: 1.0, bass: 1.0, bob: 0.0 },
-        SwayPreset { name: "Gentle", lean: 0.5, speed: 0.6, bass: 0.5, bob: 0.0 },
-        SwayPreset { name: "Windy", lean: 1.9, speed: 1.5, bass: 1.0, bob: 0.0 },
-        SwayPreset { name: "Bass pump", lean: 0.5, speed: 1.0, bass: 3.5, bob: 0.0 },
-        SwayPreset { name: "Wave", lean: 0.25, speed: 1.0, bass: 1.0, bob: 0.22 },
-        SwayPreset { name: "Dance", lean: 1.2, speed: 1.6, bass: 2.0, bob: 0.14 },
-        SwayPreset { name: "Drunk", lean: 2.6, speed: 0.7, bass: 1.4, bob: 0.1 },
+    pub const SWAY_PRESETS: [SwayPreset; 12] = [
+        SwayPreset { name: "Sway", lean: 0.9, speed: 1.0, bass: 1.0, bob: 0.0, stalk: 1.0 },
+        SwayPreset { name: "Soft sway", lean: 0.5, speed: 0.6, bass: 0.5, bob: 0.0, stalk: 1.0 },
+        SwayPreset { name: "Big sway", lean: 1.6, speed: 1.3, bass: 1.0, bob: 0.0, stalk: 1.0 },
+        SwayPreset { name: "Bass pump", lean: 0.5, speed: 1.0, bass: 3.5, bob: 0.0, stalk: 0.0 },
+        SwayPreset { name: "Wave", lean: 0.25, speed: 1.0, bass: 1.0, bob: 0.22, stalk: 0.0 },
+        SwayPreset { name: "Dance", lean: 0.6, speed: 1.6, bass: 2.0, bob: 0.14, stalk: 0.0 },
+        SwayPreset { name: "Dance calm", lean: 0.3, speed: 1.2, bass: 1.5, bob: 0.12, stalk: 0.0 },
+        SwayPreset { name: "Dance bounce", lean: 0.15, speed: 1.8, bass: 3.0, bob: 0.2, stalk: 0.0 },
+        SwayPreset { name: "Dance fast", lean: 0.4, speed: 2.4, bass: 2.0, bob: 0.14, stalk: 0.0 },
+        SwayPreset { name: "Drunk", lean: 1.2, speed: 0.7, bass: 1.0, bob: 0.1, stalk: 0.0 },
+        SwayPreset { name: "Drunk tipsy", lean: 0.7, speed: 0.6, bass: 0.8, bob: 0.07, stalk: 0.0 },
+        SwayPreset { name: "Drunk wobbly", lean: 1.6, speed: 1.0, bass: 1.2, bob: 0.14, stalk: 0.0 },
     ];
 
     /// How solid the window is: 1 is opaque, down to 0.3.
