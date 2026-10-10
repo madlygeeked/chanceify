@@ -73,7 +73,14 @@ pub fn topbar_disc(ui: &mut egui::Ui, app: &mut App) {
     if over {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
+    // A left click opens it where it was left; a right click opens it right
+    // under the disc.
+    let anchor = rect.left_bottom() + egui::vec2(0.0, 6.0);
+    ui.ctx().data_mut(|data| data.insert_temp(Id::new("views-anchor"), anchor));
     if response.clicked() || response.secondary_clicked() {
+        if response.secondary_clicked() {
+            ui.ctx().data_mut(|data| data.insert_temp(Id::new("views-at-disc"), true));
+        }
         app.actions.push(Action::ToggleViewsPanel);
     }
 }
@@ -132,8 +139,10 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
             grab = None;
         }
     }
+    ctx.data_mut(|data| data.insert_temp(Id::new("views-anchor"), hit.left_bottom() + egui::vec2(0.0, 6.0)));
     if right_released && pos.is_some_and(|p| hit.contains(p)) {
         toggle = true;
+        ctx.data_mut(|data| data.insert_temp(Id::new("views-at-disc"), true));
     }
     ctx.data_mut(|data| data.insert_temp(grab_id, grab));
     let over = pos.is_some_and(|p| hit.contains(p)) || grab.is_some();
@@ -631,23 +640,32 @@ pub fn show(app: &mut App, ctx: &Context) {
         corner_disc(app, ctx);
     }
     floating_controls(app, ctx);
-    // Closed, the panel forgets where it was: it opens in its usual place
-    // each time (a new id makes the window start afresh).
+    // The panel remembers where it was left. A right click on the disc asks
+    // for the place right under it instead.
     let open_id = Id::new("views-panel-was-open");
-    let gen_id = Id::new("views-panel-generation");
+    let pos_id = Id::new("views-panel-pos");
     if !app.views_panel {
         if ctx.data(|data| data.get_temp::<bool>(open_id)).unwrap_or(false) {
             ctx.data_mut(|data| {
                 data.insert_temp(open_id, false);
-                let generation: u32 = data.get_temp(gen_id).unwrap_or(0);
-                data.insert_temp(gen_id, generation.wrapping_add(1));
                 data.remove::<Rect>(Id::new("views-panel-rect"));
             });
         }
         return;
     }
+    if !ctx.data(|data| data.get_temp::<bool>(open_id)).unwrap_or(false) {
+        // Just opened.
+        let at_disc = ctx.data(|data| data.get_temp::<bool>(Id::new("views-at-disc"))).unwrap_or(false);
+        let anchor: egui::Pos2 = ctx.data(|data| data.get_temp(Id::new("views-anchor"))).unwrap_or(egui::pos2(60.0, 60.0));
+        let known: Option<egui::Pos2> = ctx.data(|data| data.get_temp(pos_id));
+        let start = if at_disc || known.is_none() { anchor } else { known.unwrap_or(anchor) };
+        ctx.data_mut(|data| {
+            data.insert_temp(pos_id, start);
+            data.insert_temp(Id::new("views-at-disc"), false);
+        });
+    }
     ctx.data_mut(|data| data.insert_temp(open_id, true));
-    let panel_id = Id::new(("views-panel-v3", ctx.data(|data| data.get_temp::<u32>(gen_id)).unwrap_or(0)));
+    let panel_id = Id::new("views-panel-v4");
     let palette = dark_palette(app);
     let frame = Frame::new()
         .fill(Color32::from_rgb(0x14, 0x16, 0x1a))
@@ -666,6 +684,7 @@ pub fn show(app: &mut App, ctx: &Context) {
     // and comes straight back when it returns.
     let rect_id = Id::new("views-panel-rect");
     let last_rect: Option<Rect> = ctx.data(|data| data.get_temp(rect_id));
+    let last_rect_local = last_rect;
     // The panel can be drawn bigger or smaller: its layer is scaled about its
     // top-left corner, drawing and pointer alike.
     let scale = if app.settings.views_scale.is_finite() { app.settings.views_scale.clamp(0.7, 1.6) } else { 1.0 };
@@ -675,7 +694,15 @@ pub fn show(app: &mut App, ctx: &Context) {
         Some(rect) if rect.height() > 1.0 => scale.min(((ctx.content_rect().height() - 16.0) / rect.height()).clamp(0.45, 1.6)),
         _ => scale,
     };
-    let pivot = last_rect.map_or(egui::pos2(60.0, 60.0), |rect| rect.min);
+    // The panel's corner is its pivot: it grows and shrinks from there, and
+    // dragging it moves the corner by exactly as much as the pointer moved.
+    let mut panel_pos: egui::Pos2 = ctx.data(|data| data.get_temp(pos_id)).unwrap_or(egui::pos2(60.0, 60.0));
+    if let Some(rect) = last_rect {
+        let screen = ctx.content_rect();
+        panel_pos.x = panel_pos.x.clamp(screen.left(), (screen.right() - rect.width() * scale).max(screen.left()));
+        panel_pos.y = panel_pos.y.clamp(screen.top(), (screen.bottom() - rect.height() * scale).max(screen.top()));
+    }
+    let pivot = panel_pos;
     let to_global = |p: egui::Pos2| pivot + (p - pivot) * scale;
     let panel_layer = egui::LayerId::new(egui::Order::Foreground, panel_id);
     ctx.set_transform_layer(
@@ -688,32 +715,36 @@ pub fn show(app: &mut App, ctx: &Context) {
     });
     let dim = panel_dim(ctx, over);
     let frame = frame.multiply_with_opacity(dim);
-    let width = app.settings.views_width.clamp(260.0, 520.0);
+    let width = 400.0;
     let shown = egui::Window::new("Views")
         .id(panel_id)
         .title_bar(false)
         .order(egui::Order::Foreground)
         .frame(frame)
-        .default_pos(egui::pos2(60.0, 60.0))
+        .fixed_pos(panel_pos)
         .min_width(width)
         .max_width(width)
         .resizable(false)
         .collapsible(false)
-        .constrain(true)
+        .constrain(false)
         .show(ctx, |ui| {
             ui.set_opacity(dim);
+            // The whole panel is a handle (registered first, so the buttons
+            // on it still take their own clicks).
+            if let Some(grip_rect) = last_rect_local {
+                let grip = ui.interact(grip_rect, Id::new("views-panel-grip"), egui::Sense::drag());
+                if grip.dragged() {
+                    let moved = ui.ctx().input(|input| input.pointer.delta());
+                    ui.ctx().data_mut(|data| data.insert_temp(pos_id, panel_pos + moved));
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+                }
+            }
             ui.visuals_mut().override_text_color = Some(palette.text);
             ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
             let screen_h = ctx.content_rect().height();
             egui::ScrollArea::vertical()
-                .max_height(if app.settings.views_height > 0.0 {
-                    app.settings.views_height.clamp(160.0, (screen_h - 40.0).max(200.0))
-                } else {
-                    f32::INFINITY
-                })
                 .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
-                .min_scrolled_height(if app.settings.views_height > 0.0 { app.settings.views_height.clamp(160.0, (screen_h - 40.0).max(200.0)) } else { 0.0 })
-                .auto_shrink([false, app.settings.views_height <= 0.0])
+                .auto_shrink([false, true])
                 .show(ui, |ui| {
                     // Icons only, one row: the four views of this window (exactly
                     // one is on) and the mini player, which is a window of its own.
@@ -820,50 +851,6 @@ pub fn show(app: &mut App, ctx: &Context) {
         ctx.data_mut(|data| data.insert_temp(rect_id, local));
         // Where the panel really is on the screen, scaled.
         let rect = Rect::from_min_max(to_global(local.min), to_global(local.max));
-        // A strip on the right edge: drag it to make the panel wider or narrower.
-        egui::Area::new(Id::new("views-panel-edge"))
-            .order(egui::Order::Foreground)
-            .fixed_pos(egui::pos2(rect.right() - 7.0, rect.top() + 10.0))
-            .show(ctx, |ui| {
-                let (strip, response) = ui.allocate_exact_size(egui::vec2(10.0, (rect.height() - 40.0).max(10.0)), egui::Sense::drag());
-                if response.hovered() || response.dragged() {
-                    ctx.set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
-                    ui.painter().rect_filled(
-                        egui::Rect::from_center_size(strip.center(), egui::vec2(3.0, 28.0)),
-                        1.5,
-                        Color32::from_white_alpha(90),
-                    );
-                }
-                if response.dragged() {
-                    app.settings.views_width = (width + response.drag_delta().x / scale).clamp(260.0, 520.0);
-                    app.mark_settings_dirty();
-                }
-            });
-        // A strip along the bottom edge: drag it to make the panel taller or shorter.
-        egui::Area::new(Id::new("views-panel-edge-bottom"))
-            .order(egui::Order::Foreground)
-            .fixed_pos(egui::pos2(rect.left() + 10.0, rect.bottom() - 7.0))
-            .show(ctx, |ui| {
-                let (strip, response) = ui.allocate_exact_size(egui::vec2((rect.width() - 40.0).max(10.0), 10.0), egui::Sense::drag());
-                if response.hovered() || response.dragged() {
-                    ctx.set_cursor_icon(egui::CursorIcon::ResizeVertical);
-                    ui.painter().rect_filled(
-                        egui::Rect::from_center_size(strip.center(), egui::vec2(28.0, 3.0)),
-                        1.5,
-                        Color32::from_white_alpha(90),
-                    );
-                }
-                if response.dragged() {
-                    let max_h = (ctx.content_rect().height() / scale - 40.0).max(200.0);
-                    let now = if app.settings.views_height > 0.0 { app.settings.views_height } else { local.height() };
-                    app.settings.views_height = (now + response.drag_delta().y / scale).clamp(160.0, max_h);
-                    app.mark_settings_dirty();
-                }
-                if response.double_clicked() {
-                    app.settings.views_height = 0.0;
-                    app.mark_settings_dirty();
-                }
-            });
         // The bottom-right corner scales the whole panel (double-click: normal size).
         egui::Area::new(Id::new("views-panel-corner"))
             .order(egui::Order::Foreground)
@@ -876,7 +863,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                 }
                 if response.dragged() {
                     let d = response.drag_delta();
-                    app.settings.views_scale = (scale + (d.x + d.y) / 360.0).clamp(0.7, 1.6);
+                    app.settings.views_scale = (scale + (d.x + d.y) / 800.0).clamp(0.7, 1.6);
                     app.mark_settings_dirty();
                 }
                 if response.double_clicked() {

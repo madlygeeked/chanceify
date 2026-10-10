@@ -62,7 +62,9 @@ pub fn show(app: &mut App, ctx: &Context) {
         if ctx.input(|input| input.key_pressed(egui::Key::F11)) {
             ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));
         }
-        let lyrics_mode = app.extra_mode == 1;
+        // This window is only ever the visualizer. Its lyrics button shows the
+        // lyrics beside the cover, like the full screen visualizer's.
+        let lyrics_mode = false;
         let rect = ctx.content_rect();
         // The page: the visualizer, or the full-screen lyrics page.
         if lyrics_mode {
@@ -128,6 +130,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                     // The visualizer paints as it does full screen.
                     app.fullscreen_vis = true;
                     let moving = super::player_bar::lyrics_backdrop(app, ui, rect, now.as_ref(), 3);
+                    super::lyrics::vis_overlay(app, ui);
                     app.fullscreen_vis = was_full;
                     if !moving {
                         ui.painter().text(
@@ -177,7 +180,7 @@ pub fn show(app: &mut App, ctx: &Context) {
         let wave = egui::Rect::from_min_size(pos2(rect.left() + 10.0, rect.top() + 10.0), size);
         let swap = egui::Rect::from_min_size(pos2(rect.left() + 48.0, rect.top() + 10.0), size);
         let exit = egui::Rect::from_min_size(pos2(rect.right() - 42.0, rect.top() + 10.0), size);
-        let swap_icon = if lyrics_mode { theme::Icon::AudioLines } else { theme::Icon::Mic };
+        let swap_icon = theme::Icon::Mic;
         let painter = ui.painter().clone();
         for (button, icon) in [(wave, theme::Icon::Settings), (swap, swap_icon), (exit, theme::Icon::X)] {
             let hot = pointer.is_some_and(|p| button.contains(p));
@@ -192,7 +195,7 @@ pub fn show(app: &mut App, ctx: &Context) {
             if wave.contains(p) {
                 app.extra_vis_panel = !was_open;
             } else if swap.contains(p) {
-                app.extra_mode = if lyrics_mode { 0 } else { 1 };
+                app.actions.push(crate::model::Action::ToggleVisLyrics);
             } else if exit.contains(p) {
                 close = true;
             }
