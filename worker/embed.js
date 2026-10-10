@@ -7,6 +7,10 @@
 // The cover comes from Spotify's public oEmbed. The title and artist come from
 // the link itself (chanceify puts them there), with oEmbed as the fallback.
 
+// chance's little bear. Paste the picture here as a data address
+// ("data:image/png;base64,...") and it shows after every "chance" link.
+const BEAR = "";
+
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -66,20 +70,78 @@ background:radial-gradient(900px 600px at 20% 10%,#4c1d95 0,transparent 60%),rad
 .cover{width:100%;aspect-ratio:1;border-radius:22px;background:#241a45 center/cover;box-shadow:0 30px 80px #0009,0 0 0 1px #ffffff1a}
 h1{font-size:26px;margin:22px 0 4px;line-height:1.2}
 p{margin:0;color:#c4b5fd;font-size:16px}
-.btn{display:inline-block;margin-top:26px;padding:13px 28px;border-radius:999px;background:linear-gradient(90deg,#6366f1,#8b5cf6);color:#fff;font-weight:600;text-decoration:none}
+.btn{display:block;text-align:center;padding:13px 28px;border-radius:999px;background:linear-gradient(90deg,#6366f1,#8b5cf6);color:#fff;font-weight:600;text-decoration:none}
 .btn:hover{filter:brightness(1.12)}
 .row{margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-.ghost{padding:9px 16px;border-radius:999px;border:1px solid #a78bfa55;color:#ddd6fe;text-decoration:none;font-size:14px}
-.ghost:hover{background:#a78bfa22}
+.stack{margin-top:24px;flex-direction:column;align-items:stretch}
+.btn.alt{background:#ffffff14;border:1px solid #a78bfa55;color:#ede9fe;font-weight:500}
+.btn.alt:hover{background:#a78bfa2a}
+.play{margin-top:18px;border:0;border-radius:14px;color-scheme:normal}
+.bear{height:1.5em;width:auto;vertical-align:middle;margin-left:6px}
+#swirl{position:fixed;inset:0;width:100%;height:100%;z-index:-1}
+.card{position:relative}
 .foot{margin-top:28px;font-size:13px;color:#a78bfa99}
 .foot a{color:inherit}
 </style></head><body>
+<canvas id="swirl"></canvas>
 <main class="card">
 <div class="cover"${image ? ` style="background-image:url('${esc(image)}')"` : ""}></div>
 <h1>${esc(title)}</h1>
 <p>${esc(line)}</p>
-${id ? `<a class="btn" href="${esc(spotify)}">Listen on Spotify</a>
-<div class="row"><a class="ghost" href="spotify:track:${esc(id)}">Open in the Spotify app</a><a class="ghost" href="chanceify://track/${esc(id)}">Open in chanceify</a></div>` : ""}
-<div class="foot">Built with love by <a href="https://github.com/madlygeeked">chance</a></div>
-</main></body></html>`;
+${id ? `<div class="row stack"><a class="btn" href="chanceify://track/${esc(id)}">Open in chanceify</a>
+<a class="btn alt" href="${esc(spotify)}">Listen on Spotify</a>
+<a class="btn alt" href="spotify:track:${esc(id)}">Open in the Spotify app</a></div>
+<iframe class="play" title="Play a preview" src="https://open.spotify.com/embed/track/${esc(id)}?theme=0" width="100%" height="152" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>` : ""}
+<div class="foot">Built with love by <a href="https://github.com/madlygeeked">chance</a>${BEAR ? `<img class="bear" src="${BEAR}" alt="">` : ""}</div>
+</main>
+<script>
+// A swirl in the cover's own colours, drifting like chanceify's visualizer.
+(function(){
+  var cv=document.getElementById("swirl"),g=cv.getContext("2d");
+  var cols=[[139,92,246],[99,102,241],[168,85,247]];
+  var W,H;function size(){W=cv.width=innerWidth;H=cv.height=innerHeight}size();addEventListener("resize",size);
+  var still=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var url=${JSON.stringify(image || "")};
+  if(url){
+    var im=new Image();im.crossOrigin="anonymous";
+    im.onload=function(){try{
+      var c=document.createElement("canvas");c.width=c.height=24;var x=c.getContext("2d");x.drawImage(im,0,0,24,24);
+      var d=x.getImageData(0,0,24,24).data,bins={};
+      for(var i=0;i<d.length;i+=4){
+        var r=d[i],gg=d[i+1],b=d[i+2],mx=Math.max(r,gg,b),mn=Math.min(r,gg,b);
+        if(mx<50||mx-mn<28)continue;
+        var k=(r>>6)+","+(gg>>6)+","+(b>>6),o=bins[k]||(bins[k]=[0,0,0,0]);
+        o[0]+=r;o[1]+=gg;o[2]+=b;o[3]++;
+      }
+      var list=Object.values(bins).sort(function(a,b){return b[3]-a[3]}).slice(0,4)
+        .map(function(o){return[o[0]/o[3]|0,o[1]/o[3]|0,o[2]/o[3]|0]});
+      if(list.length)cols=list;
+    }catch(e){}};
+    im.src=url;
+  }
+  var t=0;
+  function frame(){
+    g.globalCompositeOperation="source-over";
+    g.fillStyle="rgba(15,11,29,"+(still?1:0.12)+")";g.fillRect(0,0,W,H);
+    g.globalCompositeOperation="lighter";
+    var cx=W/2,cy=H/2,R=Math.hypot(W,H)/2;
+    for(var a=0;a<cols.length*2;a++){
+      var c=cols[a%cols.length];
+      for(var i=0;i<46;i++){
+        var f=i/46,ang=t*0.35*(a%2?-1:1)+f*7+a*1.7,rad=f*R;
+        var px=cx+Math.cos(ang)*rad,py=cy+Math.sin(ang)*rad*0.8;
+        var s=14+f*70;
+        var rg=g.createRadialGradient(px,py,0,px,py,s);
+        rg.addColorStop(0,"rgba("+c[0]+","+c[1]+","+c[2]+","+(0.10*(1-f*0.5))+")");
+        rg.addColorStop(1,"rgba("+c[0]+","+c[1]+","+c[2]+",0)");
+        g.fillStyle=rg;g.fillRect(px-s,py-s,s*2,s*2);
+      }
+    }
+    t+=0.016;
+    if(!still)requestAnimationFrame(frame);
+  }
+  if(still){for(var n=0;n<30;n++){t+=0.2;frame()}}else frame();
+})();
+</script>
+</body></html>`;
 }
