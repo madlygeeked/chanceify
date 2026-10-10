@@ -158,7 +158,7 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
             ui.painter().circle_filled(
                 rect.center(),
                 (size + 12.0) / 2.0,
-                Color32::from_black_alpha(if hot { 190 } else { 140 }),
+                Color32::from_rgb(if hot { 20 } else { 14 }, if hot { 22 } else { 16 }, if hot { 26 } else { 20 }),
             );
             ui.painter().circle_stroke(
                 rect.center(),
@@ -301,125 +301,165 @@ pub fn show(app: &mut App, ctx: &Context) {
             color: Color32::from_black_alpha(160),
         });
     let close = false;
+    let current = current_view(app);
     egui::Window::new("Views")
-        .id(Id::new("views-panel-v2"))
+        .id(Id::new("views-panel-v3"))
         .title_bar(false)
         .order(egui::Order::Foreground)
         .frame(frame)
-        .default_pos(egui::pos2(90.0, 90.0))
-        .default_width(320.0)
-        .min_width(240.0)
-        .resizable(true)
+        .default_pos(egui::pos2(60.0, 60.0))
+        .default_width(316.0)
+        .resizable(false)
         .collapsible(false)
+        .constrain(true)
         .show(ctx, |ui| {
             ui.visuals_mut().override_text_color = Some(palette.text);
-            egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui| {
-                // A bare disc where a title would be: press it to put the panel away.
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 8.0;
+            ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+            let screen_h = ctx.content_rect().height();
+            egui::ScrollArea::vertical()
+                .max_height((screen_h - 120.0).max(200.0))
+                .auto_shrink([true, true])
+                .show(ui, |ui| {
+                    // The four views. Exactly one is on at a time.
+                    let half = (ui.available_width() - 6.0) / 2.0;
+                    let views = [
+                        ("Mini player", ViewKind::Mini),
+                        ("Visualizer", ViewKind::Visualizer),
+                        ("Full screen visualizer", ViewKind::FullVisualizer),
+                        ("Full screen lyrics", ViewKind::FullLyrics),
+                    ];
+                    for pair in views.chunks(2) {
+                        ui.horizontal(|ui| {
+                            for (label, kind) in pair {
+                                if theme::soft_button_tall(ui, &palette, label, current == *kind, half, 34.0).clicked() {
+                                    app.actions.push(Action::GoView(*kind));
+                                }
+                            }
+                        });
+                    }
+                    // Calm mode is a fifth view of its own.
+                    let full = ui.available_width();
+                    if theme::soft_button_tall(ui, &palette, "Calm mode", current == ViewKind::Calm, full, 34.0).clicked() {
+                        app.actions.push(Action::GoView(ViewKind::Calm));
+                    }
+                    ui.add_space(4.0);
+                    // Other ways to see it.
+                    let float_on = app.float_slot(default_float(ctx)).is_some();
                     ui.horizontal_wrapped(|ui| {
-                        ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
-                        let presets = [
-                            ("Mini player", app.mini_active, Action::GoView(ViewKind::Mini)),
-                            ("Visualizer", app.settings.vis_shapes_value() != 0, Action::GoView(ViewKind::Visualizer)),
-                            ("Full screen visualizer", app.fullscreen_vis, Action::GoView(ViewKind::FullVisualizer)),
-                            ("Full screen lyrics", app.lyrics_fullscreen.is_some(), Action::GoView(ViewKind::FullLyrics)),
+                        let chips = [
                             ("Library only", false, Action::GoView(ViewKind::LibraryOnly)),
                             ("Default view", false, Action::GoView(ViewKind::Default)),
-                            ("My view", app.settings.my_view.is_some(), Action::InDefaultView(Box::new(Action::ApplyMyView))),
+                            ("My view", false, Action::InDefaultView(Box::new(Action::ApplyMyView))),
                             ("Save my view", false, Action::SaveMyView),
-                            ("Calm mode", app.calm_mode, Action::GoView(ViewKind::Calm)),
-                            (if app.extra_vis { "Close visualizer window" } else { "New visualizer window" }, app.extra_vis, Action::ToggleExtraWindow),
                         ];
-                        for (label, on, action) in presets {
+                        for (label, on, action) in chips {
                             if theme::soft_button(ui, &palette, None, label, on).clicked() {
                                 app.actions.push(action);
                             }
                         }
                     });
-                });
-                ui.add_space(8.0);
-                let float_on = app.float_slot(default_float(ctx)).is_some();
-                let rows: [(&str, bool, Action); 11] = [
-                    ("Always on top", app.settings.mini_on_top, Action::ToggleMiniOnTop),
-                    ("Library", app.settings.sidebar_visible, Action::InDefaultView(Box::new(Action::ToggleSidebar))),
-                    ("Queue", app.show_queue_panel, Action::InDefaultView(Box::new(Action::ToggleQueuePanel))),
-                    ("Side lyrics", app.show_lyrics_panel, Action::InDefaultView(Box::new(Action::ToggleLyricsPanel))),
-                    ("Full screen lyrics", app.lyrics_fullscreen.is_some(), Action::GoView(ViewKind::FullLyrics)),
-                    ("Full screen visualizer", app.fullscreen_vis, Action::GoView(ViewKind::FullVisualizer)),
-                    ("Visualizer settings", app.vis_panel, Action::ToggleVisPanel),
-                    ("Visualizer", app.settings.vis_shapes_value() != 0, Action::InDefaultView(Box::new(Action::ToggleVisShapes))),
-                    ("Big album art", app.settings.art_expanded, Action::InDefaultView(Box::new(Action::ToggleArtExpanded))),
-                    ("Mini player", app.mini_active, Action::GoView(ViewKind::Mini)),
-                    ("Pop-out controls", float_on, Action::SetFloatControls(if float_on { None } else { Some(default_float(ctx)) })),
-                ];
-                for (label, on, action) in rows {
-                    let mut value = on;
-                    ui.horizontal(|ui| {
-                        theme::text(ui, label, theme::regular(13.5), palette.text);
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if widgets::switch(ui, &palette, label, &mut value).changed() {
+                    ui.add_space(4.0);
+                    // What is shown, each one a plain on/off.
+                    ui.horizontal_wrapped(|ui| {
+                        let chips = [
+                            ("Library", app.settings.sidebar_visible, Action::InDefaultView(Box::new(Action::ToggleSidebar))),
+                            ("Queue", app.show_queue_panel, Action::InDefaultView(Box::new(Action::ToggleQueuePanel))),
+                            ("Side lyrics", app.show_lyrics_panel, Action::InDefaultView(Box::new(Action::ToggleLyricsPanel))),
+                            ("Big album art", app.settings.art_expanded, Action::InDefaultView(Box::new(Action::ToggleArtExpanded))),
+                            ("Pop-out controls", float_on, Action::SetFloatControls(if float_on { None } else { Some(default_float(ctx)) })),
+                            ("Clean screen", app.settings.float_hide_bar, Action::SetFloatHideBar(!app.settings.float_hide_bar)),
+                            ("Visualizer settings", app.vis_panel, Action::ToggleVisPanel),
+                            (if app.extra_vis { "Close visualizer window" } else { "New visualizer window" }, app.extra_vis, Action::ToggleExtraWindow),
+                            ("Always on top", app.settings.mini_on_top, Action::ToggleMiniOnTop),
+                        ];
+                        for (label, on, action) in chips {
+                            let response = theme::soft_button(ui, &palette, None, label, on);
+                            let response = if label == "Clean screen" {
+                                response.on_hover_text("With the controls popped out, hides the whole bottom bar too")
+                            } else {
+                                response
+                            };
+                            if response.clicked() {
                                 app.actions.push(action);
+                            }
+                        }
+                    });
+                    ui.add_space(2.0);
+                    egui::CollapsingHeader::new(
+                        egui::RichText::new("More").color(palette.secondary).font(theme::medium(13.0)),
+                    )
+                    .id_salt("views-more")
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        zoom_row(ui, app, &palette);
+                        ui.spacing_mut().slider_width = 110.0;
+                        let mut dim = app.settings.disc_dim;
+                        if ui.add(egui::Slider::new(&mut dim, 0.05..=1.0).text("Disc when idle")).changed() {
+                            app.settings.disc_dim = dim;
+                            app.mark_settings_dirty();
+                        }
+                        ui.horizontal_wrapped(|ui| {
+                            if theme::soft_button(ui, &palette, None, "Default controls", false).clicked() {
+                                app.actions.push(Action::ResetBlockNudge);
+                            }
+                            if theme::soft_button(ui, &palette, Some(Icon::Info), "Bug test guide", false).clicked() {
+                                app.show_bug_guide = !app.show_bug_guide;
+                            }
+                            if theme::soft_button(ui, &palette, Some(Icon::Info), "Shortcuts", false).clicked() {
+                                app.actions.push(Action::ShowDialog(crate::model::Dialog::Shortcuts));
+                            }
+                        });
+                        // Every key's job as a button, for those who use the mouse only.
+                        egui::CollapsingHeader::new(
+                            egui::RichText::new("Everything the keys do").color(palette.text).font(theme::medium(13.0)),
+                        )
+                        .id_salt("views-all-actions")
+                        .default_open(false)
+                        .show(ui, |ui| {
+                            for (group, ids) in super::keys::CATEGORIES {
+                                theme::subtle(ui, &palette, &group.to_uppercase());
+                                ui.horizontal_wrapped(|ui| {
+                                    for id in *ids {
+                                        if let Some(bindable) = super::keys::BINDABLE.iter().find(|b| b.id == *id) {
+                                            let hint = super::keys::chord_label(app, bindable.id);
+                                            let mut button = theme::soft_button(ui, &palette, None, bindable.label, false);
+                                            if let Some(hint) = hint {
+                                                button = button.on_hover_text(format!("Key: {hint}"));
+                                            }
+                                            if button.clicked() {
+                                                app.actions.push((bindable.action)());
+                                            }
+                                        }
+                                    }
+                                });
+                                ui.add_space(4.0);
                             }
                         });
                     });
-                    ui.add_space(2.0);
-                }
-                ui.add_space(8.0);
-                // Every key's job as a button, for those who use the mouse only.
-                egui::CollapsingHeader::new(
-                    egui::RichText::new("Everything the keys do").color(palette.text).font(theme::semibold(13.5)),
-                )
-                .id_salt("views-all-actions")
-                .default_open(false)
-                .show(ui, |ui| {
-                    for (group, ids) in super::keys::CATEGORIES {
-                        theme::subtle(ui, &palette, &group.to_uppercase());
-                        ui.horizontal_wrapped(|ui| {
-                            ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
-                            for id in *ids {
-                                if let Some(bindable) = super::keys::BINDABLE.iter().find(|b| b.id == *id) {
-                                    let hint = super::keys::chord_label(app, bindable.id);
-                                    let mut button = theme::soft_button(ui, &palette, None, bindable.label, false);
-                                    if let Some(hint) = hint {
-                                        button = button.on_hover_text(format!("Key: {hint}"));
-                                    }
-                                    if button.clicked() {
-                                        app.actions.push((bindable.action)());
-                                    }
-                                }
-                            }
-                        });
-                        ui.add_space(6.0);
-                    }
                 });
-                ui.add_space(8.0);
-                zoom_row(ui, app, &palette);
-                ui.add_space(10.0);
-                ui.horizontal_wrapped(|ui| {
-                    ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
-                    ui.spacing_mut().slider_width = 90.0;
-                    let mut dim = app.settings.disc_dim;
-                    if ui.add(egui::Slider::new(&mut dim, 0.05..=1.0).text("Disc when idle")).changed() {
-                        app.settings.disc_dim = dim;
-                        app.mark_settings_dirty();
-                    }
-                    if theme::soft_button(ui, &palette, None, "Default controls", false).clicked() {
-                        app.actions.push(Action::ResetBlockNudge);
-                    }
-                    if theme::soft_button(ui, &palette, Some(Icon::Info), "Bug test guide", false).clicked() {
-                        app.show_bug_guide = !app.show_bug_guide;
-                    }
-                    if theme::soft_button(ui, &palette, Some(Icon::Info), "Shortcuts", false).clicked() {
-                        app.actions.push(Action::ShowDialog(crate::model::Dialog::Shortcuts));
-                    }
-                });
-            });
         });
     if close {
         app.actions.push(Action::ToggleViewsPanel);
     }
     bug_guide(app, ctx);
+}
+
+/// Which of the exclusive views is on now: the mini player, a full screen,
+/// calm mode, the ordinary window with the visualizer, or the plain window.
+fn current_view(app: &App) -> ViewKind {
+    if app.calm_mode {
+        ViewKind::Calm
+    } else if app.mini_active {
+        ViewKind::Mini
+    } else if app.fullscreen_vis {
+        ViewKind::FullVisualizer
+    } else if app.lyrics_fullscreen.is_some() {
+        ViewKind::FullLyrics
+    } else if app.settings.vis_shapes_value() != 0 {
+        ViewKind::Visualizer
+    } else {
+        ViewKind::Default
+    }
 }
 
 /// The bug test checklist, in a window of its own.

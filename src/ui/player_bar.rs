@@ -193,6 +193,25 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             .show(ui, |_| {});
         return;
     }
+    // Clean screen: the controls are popped out and the reader wants the
+    // whole bottom bar gone, track info included.
+    if app.settings.float_hide_bar
+        && !app.mini_active
+        && app.float_slot(super::views_panel::default_float(ui.ctx())).is_some()
+    {
+        let bottom = ui.ctx().input(|input| input.raw.screen_rect).map_or(0.0, |rect| rect.bottom());
+        ui.ctx().data_mut(|data| {
+            data.insert_temp(egui::Id::new("vis-row-h"), 0.0_f32);
+            data.insert_temp(egui::Id::new("vis-top"), bottom);
+        });
+        egui::Panel::bottom("player-bar")
+            .exact_size(0.0)
+            .resizable(false)
+            .show_separator_line(false)
+            .frame(Frame::new().fill(Color32::TRANSPARENT))
+            .show(ui, |_| {});
+        return;
+    }
     // The bar is one fixed dark colour; the cover's colour lives in the
     // visualizer, not in the bar behind it.
     let lyrics_page = false;

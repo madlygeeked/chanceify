@@ -90,6 +90,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         keys::handle(app, ctx);
         views_panel::show(app, ctx);
         toasts(app, ctx, 20.0);
+        window_controls(ui, &app.palette, app.locale);
+        window_resize(ui);
         return;
     }
     if app.fullscreen_vis {
@@ -98,6 +100,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         keys::handle(app, ctx);
         views_panel::show(app, ctx);
         toasts(app, ctx, 20.0);
+        window_controls(ui, &app.palette, app.locale);
+        window_resize(ui);
         return;
     }
     // The mini player, by the reader's choice or because the window was made
@@ -105,6 +109,16 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     // player bar. The shortcuts, the toasts and the dialogs still work.
     app.mini_active = mini::wanted(app, ctx);
     app.sync_mini_level(ctx);
+    // The little player may shrink and stay resizable, however it was opened
+    // (also at launch, when it was left on).
+    let min_id = Id::new("mini-min-sent");
+    if app.mini_active != ctx.data(|data| data.get_temp::<bool>(min_id)).unwrap_or(false) {
+        ctx.data_mut(|data| data.insert_temp(min_id, app.mini_active));
+        if app.mini_active && !crate::window::fixed_size() {
+            ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(vec2(300.0, 260.0)));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
+        }
+    }
     if app.mini_active {
         app.window_alpha = mini::fade_level(app, ctx);
         mini::show(app, ui);
@@ -652,7 +666,7 @@ pub fn window_controls(ui: &mut egui::Ui, palette: &theme::Palette, locale: crat
         });
 }
 
-fn window_resize(ui: &mut egui::Ui) {
+pub(super) fn window_resize(ui: &mut egui::Ui) {
     let (fullscreen, maximized) = ui.ctx().input(|input| {
         (
             input.viewport().fullscreen.unwrap_or(false),

@@ -353,6 +353,8 @@ pub struct App {
     lastfm_song_count: u32,
     /// The extra visualizer window is open.
     pub extra_vis: bool,
+    /// The visualizer settings panel open inside the extra window.
+    pub extra_vis_panel: bool,
     pub extra_vis_since: Option<std::time::Instant>,
     /// A theme shown for a moment while the pointer is over it in Settings.
     pub theme_preview: Option<(Palette, Instant)>,
@@ -467,6 +469,9 @@ pub struct App {
     pub recents_generation: u64,
     pub queue_tab: QueueTab,
     pub search: SearchState,
+    /// Finished searches, kept while they are in the recent searches so
+    /// going back to one is instant. Forgetting a search drops its results.
+    search_cache: HashMap<String, crate::api::models::SearchResults>,
     pub playlist_pages: HashMap<String, PlaylistPage>,
     /// One checkpoint snapshot at a time, including pages evicted while it writes.
     playlist_cache_write_in_flight: bool,
@@ -1051,6 +1056,7 @@ impl App {
             calm_mode: false,
             lastfm_song_count: 0,
             extra_vis: false,
+            extra_vis_panel: false,
             extra_vis_since: None,
             theme_preview: None,
             theme_previewing: false,
@@ -1133,6 +1139,7 @@ impl App {
                 .and_then(QueueTab::decode)
                 .unwrap_or_default(),
             search: SearchState::default(),
+            search_cache: HashMap::new(),
             playlist_pages: HashMap::new(),
             playlist_cache_write_in_flight: false,
             load_generation: 0,
@@ -5990,6 +5997,29 @@ impl App {
         {
             return;
         }
+        // Seen before and still in the recent searches: show it at once.
+        if !query.is_empty()
+            && let Some(cached) = self.search_cache.get(&query.to_lowercase()).cloned()
+        {
+            self.search.serial += 1;
+            self.search.committed = query.clone();
+            self.search.playlists = None;
+            self.search.error = None;
+            self.search.catalogue_pending = false;
+            self.search.playlists_pending = false;
+            let uris = cached
+                .tracks
+                .iter()
+                .flat_map(|page| page.items.iter())
+                .map(|track| track.uri.clone())
+                .collect();
+            self.request_contains(uris);
+            self.search.results = Loadable::Loaded(cached);
+            self.search.results_serial = self.search.serial;
+            self.settings.remember_search(&query);
+            self.settings_dirty = true;
+            return;
+        }
         self.search.serial += 1;
         self.search.committed = query.clone();
         self.search.playlists = None;
@@ -6024,6 +6054,30 @@ impl App {
         if let Some(results) = self.search.results.get_mut() {
             results.playlists = Some(page.clone());
         }
+        self.cache_search();
+    }
+
+    /// Keeps the finished search for the recent-searches shelf, and lets go
+    /// of any whose entry has been cleared.
+    fn cache_search(&mut self) {
+        let query = self.search.committed.to_lowercase();
+        if let Some(results) = self.search.results.get()
+            && !query.is_empty()
+            && self.settings.search_history.iter().any(|entry| entry.to_lowercase() == query)
+        {
+            self.search_cache.insert(query, results.clone());
+        }
+        self.prune_search_cache();
+    }
+
+    fn prune_search_cache(&mut self) {
+        let kept: HashSet<String> = self
+            .settings
+            .search_history
+            .iter()
+            .map(|entry| entry.to_lowercase())
+            .collect();
+        self.search_cache.retain(|key, _| kept.contains(key));
     }
 
     fn search_failed(&mut self, part: &str, error: impl std::fmt::Display) {
@@ -7451,6 +7505,7 @@ impl App {
                         self.search.results = Loadable::Loaded(results);
                         self.search.results_serial = serial;
                         self.show_search_playlists();
+                        self.cache_search();
                     }
                     Err(error) => self.search_failed(&gettext(self.locale, "Search"), error),
                 }
@@ -10577,6 +10632,7 @@ impl App {
             Action::ForgetSearch(query) => {
                 self.settings.search_history.retain(|entry| entry != &query);
                 self.settings_dirty = true;
+                self.prune_search_cache();
             }
             Action::SetSearchFilter(filter) => self.search.filter = filter,
             Action::FocusSearch => {
@@ -10923,6 +10979,10 @@ impl App {
                     1 => self.settings.float_big = place,
                     _ => self.settings.float_controls = place,
                 }
+                self.mark_settings_dirty();
+            }
+            Action::SetFloatHideBar(on) => {
+                self.settings.float_hide_bar = on;
                 self.mark_settings_dirty();
             }
             Action::InDefaultView(inner) => {
@@ -11519,7 +11579,10 @@ impl App {
                 if was_mini {
                     // Back to the whole window, at the size it had.
                     self.settings.mini_player = false;
-                    let [width, height] = self.mini_restore.unwrap_or([1240.0, 800.0]);
+                    let [width, height] = self
+                        .mini_restore
+                        .or(self.settings.mini_restore_size)
+                        .unwrap_or([1240.0, 800.0]);
                     // The full window's smallest size comes back, and the
                     // panel check sends its own minimum again.
                     if !crate::window::fixed_size() {
@@ -11542,6 +11605,9 @@ impl App {
                     self.mini_restore = self
                         .last_window_size
                         .filter(|size| size[0] >= 740.0 && size[1] >= 500.0);
+                    if self.mini_restore.is_some() {
+                        self.settings.mini_restore_size = self.mini_restore;
+                    }
                     self.settings.mini_player = true;
                     let height = if self.settings.mini_queue { 680.0 } else { 340.0 };
                     // The window may shrink to the little player, and stays

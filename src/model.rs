@@ -1414,6 +1414,8 @@ pub enum Action {
     /// full screen, calm) first. Choosing the view already shown goes back
     /// to the default one.
     GoView(ViewKind),
+    /// With the controls popped out, hide the whole bottom bar too.
+    SetFloatHideBar(bool),
     /// Run an action from the normal window: any special view is left first.
     InDefaultView(Box<Action>),
     SetLyricsCtlOff([f32; 2]),

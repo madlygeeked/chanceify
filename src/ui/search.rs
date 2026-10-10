@@ -124,18 +124,8 @@ fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
             artist.name.to_lowercase() == query
                 || results.tracks.as_ref().is_none_or(|t| t.items.is_empty())
         });
-    let wide = ui.available_width() > 720.0;
-    ui.horizontal_top(|ui| {
-        ui.spacing_mut().item_spacing.x = 24.0;
-        let top_width = if wide {
-            (ui.available_width() * 0.36).clamp(240.0, 380.0)
-        } else {
-            ui.available_width()
-        };
-        ui.vertical(|ui| {
-            ui.set_width(top_width);
-            theme::section_title(ui, &palette, &gettext(locale, "Top result"));
-            ui.add_space(4.0);
+    ui.add_space(2.0);
+        {
             if let Some(artist) = top_artist {
                 top_result(
                     app,
@@ -247,18 +237,9 @@ fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
                     },
                 );
             }
-        });
-        if wide {
-            ui.vertical(|ui| {
-                ui.set_width(ui.available_width());
-                songs(app, ui, results, 4);
-            });
         }
-    });
-    if !wide {
-        ui.add_space(12.0);
-        songs(app, ui, results, 4);
-    }
+    ui.add_space(10.0);
+    result_rows(app, ui, results, 8);
     ui.add_space(8.0);
     shelf_artists(app, ui, results);
     shelf_albums(app, ui, results);
@@ -272,6 +253,85 @@ fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
         theme::section_title(ui, &palette, &gettext(locale, "Episodes"));
         ui.add_space(4.0);
         episodes(app, ui, results, 4);
+    }
+}
+
+/// The songs under the top result, as Spotify lays them out: cover, name and
+/// artists, a small tag saying what it is, and a round add / saved mark.
+fn result_rows(app: &mut App, ui: &mut egui::Ui, results: &SearchResults, limit: usize) {
+    let palette = app.palette;
+    let Some(page) = &results.tracks else {
+        return;
+    };
+    let uris: Arc<[String]> = page.items.iter().map(|track| track.uri.clone()).collect::<Vec<_>>().into();
+    for (index, track) in page.items.iter().take(limit).enumerate() {
+        let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), 58.0), Sense::click());
+        if !ui.is_rect_visible(rect) {
+            continue;
+        }
+        let hovered = response.hovered();
+        if hovered {
+            ui.painter().rect_filled(rect, CornerRadius::same(6), palette.surface_hover);
+        }
+        let cover = Rect::from_min_size(rect.min + vec2(8.0, 6.0), Vec2::splat(46.0));
+        widgets::paint_cover(ui, &palette, track.image(64), cover, 4.0, Icon::Music, Some(app.backend.art()));
+        if hovered {
+            ui.painter().rect_filled(cover, CornerRadius::same(4), egui::Color32::from_black_alpha(130));
+            theme::paint_icon(ui, Icon::PlayFilled, cover, 20.0, egui::Color32::WHITE);
+        }
+        let tag_x = rect.left() + rect.width() * 0.62;
+        let text_right = (tag_x - 12.0).max(rect.left() + 80.0);
+        let clip = Rect::from_min_max(pos2(cover.right() + 12.0, rect.top()), pos2(text_right, rect.bottom()));
+        let painter = ui.painter().with_clip_rect(clip);
+        crate::bidi::paint_line(&painter, clip.left(), clip.right(), rect.top() + 19.0, &track.name, theme::medium(15.0), palette.text);
+        let artists = crate::api::models::join_names(track.artists.iter().map(|a| a.name.as_str()));
+        crate::bidi::paint_line(&painter, clip.left(), clip.right(), rect.top() + 40.0, &artists, theme::regular(13.0), palette.secondary);
+        // What it is: Song, Single, EP or Album.
+        let tag = match track.album.as_ref().and_then(|album| album.album_type.as_deref()) {
+            Some("single") => "Single",
+            Some("compilation") => "Album",
+            _ => "Song",
+        };
+        let tag_galley = crate::bidi::layout_line(ui.painter(), tag, theme::medium(11.5), palette.secondary);
+        let tag_rect = Rect::from_min_size(
+            pos2(tag_x, rect.center().y - 9.0),
+            vec2(tag_galley.size().x + 10.0, 18.0),
+        );
+        ui.painter().rect_filled(tag_rect, CornerRadius::same(3), palette.surface_hover.gamma_multiply(1.2));
+        ui.painter().galley(
+            pos2(tag_rect.left() + 5.0, tag_rect.center().y - tag_galley.size().y / 2.0),
+            tag_galley,
+            palette.secondary,
+        );
+        // The round mark: saved songs show a tick, others a plus.
+        let saved = app.is_saved(&track.uri).unwrap_or(false);
+        let mark = Rect::from_center_size(pos2(rect.right() - 24.0, rect.center().y), Vec2::splat(28.0));
+        let mark_response = ui.interact(mark, ui.id().with(("result-mark", index)), Sense::click());
+        theme::paint_icon(
+            ui,
+            if saved { Icon::CircleCheck } else { Icon::CirclePlus },
+            mark,
+            20.0,
+            if saved {
+                palette.accent
+            } else if mark_response.hovered() {
+                palette.text
+            } else {
+                palette.secondary
+            },
+        );
+        if mark_response.clicked() {
+            app.actions.push(Action::ToggleSaved(track.uri.clone()));
+        } else if response.double_clicked() {
+            app.actions.push(Action::PlayUris {
+                uris: uris.to_vec(),
+                index: index as u32,
+            });
+        }
+        let item = PlayableItem::Track(track.clone());
+        egui::Popup::context_menu(&response)
+            .frame(widgets::menu_frame(&palette))
+            .show(|ui| widgets::item_menu(ui, app, &item, None, None));
     }
 }
 
@@ -295,7 +355,7 @@ fn top_result(
     let palette = app.palette;
     let mut subtitle_clicked = false;
     let (rect, response) =
-        ui.allocate_exact_size(vec2(ui.available_width(), 232.0), Sense::click());
+        ui.allocate_exact_size(vec2(ui.available_width(), 84.0), Sense::click());
     if ui.is_rect_visible(rect) {
         let hovered = ui.rect_contains_pointer(rect);
         let fill = if hovered {
@@ -305,36 +365,35 @@ fn top_result(
         };
         ui.painter()
             .rect_filled(rect, CornerRadius::same(theme::RADIUS), fill);
-        let image_rect = Rect::from_min_size(rect.min + vec2(20.0, 20.0), Vec2::splat(96.0));
-        widgets::paint_shadow(ui, &palette, image_rect, if round { 48.0 } else { 6.0 });
+        let image_rect = Rect::from_min_size(rect.min + vec2(14.0, 10.0), Vec2::splat(64.0));
         widgets::paint_cover(
             ui,
             &palette,
             image,
             image_rect,
-            if round { 48.0 } else { 6.0 },
+            if round { 32.0 } else { 4.0 },
             if round { Icon::User } else { Icon::Music },
             Some(app.backend.art()),
         );
         let text_clip = Rect::from_min_max(
-            pos2(rect.left() + 20.0, image_rect.bottom() + 12.0),
-            pos2(rect.right() - 20.0, rect.bottom()),
+            pos2(image_rect.right() + 16.0, rect.top()),
+            pos2(rect.right() - 150.0, rect.bottom()),
         );
         let painter = ui.painter().with_clip_rect(text_clip);
         crate::bidi::paint_line(
             &painter,
             text_clip.left(),
             text_clip.right(),
-            text_clip.top() + 16.0,
+            text_clip.top() + 26.0,
             title,
-            theme::bold(26.0),
+            theme::bold(22.0),
             palette.text,
         );
         match subtitle {
             TopResultSubtitle::SongArtists(artists) => {
                 let subtitle_rect = Rect::from_min_max(
-                    pos2(text_clip.left(), text_clip.top() + 36.0),
-                    pos2(text_clip.right(), text_clip.top() + 56.0),
+                    pos2(text_clip.left(), text_clip.top() + 46.0),
+                    pos2(text_clip.right(), text_clip.top() + 66.0),
                 );
                 let mut child = ui.new_child(
                     egui::UiBuilder::new()
@@ -363,16 +422,30 @@ fn top_result(
                     &painter,
                     text_clip.left(),
                     text_clip.right(),
-                    text_clip.top() + 46.0,
+                    text_clip.top() + 56.0,
                     subtitle,
                     theme::regular(13.5),
                     palette.secondary,
                 );
             }
         }
-        if hovered && let Some(uri) = &play_uri {
+        if let Some(uri) = &play_uri {
+            // Artists get a Follow pill beside the play button.
+            if round {
+                let following = app.is_saved(uri).unwrap_or(false);
+                let label = if following { "Following" } else { "Follow" };
+                let pill = Rect::from_center_size(pos2(rect.right() - 126.0, rect.center().y), vec2(84.0, 30.0));
+                let mut child = ui.new_child(
+                    egui::UiBuilder::new()
+                        .max_rect(pill)
+                        .layout(Layout::centered_and_justified(egui::Direction::LeftToRight)),
+                );
+                if theme::soft_button(&mut child, &palette, None, label, following).clicked() {
+                    app.actions.push(Action::ToggleSaved(uri.clone()));
+                }
+            }
             let button = Rect::from_center_size(
-                pos2(rect.right() - 44.0, rect.bottom() - 44.0),
+                pos2(rect.right() - 40.0, rect.center().y),
                 Vec2::splat(48.0),
             );
             let mut child = ui.new_child(
