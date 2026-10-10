@@ -462,7 +462,14 @@ fn detached_controls(app: &mut App, ctx: &Context) {
     use egui::{ViewportBuilder, ViewportClass, ViewportCommand, ViewportId};
     let id = ViewportId::from_hash_of("chanceify-pop-out-controls");
     let width = super::lyrics::controls_width(app, 0.0);
-    let height = super::lyrics::controls_height(app);
+    // The song's card (little cover and name) goes out of the window with
+    // the controls, above them, unless the big album art is on (that one
+    // stays in the window).
+    let with_card = !app.settings.art_expanded && app.now_playing().is_some();
+    let card_side = (width * 0.26).clamp(64.0, 120.0);
+    let card_h = if with_card { card_side + 16.0 + 8.0 } else { 0.0 };
+    let controls_h = super::lyrics::controls_height(app);
+    let height = controls_h + card_h;
     let saved = app.settings.float_window;
     let mut builder = ViewportBuilder::default()
         .with_title("chanceify controls")
@@ -501,7 +508,65 @@ fn detached_controls(app: &mut App, ctx: &Context) {
                 if grip.drag_started() {
                     ctx.send_viewport_cmd(ViewportCommand::StartDrag);
                 }
-                let _ = super::lyrics::controls_box_inner(app, ui, egui::pos2(0.0, 0.0), width, false);
+                if with_card && let Some(now) = app.now_playing() {
+                    let palette = app.palette;
+                    let pad = 8.0;
+                    let cover = Rect::from_min_size(egui::pos2(pad, pad), egui::vec2(card_side, card_side));
+                    let card = Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(width, card_side + pad * 2.0));
+                    ui.painter().rect(
+                        card,
+                        12.0,
+                        palette.panel.gamma_multiply(0.94),
+                        Stroke::new(1.0, palette.outline),
+                        egui::StrokeKind::Inside,
+                    );
+                    let loader = app.backend.art().clone();
+                    super::widgets::paint_cover(
+                        ui,
+                        &palette,
+                        now.art_url.as_deref().or(now.art_small.as_deref()),
+                        cover,
+                        8.0,
+                        Icon::Music,
+                        Some(&loader),
+                    );
+                    let text_left = cover.right() + 12.0;
+                    let text_w = (width - pad - text_left - 28.0).max(40.0);
+                    let title = crate::bidi::layout(
+                        ui.painter(),
+                        &now.title,
+                        theme::bold((card_side * 0.2).clamp(14.0, 22.0)),
+                        palette.text,
+                        text_w,
+                        2,
+                        Some(crate::bidi::ELLIPSIS),
+                    );
+                    let artist = crate::bidi::layout(
+                        ui.painter(),
+                        &now.subtitle,
+                        theme::regular((card_side * 0.15).clamp(12.0, 16.0)),
+                        palette.secondary,
+                        text_w,
+                        1,
+                        Some(crate::bidi::ELLIPSIS),
+                    );
+                    let block = title.size().y + 4.0 + artist.size().y;
+                    let y = cover.center().y - block / 2.0;
+                    let title_h = title.size().y;
+                    let title_w = title.size().x;
+                    let first_row = title_h / title.rows.len().max(1) as f32;
+                    ui.painter().galley(egui::pos2(text_left, y), title, palette.text);
+                    super::player_bar::like_heart(
+                        app,
+                        ui,
+                        "pop-out-card",
+                        egui::pos2(text_left + title_w.min(text_w) + 16.0, y + first_row / 2.0),
+                        18.0,
+                        &now.uri,
+                    );
+                    ui.painter().galley(egui::pos2(text_left, y + title_h + 4.0), artist, palette.secondary);
+                }
+                let _ = super::lyrics::controls_box_inner(app, ui, egui::pos2(0.0, card_h), width, false);
                 // A press that begins on a bar drags the window too.
                 let bar_drag: egui::Vec2 = ctx.data(|data| data.get_temp(Id::new("popout-bar-drag"))).unwrap_or(egui::Vec2::ZERO);
                 if bar_drag != egui::Vec2::ZERO {
