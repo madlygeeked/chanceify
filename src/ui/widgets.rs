@@ -4528,6 +4528,18 @@ pub fn setting_row(
     setting_row_sized(ui, palette, label, description, 0.0, control);
 }
 
+/// A settings row that keeps its second line: for a status the reader needs
+/// to see (who is signed in), not for explaining what a switch does.
+pub fn setting_row_note(
+    ui: &mut Ui,
+    palette: &Palette,
+    label: &str,
+    note: &str,
+    control: impl FnOnce(&mut Ui),
+) {
+    setting_row_full(ui, palette, label, note, true, 0.0, control);
+}
+
 /// A settings row whose control needs `control_width` points, such as a
 /// row of choices. Its text wraps before a control wider than usual, and
 /// in a window too narrow for both, any control goes on its own line below
@@ -4541,13 +4553,27 @@ pub fn setting_row_sized(
     control_width: f32,
     control: impl FnOnce(&mut Ui),
 ) {
+    // People know what a setting does: the explanation is not shown. (It
+    // still feeds the settings search.)
+    setting_row_full(ui, palette, label, description, false, control_width, control);
+}
+
+fn setting_row_full(
+    ui: &mut Ui,
+    palette: &Palette,
+    label: &str,
+    description: &str,
+    show_description: bool,
+    control_width: f32,
+    control: impl FnOnce(&mut Ui),
+) {
     let reserved = (control_width + 16.0).max(SETTING_CONTROL_WIDTH);
     let text = |ui: &mut Ui| {
-        theme::text(ui, label, theme::medium(14.0), palette.text);
-        if !description.is_empty() {
+        theme::text(ui, crate::i18n::ui_text(label), theme::medium(14.0), palette.text);
+        if show_description && !description.is_empty() {
             ui.add(
                 egui::Label::new(
-                    egui::RichText::new(description)
+                    egui::RichText::new(crate::i18n::ui_text(description))
                         .font(theme::regular(12.5))
                         .color(palette.secondary),
                 )

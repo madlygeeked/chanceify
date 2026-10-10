@@ -2,7 +2,109 @@
 //! for every message a catalog has not translated yet. The interface follows
 //! the operating system's language unless Settings names another one.
 
-pub use fastframe_i18n::{gettext, ngettext, pgettext};
+use std::borrow::Cow;
+
+use fastframe_i18n::Locale as CatalogLocale;
+
+/// Names that keep their capitals in the all-lowercase interface: products,
+/// companies, keys and the usual acronyms.
+const KEEP_CAPITALS: &[&str] = &[
+    "Spotify", "Spotifast", "Spicetify", "Last.fm", "Discord", "MusicBrainz", "Windows", "Linux", "macOS",
+    "GitHub", "Wi-Fi", "Bluetooth", "Chromecast", "AirPlay", "Winamp", "MilkDrop", "YouTube", "Cloudflare",
+    "Ctrl", "Shift", "Alt", "Enter", "Esc", "Escape", "Backspace", "Tab", "Cmd", "Premium", "BPM", "EQ", "ID",
+    "URL", "API", "HTTP", "HTTPS", "SOCKS5", "MP3", "FLAC", "OGG", "WAV", "AAC", "USB", "UI", "PNG", "JPG",
+    "JPEG", "GIF", "JSON", "DJ", "OK", "MB", "GB", "kHz", "Hz", "dB", "FPS", "GPU", "CPU", "DNS", "VPN",
+    "OAuth", "PKCE", "DPI", "MIDI", "CD", "TV", "PC", "SSL", "TLS", "LAN", "HDR", "RGB", "AM", "PM",
+];
+
+/// The interface is written in lowercase, as chanceify always is: every word
+/// is lowercased except the names in [`KEEP_CAPITALS`] and anything inside
+/// `{braces}` (a placeholder that code fills in).
+pub fn lowercase_style(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut word = String::new();
+    let mut in_braces = false;
+    let flush = |word: &mut String, out: &mut String, in_braces: bool| {
+        if word.is_empty() {
+            return;
+        }
+        let function_key = word.len() <= 3
+            && word.starts_with('F')
+            && word[1..].chars().all(|c| c.is_ascii_digit())
+            && word.len() > 1;
+        if in_braces || function_key || KEEP_CAPITALS.contains(&word.as_str()) {
+            out.push_str(word);
+        } else {
+            out.push_str(&word.to_lowercase());
+        }
+        word.clear();
+    };
+    let chars: Vec<char> = text.chars().collect();
+    for (index, c) in chars.iter().copied().enumerate() {
+        let joins = !word.is_empty()
+            && (c == '.' || c == '-')
+            && chars.get(index + 1).is_some_and(|next| next.is_alphanumeric());
+        if c.is_alphanumeric() || joins {
+            word.push(c);
+            continue;
+        }
+        flush(&mut word, &mut out, in_braces);
+        if c == '{' {
+            in_braces = true;
+        } else if c == '}' {
+            in_braces = false;
+        }
+        out.push(c);
+    }
+    flush(&mut word, &mut out, in_braces);
+    out
+}
+
+static ENGLISH: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+/// Tells the text helpers whether the interface is in English (the app sets
+/// this every frame from its locale).
+pub fn set_english(on: bool) {
+    ENGLISH.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Interface text that is written in English in the code and not run
+/// through a catalog (a label, a heading): lowercased in the English
+/// interface, left alone in every other language.
+pub fn ui_text(text: &str) -> Cow<'_, str> {
+    if ENGLISH.load(std::sync::atomic::Ordering::Relaxed) {
+        let lowered = lowercase_style(text);
+        if lowered == text { Cow::Borrowed(text) } else { Cow::Owned(lowered) }
+    } else {
+        Cow::Borrowed(text)
+    }
+}
+
+fn styled<L: CatalogLocale>(locale: L, text: Cow<'static, str>) -> Cow<'static, str> {
+    // Only the source language: a translation is left as its translators wrote it.
+    if locale.catalog().is_some() {
+        return text;
+    }
+    let lowered = lowercase_style(&text);
+    if lowered == text { text } else { Cow::Owned(lowered) }
+}
+
+pub fn gettext<L: CatalogLocale>(locale: L, source: &'static str) -> Cow<'static, str> {
+    styled(locale, fastframe_i18n::gettext(locale, source))
+}
+
+pub fn pgettext<L: CatalogLocale>(locale: L, context: &'static str, source: &'static str) -> Cow<'static, str> {
+    styled(locale, fastframe_i18n::pgettext(locale, context, source))
+}
+
+pub fn ngettext<L: CatalogLocale>(
+    locale: L,
+    singular: &'static str,
+    plural: &'static str,
+    count: u32,
+) -> Cow<'static, str> {
+    styled(locale, fastframe_i18n::ngettext(locale, singular, plural, count))
+}
 
 include!(concat!(env!("OUT_DIR"), "/catalogs.rs"));
 
@@ -262,7 +364,8 @@ mod tests {
         assert_eq!(gettext(Locale::German, "Home"), "Start");
         let missing = "Not translated yet";
         assert_eq!(gettext(Locale::German, missing), missing);
-        assert_eq!(gettext(Locale::English, "Home"), "Home");
+        assert_eq!(gettext(Locale::English, "Home"), "home");
+        assert_eq!(gettext(Locale::English, "Spotify and Last.fm"), "Spotify and Last.fm");
         assert_eq!(Locale::default(), Locale::English);
     }
 
@@ -358,7 +461,7 @@ mod tests {
         let context = "lyrics";
         assert_eq!(pgettext(Locale::German, context, source), "Folgen");
         assert_eq!(pgettext(Locale::Japanese, context, source), "追従");
-        assert_eq!(pgettext(Locale::English, context, source), source);
+        assert_eq!(pgettext(Locale::English, context, source), "follow");
         assert_eq!(pgettext(Locale::German, "no such context", source), source);
         assert_eq!(gettext(Locale::German, source), source);
     }
@@ -366,12 +469,12 @@ mod tests {
     #[test]
     fn zero_one_and_many_songs_have_complete_localized_labels() {
         for (count, english, german) in [
-            (0, "Playlist • 0 songs", "Playlist • 0 Titel"),
-            (1, "Playlist • 1 song", "Playlist • 1 Titel"),
-            (2, "Playlist • 2 songs", "Playlist • 2 Titel"),
+            (0, "playlist • 0 songs", "Playlist • 0 Titel"),
+            (1, "playlist • 1 song", "Playlist • 1 Titel"),
+            (2, "playlist • 2 songs", "Playlist • 2 Titel"),
             (
                 100_000,
-                "Playlist • 100000 songs",
+                "playlist • 100000 songs",
                 "Playlist • 100000 Titel",
             ),
         ] {
@@ -396,8 +499,8 @@ mod tests {
         assert_eq!(Locale::Ukrainian.playlist_count(2), "2 плейлісти");
         assert_eq!(Locale::Ukrainian.playlist_count(5), "5 плейлістів");
         for (locale, count, expected) in [
-            (Locale::English, 1, "Folder • 1 playlist"),
-            (Locale::English, 2, "Folder • 2 playlists"),
+            (Locale::English, 1, "folder • 1 playlist"),
+            (Locale::English, 2, "folder • 2 playlists"),
             (Locale::German, 1, "Ordner • 1 Playlist"),
             (Locale::German, 2, "Ordner • 2 Playlists"),
             (Locale::Polish, 1, "Folder • 1 playlista"),

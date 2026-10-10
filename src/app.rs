@@ -12923,6 +12923,7 @@ impl App {
         if self.settings.winamp_window && needs_sign_in && !self.switch_intent {
             self.actions.push(Action::ToggleWinampWindow);
         }
+        crate::i18n::set_english(self.locale == crate::i18n::Locale::English);
         if self.settings.winamp_window {
             crate::ui::winamp::show(self, ui);
         } else {

@@ -32,6 +32,8 @@ struct RowText<'a> {
     title: std::borrow::Cow<'a, str>,
     description: std::borrow::Cow<'a, str>,
     available: bool,
+    /// The second line is shown (a status), not hidden as an explanation.
+    keep: bool,
 }
 
 impl<'a> RowText<'a> {
@@ -43,7 +45,13 @@ impl<'a> RowText<'a> {
             title: title.into(),
             description: description.into(),
             available: true,
+            keep: false,
         }
+    }
+
+    fn noted(mut self) -> Self {
+        self.keep = true;
+        self
     }
 
     fn when(mut self, available: bool) -> Self {
@@ -76,7 +84,11 @@ fn filtered_row(
     control: impl FnOnce(&mut egui::Ui),
 ) {
     if row.matches(needle, section) {
-        widgets::setting_row(ui, palette, &row.title, &row.description, control);
+        if row.keep {
+            widgets::setting_row_note(ui, palette, &row.title, &row.description, control);
+        } else {
+            widgets::setting_row(ui, palette, &row.title, &row.description, control);
+        }
     }
 }
 
@@ -212,7 +224,7 @@ fn section(
         return;
     }
     ui.add_space(10.0);
-    theme::text(ui, title, theme::bold(18.0), palette.text);
+    theme::text(ui, crate::i18n::ui_text(title), theme::bold(18.0), palette.text);
     ui.add_space(8.0);
     Frame::new()
         .fill(
@@ -266,7 +278,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
                 for (index, name) in TABS.iter().enumerate() {
-                    if theme::soft_button(ui, &palette, None, name, tab == index as u8).clicked() {
+                    if theme::soft_button(ui, &palette, None, &crate::i18n::ui_text(name), tab == index as u8).clicked() {
                         tab = index as u8;
                     }
                 }
@@ -482,7 +494,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let (status, detail, action) = match &app.local_playback {
         crate::backend::LocalPlayback::Ready { .. } => (
             pgettext(locale, "playback status", "Ready"),
-            gettext(locale, "This computer is a Spotify Connect device."),
+            std::borrow::Cow::Borrowed(""),
             None,
         ),
         crate::backend::LocalPlayback::Authorizing => (
@@ -523,7 +535,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             // Translators: {status} is a playback state such as Ready or Not set up.
             gettext(locale, "Status: {status}").replace("{status}", &status),
             detail,
-        ),
+        )
+        .noted(),
         RowText::new(
             gettext(locale, "Device name"),
             gettext(locale, "How this computer appears in Spotify Connect."),
@@ -2291,7 +2304,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     status.push_str(&format!(" {} waiting to be sent.", view.queued));
                 }
             }
-            widgets::setting_row(
+            widgets::setting_row_note(
                 ui,
                 &palette,
                 "Last.fm account",
@@ -2890,11 +2903,6 @@ fn missing_lists(ui: &mut egui::Ui, app: &mut App, palette: &Palette) {
         };
         lists.push(names);
     }
-    theme::subtle(
-        ui,
-        palette,
-        "Open its Last.fm page, press Upload image, and pick the picture from the folder. Press Done to take it off this list (it is checked again in a week).",
-    );
     ui.add_space(4.0);
     ui.columns(2, |columns| {
         for (index, ui) in columns.iter_mut().enumerate() {
@@ -2913,7 +2921,7 @@ fn missing_lists(ui: &mut egui::Ui, app: &mut App, palette: &Palette) {
             }
             egui::ScrollArea::vertical()
                 .id_salt(("missing-scroll", artists))
-                .max_height((ui.ctx().content_rect().height() * 0.8).max(560.0))
+                .max_height((ui.ctx().content_rect().height() * 1.3).max(900.0))
                 .auto_shrink([false, true])
                 .show(ui, |ui| {
                     for name in names.iter() {
