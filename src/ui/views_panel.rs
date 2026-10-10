@@ -21,26 +21,6 @@ fn dark_palette(app: &App) -> Palette {
     palette
 }
 
-/// One line of the zoom control: smaller, the size, bigger.
-pub fn zoom_row(ui: &mut egui::Ui, app: &mut App, palette: &Palette) {
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 6.0;
-        theme::text(ui, "Zoom", theme::medium(13.5), palette.text);
-        if theme::soft_button(ui, palette, None, "-", false).clicked() {
-            app.actions.push(Action::AdjustZoom(-1));
-        }
-        if theme::soft_button(ui, palette, None, &format!("{:.0}%", app.settings.zoom * 100.0), false)
-            .on_hover_text("Back to 100%")
-            .clicked()
-        {
-            app.actions.push(Action::AdjustZoom(0));
-        }
-        if theme::soft_button(ui, palette, None, "+", false).clicked() {
-            app.actions.push(Action::AdjustZoom(1));
-        }
-    });
-}
-
 /// The Views disc: a small disc the mouse can drag anywhere and click to open
 /// the Views panel, on every screen. Until it has been moved, it stays out of
 /// the way where the sidebar has its own disc.
@@ -248,6 +228,14 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
     let width = super::lyrics::controls_width(app, width);
     let mut change: Option<Option<[f32; 3]>> = None;
     let mut top_left = egui::pos2(x, y);
+    // Until it has been moved, the lyrics page's controls hang under the
+    // cover's resting place, so a bouncing or tilting cover never reaches them.
+    if app.lyrics_fullscreen.is_some()
+        && app.settings.float_lyrics.is_none()
+        && let Some(base) = ctx.data(|data| data.get_temp::<Rect>(Id::new("lyrics-base-cover")))
+    {
+        top_left = egui::pos2(base.left(), (base.bottom() + 96.0).min(screen.bottom() - 120.0));
+    }
     egui::Area::new(Id::new("pop-out-controls"))
         .order(egui::Order::Foreground)
         .fixed_pos(egui::pos2(0.0, 0.0))
@@ -260,36 +248,66 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
             let Some(outer) = super::lyrics::controls_box_inner(app, ui, top_left, width, false) else {
                 return;
             };
-            // The small album art mode: the cover and the song's name sit
-            // just above the controls and travel with them.
-            if !app.settings.art_expanded
-                && app.lyrics_fullscreen.is_none()
+            // The now playing card: the cover and the song's name sit just
+            // above the controls and travel with them. Under the full screen
+            // lyrics the big cover is already on the page, so the card is
+            // only the words. Any part of it drags the whole panel.
+            let mut card_drag = egui::Vec2::ZERO;
+            let mut card_dragging = false;
+            let lyrics_page = app.lyrics_fullscreen.is_some();
+            if (lyrics_page || !app.settings.art_expanded)
                 && let Some(now) = app.now_playing()
             {
-                let side = (outer.width() * 0.26).clamp(64.0, 120.0);
+                let side = if lyrics_page { 44.0 } else { (outer.width() * 0.26).clamp(64.0, 120.0) };
                 let pad = 8.0;
                 let top = (outer.top() - side - pad * 2.0 - 8.0).max(screen.top() + 4.0 + pad);
                 let cover = Rect::from_min_size(egui::pos2(outer.left() + pad, top), egui::vec2(side, side));
+                let card = Rect::from_min_max(cover.min - egui::vec2(pad, pad), egui::pos2(outer.right(), cover.bottom() + pad));
                 let palette = dark_palette(app);
+                // The whole card is a handle, registered first so the cover,
+                // the name and the heart still take their own clicks.
+                let handle = ui.interact(card, Id::new("pop-out-card-grip"), egui::Sense::click_and_drag());
+                if handle.hovered() || handle.dragged() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+                }
+                card_drag = handle.drag_delta();
+                card_dragging = handle.dragged();
                 // A backing, so the words read over any page.
                 ui.painter().rect(
-                    Rect::from_min_max(cover.min - egui::vec2(pad, pad), egui::pos2(outer.right(), cover.bottom() + pad)),
+                    card,
                     12.0,
                     Color32::from_rgba_unmultiplied(0x14, 0x16, 0x1a, 235),
                     Stroke::new(1.0, palette.outline),
                     egui::StrokeKind::Inside,
                 );
-                let loader = app.backend.art().clone();
-                super::widgets::paint_cover(
-                    ui,
-                    &palette,
-                    now.art_url.as_deref().or(now.art_small.as_deref()),
-                    cover,
-                    8.0,
-                    Icon::Music,
-                    Some(&loader),
-                );
-                let text_left = cover.right() + 12.0;
+                let open_song = |app: &mut App| {
+                    if let Some(id) = &now.album_id {
+                        app.actions.push(Action::Open(crate::model::Page::Album(id.clone())));
+                    } else if let Some(id) = &now.show_id {
+                        app.actions.push(Action::Open(crate::model::Page::Show(id.clone())));
+                    }
+                };
+                let text_left = if lyrics_page {
+                    card.left() + 14.0
+                } else {
+                    let loader = app.backend.art().clone();
+                    super::widgets::paint_cover(
+                        ui,
+                        &palette,
+                        now.art_url.as_deref().or(now.art_small.as_deref()),
+                        cover,
+                        8.0,
+                        Icon::Music,
+                        Some(&loader),
+                    );
+                    let cover_click = ui
+                        .interact(cover, Id::new("pop-out-card-cover"), egui::Sense::click())
+                        .on_hover_cursor(egui::CursorIcon::PointingHand);
+                    if cover_click.clicked() {
+                        open_song(app);
+                    }
+                    cover.right() + 12.0
+                };
                 let text_w = (outer.right() - pad - text_left - 28.0).max(40.0);
                 let title = crate::bidi::layout(
                     ui.painter(),
@@ -314,6 +332,13 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                 let title_h = title.size().y;
                 let title_w = title.size().x;
                 let first_row = title_h / title.rows.len().max(1) as f32;
+                let words = Rect::from_min_size(egui::pos2(text_left, y), egui::vec2(text_w, block));
+                let words_click = ui
+                    .interact(words, Id::new("pop-out-card-words"), egui::Sense::click())
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                if words_click.clicked() {
+                    open_song(app);
+                }
                 ui.painter().galley(egui::pos2(text_left, y), title, Color32::WHITE);
                 // The like heart, right after the song's name.
                 super::player_bar::like_heart(
@@ -338,8 +363,8 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
             if grip_response.hovered() || grip_response.dragged() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
             }
-            if grip_response.dragged() {
-                let to = top_left + grip_response.drag_delta();
+            if grip_response.dragged() || card_dragging {
+                let to = top_left + grip_response.drag_delta() + card_drag;
                 top_left = egui::pos2(
                     to.x.clamp(screen.left(), (screen.right() - width).max(screen.left())),
                     to.y.clamp(screen.top(), (screen.bottom() - outer.height()).max(screen.top())),
@@ -530,10 +555,10 @@ pub fn show(app: &mut App, ctx: &Context) {
                         ],
                         _ => vec![
                             ("Library", app.settings.sidebar_visible, Action::InDefaultView(Box::new(Action::ToggleSidebar))),
-                            ("Queue", app.show_queue_panel, Action::InDefaultView(Box::new(Action::ToggleQueuePanel))),
                             ("Side lyrics", app.show_lyrics_panel, Action::InDefaultView(Box::new(Action::ToggleLyricsPanel))),
+                            ("Queue", app.show_queue_panel, Action::InDefaultView(Box::new(Action::ToggleQueuePanel))),
                             ("Big album art", app.settings.art_expanded, Action::InDefaultView(Box::new(Action::ToggleArtExpanded))),
-                            ("Clean screen", app.settings.float_hide_bar, Action::SetFloatHideBar(!app.settings.float_hide_bar)),
+                            ("Visualizer", app.settings.vis_shapes_value() != 0, Action::ToggleVisShapes),
                             ("Visualizer settings", app.vis_panel, Action::ToggleVisPanel),
                             (if app.extra_vis { "Close visualizer window" } else { "New visualizer window" }, app.extra_vis, Action::ToggleExtraWindow),
                             on_top,
@@ -543,11 +568,6 @@ pub fn show(app: &mut App, ctx: &Context) {
                         ui.horizontal_wrapped(|ui| {
                             for (label, on, action) in chips {
                                 let response = theme::soft_button(ui, &palette, None, label, on);
-                                let response = if label == "Clean screen" {
-                                    response.on_hover_text("With the controls popped out, hides the whole bottom bar too")
-                                } else {
-                                    response
-                                };
                                 if response.clicked() {
                                     app.actions.push(action);
                                 }
@@ -561,7 +581,6 @@ pub fn show(app: &mut App, ctx: &Context) {
                     .id_salt("views-more")
                     .default_open(false)
                     .show(ui, |ui| {
-                        zoom_row(ui, app, &palette);
                         ui.spacing_mut().slider_width = 110.0;
                         let mut dim = app.settings.disc_dim;
                         if ui.add(egui::Slider::new(&mut dim, 0.05..=1.0).text("Disc when idle")).changed() {
@@ -577,32 +596,6 @@ pub fn show(app: &mut App, ctx: &Context) {
                             }
                             if theme::soft_button(ui, &palette, Some(Icon::Info), "Shortcuts", false).clicked() {
                                 app.actions.push(Action::ShowDialog(crate::model::Dialog::Shortcuts));
-                            }
-                        });
-                        // Every key's job as a button, for those who use the mouse only.
-                        egui::CollapsingHeader::new(
-                            egui::RichText::new("Everything the keys do").color(palette.text).font(theme::medium(13.0)),
-                        )
-                        .id_salt("views-all-actions")
-                        .default_open(false)
-                        .show(ui, |ui| {
-                            for (group, ids) in super::keys::CATEGORIES {
-                                theme::subtle(ui, &palette, &group.to_uppercase());
-                                ui.horizontal_wrapped(|ui| {
-                                    for id in *ids {
-                                        if let Some(bindable) = super::keys::BINDABLE.iter().find(|b| b.id == *id) {
-                                            let hint = super::keys::chord_label(app, bindable.id);
-                                            let mut button = theme::soft_button(ui, &palette, None, bindable.label, false);
-                                            if let Some(hint) = hint {
-                                                button = button.on_hover_text(format!("Key: {hint}"));
-                                            }
-                                            if button.clicked() {
-                                                app.actions.push((bindable.action)());
-                                            }
-                                        }
-                                    }
-                                });
-                                ui.add_space(4.0);
                             }
                         });
                     });

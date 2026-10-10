@@ -570,12 +570,14 @@ fn with_cover(app: &mut App, ui: &mut egui::Ui, rect: Rect, top: f32) {
 
 /// The playing song's cover filling the top of `column`, with its title and
 /// artists beneath, aligned to its left edge or centred.
-fn big_cover(app: &mut App, ui: &mut egui::Ui, column: Rect, align: Align) {
+fn big_cover(app: &mut App, ui: &mut egui::Ui, column: Rect, _align: Align) {
     let Some(now) = app.now_playing() else {
         return;
     };
     let base_side = column.width();
     let base_cover = Rect::from_min_size(column.min, vec2(base_side, base_side));
+    // Where the cover rests, whatever it does to the music: the controls hang from here.
+    ui.ctx().data_mut(|data| data.insert_temp(egui::Id::new("lyrics-base-cover"), base_cover));
     // Bouncing to the music: the card swells a little with the bass. The words
     // below keep to the card's resting size so they never jump about.
     let bounce_on = app.settings.lyrics_flag(crate::settings::Settings::LYRICS_BOUNCE_ART);
@@ -721,87 +723,7 @@ fn big_cover(app: &mut App, ui: &mut egui::Ui, column: Rect, align: Align) {
                 app.actions.push(Action::SaveAlbumArt);
             }
         });
-    // The tilted card swells towards the viewer; the words follow its lowest
-    // corner so a floating card never covers them.
-    let lowest = [(-1.0_f32, -1.0_f32), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)]
-        .iter()
-        .map(|(x, y)| {
-            let z = (x * nx + y * ny) * 0.55;
-            base_cover.center().y + y * base_side * 0.5 * (3.2 / (3.2 + z))
-        })
-        .fold(base_cover.bottom(), f32::max);
-    let words_top = ctx.animate_value_with_time(hover_id.with("words"), lowest.max(base_cover.bottom()) + 18.0, 0.1);
-    let words = Rect::from_min_max(pos2(column.left(), words_top), column.max);
-    let mut text = ui.new_child(
-        UiBuilder::new()
-            .max_rect(words)
-            .layout(Layout::top_down(align)),
-    );
-    text.spacing_mut().item_spacing.y = 4.0;
-    // With the artist hidden the song's name takes the room and is bigger.
-    let show_artist = !app.settings.lyrics_flag(crate::settings::Settings::LYRICS_HIDE_ARTIST);
-    let title_size = if show_artist { 22.0 } else { 30.0 };
-    let saved = app.is_saved(&now.uri).unwrap_or(false);
-    let heart = !now.is_episode && now.uri.starts_with("spotify:track:");
-    // The title's own width, so the row can sit in the middle when the
-    // column is centred (and the heart hugs the name when it is not).
-    let heart_w = if heart { 36.0 } else { 0.0 };
-    let room = (words.width() - heart_w - 8.0).max(40.0);
-    let title_w = text
-        .painter()
-        .layout_no_wrap(now.title.clone(), theme::semibold(title_size), Color32::WHITE)
-        .size()
-        .x
-        .min(room)
-        + 4.0;
-    let lead = if align == Align::Center {
-        ((words.width() - title_w - heart_w - 8.0) / 2.0).max(0.0)
-    } else {
-        0.0
-    };
-    text.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 8.0;
-        ui.add_space(lead);
-        ui.allocate_ui_with_layout(
-            vec2(title_w, title_size + 8.0),
-            Layout::left_to_right(Align::Center),
-            |ui| {
-                ui.add(
-                    egui::Label::new(
-                        egui::RichText::new(&now.title)
-                            .font(theme::semibold(title_size))
-                            .color(Color32::WHITE),
-                    )
-                    .truncate(),
-                );
-            },
-        );
-        if heart {
-            let dark = theme::Palette::dark();
-            if theme::icon_button(
-                ui,
-                if saved { Icon::HeartFilled } else { Icon::Heart },
-                title_size.min(24.0),
-                if saved { dark.accent } else { Color32::from_gray(225) },
-                dark.accent_hover,
-                if saved { "Remove from Liked Songs" } else { "Save to Liked Songs" },
-            )
-            .clicked()
-            {
-                app.actions.push(Action::ToggleSaved(now.uri.clone()));
-            }
-        }
-    });
-    if show_artist {
-        text.add(
-            egui::Label::new(
-                egui::RichText::new(&now.subtitle)
-                    .font(theme::regular(14.0))
-                    .color(Color32::from_gray(225)),
-            )
-            .truncate(),
-        );
-    }
+    // The song's name and artist live in the card above the controls.
 }
 
 fn fullscreen_content_width(viewport_width: f32) -> f32 {
@@ -839,7 +761,8 @@ fn background(app: &mut App, ui: &mut egui::Ui, rect: Rect) {
         // cover or cut them off; the swirl fills the whole page.
         let mut area = rect;
         if app.settings.vis_shapes_value() & crate::settings::Settings::SHAPE_SWIRL == 0 {
-            let top = (rect.height() * 0.36).max(190.0).min(rect.height() * 0.8);
+            // Never higher than the bottom third of the screen.
+            let top = rect.height() * (2.0 / 3.0);
             area = Rect::from_min_max(pos2(rect.left(), rect.top() + top), rect.max);
         }
         let moving = super::player_bar::lyrics_backdrop(app, ui, area, now.as_ref(), 3);
@@ -1463,14 +1386,15 @@ fn controls_slim(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: 
 pub(super) fn controls_width(app: &App, width: f32) -> f32 {
     let k = app.settings.controls_scale_value();
     let kc = 1.0 + (k - 1.0) * 0.5;
-    width.max(218.0 * kc + 40.0).clamp(300.0, 640.0)
+    // Wide enough for the buttons and, beside them, a volume bar that is never squeezed small.
+    width.max(218.0 * kc + 200.0).clamp(300.0, 640.0)
 }
 
 /// How tall the pop-out controls panel is: buttons, song bar, volume.
 pub(super) fn controls_height(app: &App) -> f32 {
     let k = app.settings.controls_scale_value();
     let kc = 1.0 + (k - 1.0) * 0.5;
-    10.0 + 36.0 * kc + 4.0 + 26.0 * k + 4.0 + 24.0 * kc + 10.0
+    10.0 + 36.0 * kc + 4.0 + 26.0 * k + 10.0
 }
 
 pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f32, centred: bool) -> Option<Rect> {
@@ -1510,14 +1434,15 @@ pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egu
         Some(&now),
         seek_row,
         buttons_row,
-        outer.center().x - controls_w / 2.0,
+        outer.left() + 14.0,
         (outer.left() + 54.0, outer.right() - 14.0),
     );
     ui.ctx().data_mut(|data| data.remove::<bool>(egui::Id::new("popout-full-seek")));
-    // The volume bar stays inside the song bar's ends: never longer.
-    let volume_row = Rect::from_min_size(
-        pos2(outer.left() + 60.0, seek_row.bottom() + 4.0),
-        vec2(width - 120.0, volume_h),
+    // The volume bar sits on the first row, right of the repeat button.
+    let volume_left = outer.left() + 14.0 + controls_w + 10.0;
+    let volume_row = Rect::from_min_max(
+        pos2(volume_left, buttons_row.center().y - volume_h / 2.0),
+        pos2(outer.right() - 14.0, buttons_row.center().y + volume_h / 2.0),
     );
     super::player_bar::volume_row(app, ui, volume_row);
     if now.playing {
