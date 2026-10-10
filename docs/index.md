@@ -49,6 +49,6 @@ needs spotify premium.
 
 **does it download songs?** nope. it streams using [librespot](https://github.com/librespot-org/librespot)
 
-**does it collect data?** nope. [privacy](https://github.com/madlygeeked/chanceify/blob/main/PRIVACY.md)
+**does it collect data?** nope. [privacy and terms](https://github.com/madlygeeked/chanceify/blob/main/PRIVACY.md)
 
 **something broke?** [issues](https://github.com/madlygeeked/chanceify/issues)

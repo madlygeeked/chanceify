@@ -30,7 +30,7 @@ a spotify player for windows. needs spotify premium.
 - **keybinds.** every key can be changed.
 - **discord.** shows what you're playing.
 
-it streams with [librespot](https://github.com/librespot-org/librespot). it doesn't download songs, and it doesn't collect data ([privacy](PRIVACY.md)).
+it streams with [librespot](https://github.com/librespot-org/librespot). it doesn't download songs, and it doesn't collect data ([privacy and terms](PRIVACY.md)).
 
 more help: [chanceify](https://madlygeeked.github.io/chanceify/)
 
