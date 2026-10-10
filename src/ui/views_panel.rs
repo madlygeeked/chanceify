@@ -548,6 +548,17 @@ pub fn show(app: &mut App, ctx: &Context) {
     // and comes straight back when it returns.
     let rect_id = Id::new("views-panel-rect");
     let last_rect: Option<Rect> = ctx.data(|data| data.get_temp(rect_id));
+    // The panel can be drawn bigger or smaller: its layer is scaled about its
+    // top-left corner, drawing and pointer alike.
+    let scale = if app.settings.views_scale.is_finite() { app.settings.views_scale.clamp(0.7, 1.6) } else { 1.0 };
+    let pivot = last_rect.map_or(egui::pos2(60.0, 60.0), |rect| rect.min);
+    let to_global = |p: egui::Pos2| pivot + (p - pivot) * scale;
+    let panel_layer = egui::LayerId::new(egui::Order::Foreground, Id::new("views-panel-v3"));
+    ctx.set_transform_layer(
+        panel_layer,
+        egui::emath::TSTransform::new(pivot.to_vec2() * (1.0 - scale), scale),
+    );
+    let last_rect = last_rect.map(|rect| Rect::from_min_max(to_global(rect.min), to_global(rect.max)));
     let over = last_rect.is_some_and(|rect| {
         ctx.input(|input| input.pointer.hover_pos().is_some_and(|p| rect.expand(10.0).contains(p)) || input.pointer.any_down() && input.pointer.interact_pos().is_some_and(|p| rect.expand(30.0).contains(p)))
     });
@@ -694,14 +705,16 @@ pub fn show(app: &mut App, ctx: &Context) {
                 });
         });
     if let Some(window) = shown {
-        let rect = window.response.rect;
-        ctx.data_mut(|data| data.insert_temp(rect_id, rect));
+        let local = window.response.rect;
+        ctx.data_mut(|data| data.insert_temp(rect_id, local));
+        // Where the panel really is on the screen, scaled.
+        let rect = Rect::from_min_max(to_global(local.min), to_global(local.max));
         // A strip on the right edge: drag it to make the panel wider or narrower.
         egui::Area::new(Id::new("views-panel-edge"))
             .order(egui::Order::Foreground)
             .fixed_pos(egui::pos2(rect.right() - 7.0, rect.top() + 10.0))
             .show(ctx, |ui| {
-                let (strip, response) = ui.allocate_exact_size(egui::vec2(10.0, (rect.height() - 20.0).max(10.0)), egui::Sense::drag());
+                let (strip, response) = ui.allocate_exact_size(egui::vec2(10.0, (rect.height() - 40.0).max(10.0)), egui::Sense::drag());
                 if response.hovered() || response.dragged() {
                     ctx.set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
                     ui.painter().rect_filled(
@@ -711,7 +724,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                     );
                 }
                 if response.dragged() {
-                    app.settings.views_width = (width + response.drag_delta().x).clamp(260.0, 520.0);
+                    app.settings.views_width = (width + response.drag_delta().x / scale).clamp(260.0, 520.0);
                     app.mark_settings_dirty();
                 }
             });
@@ -720,7 +733,7 @@ pub fn show(app: &mut App, ctx: &Context) {
             .order(egui::Order::Foreground)
             .fixed_pos(egui::pos2(rect.left() + 10.0, rect.bottom() - 7.0))
             .show(ctx, |ui| {
-                let (strip, response) = ui.allocate_exact_size(egui::vec2((rect.width() - 20.0).max(10.0), 10.0), egui::Sense::drag());
+                let (strip, response) = ui.allocate_exact_size(egui::vec2((rect.width() - 40.0).max(10.0), 10.0), egui::Sense::drag());
                 if response.hovered() || response.dragged() {
                     ctx.set_cursor_icon(egui::CursorIcon::ResizeVertical);
                     ui.painter().rect_filled(
@@ -730,13 +743,33 @@ pub fn show(app: &mut App, ctx: &Context) {
                     );
                 }
                 if response.dragged() {
-                    let max_h = (ctx.content_rect().height() - 40.0).max(200.0);
-                    let now = if app.settings.views_height > 0.0 { app.settings.views_height } else { rect.height() };
-                    app.settings.views_height = (now + response.drag_delta().y).clamp(160.0, max_h);
+                    let max_h = (ctx.content_rect().height() / scale - 40.0).max(200.0);
+                    let now = if app.settings.views_height > 0.0 { app.settings.views_height } else { local.height() };
+                    app.settings.views_height = (now + response.drag_delta().y / scale).clamp(160.0, max_h);
                     app.mark_settings_dirty();
                 }
                 if response.double_clicked() {
                     app.settings.views_height = 0.0;
+                    app.mark_settings_dirty();
+                }
+            });
+        // The bottom-right corner scales the whole panel (double-click: normal size).
+        egui::Area::new(Id::new("views-panel-corner"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(egui::pos2(rect.right() - 18.0, rect.bottom() - 18.0))
+            .show(ctx, |ui| {
+                let (strip, response) = ui.allocate_exact_size(egui::vec2(22.0, 22.0), egui::Sense::drag());
+                if response.hovered() || response.dragged() {
+                    ctx.set_cursor_icon(egui::CursorIcon::ResizeNwSe);
+                    ui.painter().circle_filled(strip.center(), 4.0, Color32::from_white_alpha(110));
+                }
+                if response.dragged() {
+                    let d = response.drag_delta();
+                    app.settings.views_scale = (scale + (d.x + d.y) / 360.0).clamp(0.7, 1.6);
+                    app.mark_settings_dirty();
+                }
+                if response.double_clicked() {
+                    app.settings.views_scale = 1.0;
                     app.mark_settings_dirty();
                 }
             });

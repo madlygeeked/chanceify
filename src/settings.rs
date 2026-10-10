@@ -960,6 +960,8 @@ pub struct Settings {
     pub views_width: f32,
     /// Height of the Views panel (0 = fit the content).
     pub views_height: f32,
+    /// How big the Views panel is drawn (1 = normal).
+    pub views_scale: f32,
     /// Size of the visualizer settings panel (0 = fit the content).
     pub vis_panel_w: f32,
     pub vis_panel_h: f32,
@@ -1367,6 +1369,7 @@ impl Default for Settings {
             float_hide_bar: false,
             views_width: 316.0,
             views_height: 0.0,
+            views_scale: 1.0,
             float_detached: false,
             float_window: None,
             vis_panel_w: 0.0,
