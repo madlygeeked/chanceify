@@ -12409,7 +12409,7 @@ impl App {
     /// How the Discord profile is to look, from the settings and what plays.
     pub fn discord_style(&mut self) -> crate::discord::Style {
         let swirl = None;
-        let playlist = if self.settings.discord_playlist {
+        let playlist_name = if self.settings.discord_playlist || self.settings.discord_playlist_line {
             self.playing_context_uri()
                 .filter(|uri| uri.starts_with("spotify:playlist:"))
                 .and_then(|uri| util::uri_id(&uri).map(str::to_string))
@@ -12422,8 +12422,10 @@ impl App {
         } else {
             None
         };
+        let playlist = playlist_name.clone().filter(|_| self.settings.discord_playlist);
+        let playlist_line = playlist_name.filter(|_| self.settings.discord_playlist_line);
         let picks = [self.settings.discord_button_1.min(5), self.settings.discord_button_2.min(5)];
-        let playlist_url = if picks.contains(&3) {
+        let playlist_url = if picks.contains(&3) || self.settings.discord_playlist_line {
             self.playing_context_uri()
                 .filter(|uri| uri.starts_with("spotify:playlist:"))
                 .and_then(|uri| util::uri_id(&uri).map(str::to_string))
@@ -12456,6 +12458,7 @@ impl App {
             badge: self.settings.discord_badge,
             swirl,
             playlist,
+            playlist_line,
             profile_url,
             buttons: self.settings.discord_buttons,
             playlist_url,

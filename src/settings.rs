@@ -995,6 +995,8 @@ pub struct Settings {
     pub discord_song_page: bool,
     /// Which lines the Discord card says: the song, the artist, chanceify.
     pub discord_say_song: bool,
+    /// The playlist's name after the artist on the second line, linking to it.
+    pub discord_playlist_line: bool,
     pub discord_say_artist: bool,
     pub discord_say_app: bool,
     /// Settings sections folded away (kept between launches).
@@ -1413,6 +1415,7 @@ impl Default for Settings {
             discord_look: 0,
             discord_song_page: false,
             discord_say_song: true,
+            discord_playlist_line: false,
             discord_say_artist: true,
             discord_say_app: true,
             settings_closed: Vec::new(),

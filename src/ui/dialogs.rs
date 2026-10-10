@@ -28,7 +28,9 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
     // can still be moved and resized while it is open.
     let floating = matches!(dialog, Dialog::Shortcuts);
     let body = |ui: &mut egui::Ui| {
-            ui.set_width(420.0);
+            if !floating {
+                ui.set_width(420.0);
+            }
             match dialog {
                 Dialog::PersonalAppIntro => {
                     theme::text(ui, gettext(locale, "Spend less time waiting for Spotify"), theme::bold(20.0), palette.text);
@@ -162,9 +164,17 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     ui.add_space(6.0);
                     // One live list: what is shown here is what the keys do now.
                     // The window can be dragged to any size; the list fills it.
-                    ui.set_min_width(420.0);
+                    ui.set_min_width(260.0);
+                    // The list's height follows the window's own height, not what
+                    // the content asks for, so the window can be made any size
+                    // (it used to spring back to the full screen height).
+                    let list_height = app
+                        .dialog_rect
+                        .map_or(ctx.content_rect().height() - 330.0, |rect| rect.height() - 130.0)
+                        .max(100.0);
                     egui::ScrollArea::vertical()
-                        .max_height((ui.available_height() - 8.0).max(160.0))
+                        .max_height(list_height)
+                        .min_scrolled_height(60.0)
                         .auto_shrink([false, false])
                         .show(ui, |ui| {
                     let waiting = super::keys::rebinding(ui.ctx());
@@ -407,7 +417,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                 (screen.width() - 160.0).clamp(420.0, 1200.0),
                 (screen.height() - 200.0).max(240.0),
             ])
-            .min_size([420.0, 240.0])
+            .min_size([300.0, 200.0])
             .resizable(true)
             .collapsible(false)
             .show(ctx, body);

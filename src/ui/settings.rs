@@ -1977,10 +1977,11 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                         app.actions.push(Action::RegisterLinks);
                     }
                     ui.add_space(4.0);
-                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 7] = [
+                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 8] = [
                         ("Show the album cover", |s| &mut s.discord_cover),
                         ("Tiny chanceify badge in the corner of the cover", |s| &mut s.discord_badge),
                         ("Say which playlist I'm playing from", |s| &mut s.discord_playlist),
+                        ("Playlist name after the artist, linking to the playlist", |s| &mut s.discord_playlist_line),
                         ("Make the song and artist names links to Spotify", |s| &mut s.discord_links),
                         ("Show buttons under the song (Discord shows two)", |s| &mut s.discord_buttons),
                         ("Show songs I play from my own files", |s| &mut s.discord_files),

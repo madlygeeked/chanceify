@@ -121,6 +121,8 @@ pub struct Style {
     pub swirl: Option<String>,
     /// The playlist the song plays from, when the reader wants it said.
     pub playlist: Option<String>,
+    /// The playlist's name, to go after the artist on the second line (and link to it).
+    pub playlist_line: Option<String>,
     /// The reader's Spotify profile address, when they want a button for it.
     pub profile_url: Option<String>,
     pub buttons: bool,
@@ -246,8 +248,13 @@ pub fn activity_for(
     if style.say[0] {
         lines.push(now.title.clone());
     }
-    if style.say[1] && !artist_text.is_empty() {
-        lines.push(artist_text);
+    let artist_on = style.say[1] && !artist_text.is_empty();
+    let from_line = style.playlist_line.clone().filter(|_| style.playlist_url.is_some());
+    match (artist_on, &from_line) {
+        (true, Some(playlist)) => lines.push(format!("{artist_text} · from {playlist}")),
+        (true, None) => lines.push(artist_text),
+        (false, Some(playlist)) => lines.push(format!("from {playlist}")),
+        (false, None) => {}
     }
     if lines.is_empty() {
         lines.push(crate::build_info::DISPLAY_NAME.to_string());
@@ -275,7 +282,13 @@ pub fn activity_for(
         } else {
             None
         },
-        state_url: if style.links && both { artist_url } else { None },
+        state_url: if style.links && from_line.is_some() && style.say[0] {
+            style.playlist_url.clone()
+        } else if style.links && both {
+            artist_url
+        } else {
+            None
+        },
         status_display,
         large_image,
         large_text: if style.say[2] {
@@ -887,6 +900,7 @@ mod tests {
             badge: true,
             swirl: None,
             playlist: None,
+            playlist_line: None,
             profile_url: None,
             playlist_url: None,
             song_page: false,
