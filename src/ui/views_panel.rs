@@ -718,10 +718,10 @@ pub fn show(app: &mut App, ctx: &Context) {
                     // Icons only, one row: the four views of this window (exactly
                     // one is on) and the mini player, which is a window of its own.
                     let views = [
-                        (Icon::Shrink, "Mini player", ViewKind::Mini),
                         (Icon::PanelLeft, "Normal", ViewKind::Visualizer),
-                        (Icon::AudioLines, "Full screen visualizer", ViewKind::FullVisualizer),
                         (Icon::Mic, "Full screen lyrics", ViewKind::FullLyrics),
+                        (Icon::AudioLines, "Full screen visualizer", ViewKind::FullVisualizer),
+                        (Icon::Shrink, "Mini player", ViewKind::Mini),
                         (Icon::Moon, "Calm mode", ViewKind::Calm),
                     ];
                     let each = ((ui.available_width() - 6.0 * 4.0) / 5.0).max(30.0);
@@ -778,7 +778,10 @@ pub fn show(app: &mut App, ctx: &Context) {
                         ],
                     };
                     if !chips.is_empty() {
-                        ui.horizontal_wrapped(|ui| {
+                        // Always one row: the buttons shrink to fit, never wrap.
+                        let count = chips.len() as f32;
+                        let chip_w = ((ui.available_width() - 6.0 * (count - 1.0)) / count).clamp(22.0, 38.0);
+                        ui.horizontal(|ui| {
                             for (label, on, action) in chips {
                                 let icon = match label {
                                     "Library" => Icon::Grid3x3,
@@ -797,7 +800,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                                     "Close visualizer window" | "New visualizer window" => Icon::AudioLines,
                                     _ => Icon::Info,
                                 };
-                                let response = view_button(ui, &palette, icon, label, on, 38.0);
+                                let response = view_button(ui, &palette, icon, label, on, chip_w);
                                 if label.ends_with("visualizer window") {
                                     // A small plus (or cross, when it is open) on the corner.
                                     let badge = egui::Rect::from_center_size(response.rect.right_top() + egui::vec2(-9.0, 9.0), egui::Vec2::splat(12.0));
@@ -810,25 +813,6 @@ pub fn show(app: &mut App, ctx: &Context) {
                             }
                         });
                     }
-                    ui.add_space(2.0);
-                    egui::CollapsingHeader::new(
-                        egui::RichText::new("More").color(palette.secondary).font(theme::medium(13.0)),
-                    )
-                    .id_salt("views-more")
-                    .default_open(false)
-                    .show(ui, |ui| {
-                        ui.spacing_mut().slider_width = 110.0;
-                        let mut dim = app.settings.disc_dim;
-                        if ui.add(egui::Slider::new(&mut dim, 0.05..=1.0).text("Disc when idle")).changed() {
-                            app.settings.disc_dim = dim;
-                            app.mark_settings_dirty();
-                        }
-                        ui.horizontal_wrapped(|ui| {
-                            if theme::soft_button(ui, &palette, Some(Icon::Info), "Keybinds", false).clicked() {
-                                app.actions.push(Action::ShowDialog(crate::model::Dialog::Shortcuts));
-                            }
-                        });
-                    });
                 });
         });
     if let Some(window) = shown {
