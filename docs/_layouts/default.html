@@ -19,9 +19,10 @@
       <a href="{{ '/' | relative_url }}"{% if page.url == '/' %} class="on"{% endif %}>home</a>
       <a href="{{ '/features' | relative_url }}"{% if page.url contains 'features' %} class="on"{% endif %}>what it does</a>
       <a href="{{ '/setup' | relative_url }}"{% if page.url contains 'setup' %} class="on"{% endif %}>setup</a>
-      <a href="{{ '/faq' | relative_url }}"{% if page.url contains 'faq' %} class="on"{% endif %}>questions</a>
       <a href="{{ '/settings' | relative_url }}"{% if page.url contains 'settings' %} class="on"{% endif %}>settings</a>
+      <a href="{{ '/keys' | relative_url }}"{% if page.url contains 'keys' %} class="on"{% endif %}>keys</a>
       <a href="{{ '/files' | relative_url }}"{% if page.url contains 'files' %} class="on"{% endif %}>files</a>
+      <a href="{{ '/faq' | relative_url }}"{% if page.url contains 'faq' %} class="on"{% endif %}>questions</a>
     </nav>
   </div>
   <div class="spacer" style="height:clamp(12px,5vh,48px)"></div>
