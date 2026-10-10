@@ -8,7 +8,7 @@ needs spotify premium.
 
 ## get it
 
-1. download `chanceify.exe` from [releases](https://github.com/madlygeeked/chanceify/releases).
+1. download `chanceify.exe` from [releases](https://github.com/madlygeeked/chanceify/releases)
 2. run it. [virustotal](https://www.virustotal.com)
 
 ## features
@@ -45,10 +45,10 @@ needs spotify premium.
 
 **do i need premium?** yes. blame spotify.
 
-**does it download songs?** nope. it streams using [librespot](https://github.com/librespot-org/librespot).
+**where is everything saved?** in the folder beside `chanceify.exe`.
 
-**does it collect data?** nope. [privacy](https://github.com/madlygeeked/chanceify/blob/main/PRIVACY.md).
+**does it download songs?** nope. it streams using [librespot](https://github.com/librespot-org/librespot)
 
-**where is everything saved?** in the folder beside `chanceify.exe`. delete it to remove everything.
+**does it collect data?** nope. [privacy](https://github.com/madlygeeked/chanceify/blob/main/PRIVACY.md)
 
-**something broke?** [issues](https://github.com/madlygeeked/chanceify/issues).
+**something broke?** [issues](https://github.com/madlygeeked/chanceify/issues)
