@@ -945,6 +945,16 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
     if section_matches(&needle, &appearance, &appearance_rows) {
         any_visible = true;
         section(ui, &palette, &appearance, |ui| {
+            filtered_row(
+                ui,
+                &palette,
+                &needle,
+                &appearance,
+                &appearance_rows[1],
+                |ui| {
+                    ui.horizontal(|ui| language_picker(app, ui));
+                },
+            );
             // Wide enough for the theme's two buttons side by side.
             let theme_buttons_width = theme::soft_button_width(ui, &theme_guide)
                 + theme::soft_button_width(ui, &themes_folder)
@@ -996,22 +1006,6 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                                 app.actions.push(Action::SettingsChanged);
                             }
                         }
-                        let mut from_cover = app.settings.theme_from_cover;
-                        ui.horizontal(|ui| {
-                            theme::text(
-                                ui,
-                                "Match the theme to the album cover",
-                                theme::regular(13.0),
-                                palette.secondary,
-                            );
-                            if widgets::switch(ui, &palette, "Match the theme to the album cover", &mut from_cover)
-                                .changed()
-                            {
-                                app.settings.theme_from_cover = from_cover;
-                                app.settings.accent_from_art = from_cover;
-                                app.actions.push(Action::SettingsChanged);
-                            }
-                        });
                         let mut solid = app.settings.window_solidity() * 100.0;
                         ui.horizontal(|ui| {
                             theme::text(ui, "See-through window (works with every theme: 100% solid, 50% like frosted glass)", theme::regular(13.0), palette.secondary);
@@ -1065,14 +1059,6 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                         }
                     });
                 },
-            );
-            filtered_row(
-                ui,
-                &palette,
-                &needle,
-                &appearance,
-                &appearance_rows[1],
-                |ui| language_picker(app, ui),
             );
             if cfg!(target_os = "linux") {
                 filtered_row(
@@ -1643,6 +1629,15 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                     }
                 });
             });
+            if cfg!(windows) {
+                ui.add_space(8.0);
+                if theme::soft_button(ui, &palette, None, "Let chanceify:// links open chanceify (Windows)", false)
+                    .on_hover_text("Adds one entry for your Windows user, so links from the chanceify web page open the song here.")
+                    .clicked()
+                {
+                    app.actions.push(Action::RegisterLinks);
+                }
+            }
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
@@ -1958,24 +1953,6 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                         "Shows on your Discord profile like Spotify does: the song and artist, the cover and a progress bar, with a small chanceify badge. Discord's desktop app has to be open.",
                     );
                     ui.add_space(4.0);
-                    if theme::soft_button(ui, &palette, None, "Let chanceify:// links open chanceify (Windows)", false)
-                        .on_hover_text("Adds one entry for your Windows user, so the song page's Open in chanceify button works.")
-                        .clicked()
-                    {
-                        app.actions.push(Action::RegisterLinks);
-                    }
-                    ui.add_space(4.0);
-                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 2] = [
-                        ("Show songs I play from my own files", |s| &mut s.discord_files),
-                        ("Show nothing while paused", |s| &mut s.discord_hide_paused),
-                    ];
-                    for (label, field) in rows {
-                        let mut value = *field(&mut app.settings);
-                        if widgets::switch_labeled(ui, &palette, label, &mut value).changed() {
-                            *field(&mut app.settings) = value;
-                            app.mark_settings_dirty();
-                        }
-                    }
                     ui.add_space(6.0);
                     {
                         let (text, colour) = match crate::discord::link_state() {
@@ -1992,68 +1969,6 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                             theme::text(ui, &problem, theme::regular(12.0), palette.warning);
                         }
                         ui.ctx().request_repaint_after(std::time::Duration::from_secs(2));
-                    }
-                    ui.add_space(6.0);
-                    // A live preview: exactly what is being sent to Discord for the song now playing.
-                    {
-                        let style = app.discord_style();
-                        let seconds = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map_or(0, |elapsed| elapsed.as_secs() as i64);
-                        let activity = app
-                            .now_playing()
-                            .and_then(|now| crate::discord::activity_for(&now, &style, seconds));
-                        let playing_from = match app.playing_context_uri() {
-                            Some(uri) if uri.starts_with("spotify:playlist:") => {
-                                if style.playlist.is_some() {
-                                    "Playing from one of your playlists: named on the card".to_string()
-                                } else if app.settings.discord_playlist {
-                                    "Playing from a playlist whose name is not loaded yet (open Your Library once)".to_string()
-                                } else {
-                                    "Playing from a playlist (turn on \"Say which playlist\" to name it)".to_string()
-                                }
-                            }
-                            Some(_) => "Not playing from a playlist (an album, artist or liked songs)".to_string(),
-                            None => "chanceify does not know what you are playing from yet".to_string(),
-                        };
-                        theme::subtle(ui, &palette, "PREVIEW (what Discord shows right now)");
-                        theme::text(ui, &playing_from, theme::regular(12.0), palette.dim);
-                        egui::Frame::new()
-                            .fill(palette.surface)
-                            .corner_radius(8)
-                            .inner_margin(10)
-                            .show(ui, |ui| match &activity {
-                                Some(activity) => {
-                                    theme::text(ui, &activity.details, theme::bold(13.5), palette.text);
-                                    theme::text(ui, &activity.state, theme::regular(12.5), palette.secondary);
-                                    theme::text(
-                                        ui,
-                                        &format!("Cover hover: {}", activity.large_text),
-                                        theme::regular(12.0),
-                                        palette.dim,
-                                    );
-                                    theme::text(
-                                        ui,
-                                        &format!("Small picture hover: {}", activity.small_text),
-                                        theme::regular(12.0),
-                                        palette.dim,
-                                    );
-                                    if let Some(image) = &activity.small_image {
-                                        theme::text(ui, &format!("Small picture: {image}"), theme::regular(11.5), palette.dim);
-                                    }
-                                    for (label, _) in &activity.buttons {
-                                        theme::text(ui, &format!("[ {label} ]"), theme::regular(12.5), palette.accent);
-                                    }
-                                }
-                                None => {
-                                    theme::text(
-                                        ui,
-                                        "Nothing to show: play a song (or it is paused and \"Show nothing while paused\" is on).",
-                                        theme::regular(12.5),
-                                        palette.secondary,
-                                    );
-                                }
-                            });
                     }
                     ui.add_space(4.0);
                     if theme::soft_button(ui, &palette, None, "Copy what I'm playing for Discord", false).clicked() {
@@ -2177,6 +2092,28 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
 /// A band's frequency the short way: 60, 170, 1K, 16K.
 /// The interface language: System first, then each language by its own name,
 /// so a reader can find theirs whatever language the app is showing.
+fn flag_picture(locale: crate::i18n::Locale) -> (&'static str, &'static [u8]) {
+    use crate::i18n::Locale as L;
+    match locale {
+        L::English => ("bytes://flag-gb.png", include_bytes!("../../assets/flags/gb.png")),
+        L::German => ("bytes://flag-de.png", include_bytes!("../../assets/flags/de.png")),
+        L::Spanish => ("bytes://flag-es.png", include_bytes!("../../assets/flags/es.png")),
+        L::Dutch => ("bytes://flag-nl.png", include_bytes!("../../assets/flags/nl.png")),
+        L::PortugueseBrazil => ("bytes://flag-br.png", include_bytes!("../../assets/flags/br.png")),
+        L::PortuguesePortugal => ("bytes://flag-pt.png", include_bytes!("../../assets/flags/pt.png")),
+        L::French => ("bytes://flag-fr.png", include_bytes!("../../assets/flags/fr.png")),
+        L::Swedish => ("bytes://flag-se.png", include_bytes!("../../assets/flags/se.png")),
+        L::Polish => ("bytes://flag-pl.png", include_bytes!("../../assets/flags/pl.png")),
+        L::Russian => ("bytes://flag-ru.png", include_bytes!("../../assets/flags/ru.png")),
+        L::Italian => ("bytes://flag-it.png", include_bytes!("../../assets/flags/it.png")),
+        L::Japanese => ("bytes://flag-jp.png", include_bytes!("../../assets/flags/jp.png")),
+        L::ChineseSimplified => ("bytes://flag-cn.png", include_bytes!("../../assets/flags/cn.png")),
+        L::ChineseTraditional => ("bytes://flag-tw.png", include_bytes!("../../assets/flags/tw.png")),
+        L::Turkish => ("bytes://flag-tr.png", include_bytes!("../../assets/flags/tr.png")),
+        L::Ukrainian => ("bytes://flag-ua.png", include_bytes!("../../assets/flags/ua.png")),
+    }
+}
+
 fn language_picker(app: &mut App, ui: &mut egui::Ui) {
     let locale = app.locale;
     let system = pgettext(locale, "language", "System");
@@ -2185,6 +2122,11 @@ fn language_picker(app: &mut App, ui: &mut egui::Ui) {
         LanguageChoice::System => system.clone(),
         LanguageChoice::Locale(chosen) => chosen.native_name().into(),
     };
+    // A flag beside the language: pictures, as Windows has no flag emoji.
+    if let LanguageChoice::Locale(chosen) = current {
+        let (uri, bytes) = flag_picture(chosen);
+        ui.add(egui::Image::from_bytes(uri, bytes).fit_to_exact_size(egui::vec2(24.0, 18.0)));
+    }
     let response = egui::ComboBox::from_id_salt("interface_language")
         .selected_text(selected.as_ref())
         .width(200.0_f32.min(ui.available_width()))
@@ -2197,11 +2139,18 @@ fn language_picker(app: &mut App, ui: &mut egui::Ui) {
                     .map(|&each| (LanguageChoice::Locale(each), each.native_name().into())),
             );
             for (choice, label) in choices {
-                if ui
-                    .selectable_label(current == choice, label.as_ref())
-                    .clicked()
-                    && current != choice
-                {
+                let clicked = ui
+                    .horizontal(|ui| {
+                        if let LanguageChoice::Locale(each) = choice {
+                            let (uri, bytes) = flag_picture(each);
+                            ui.add(egui::Image::from_bytes(uri, bytes).fit_to_exact_size(egui::vec2(24.0, 18.0)));
+                        } else {
+                            ui.add_space(24.0);
+                        }
+                        ui.selectable_label(current == choice, label.as_ref()).clicked()
+                    })
+                    .inner;
+                if clicked && current != choice {
                     app.actions.push(Action::SetLanguage(choice));
                 }
             }
@@ -2590,7 +2539,7 @@ fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette)
         let picture = shown.unwrap_or_else(Palette::dark);
         let current = app.settings.custom_theme.is_none() && app.settings.theme == choice;
         // Follow system first, then every dark theme, then every light one.
-        let rank = if choice == ThemeChoice::System { 0 } else if picture.dark { 2 } else { 3 };
+        let rank = if choice == ThemeChoice::Custom { 0 } else if choice == ThemeChoice::System { 1 } else if picture.dark { 3 } else { 4 };
         tiles.push((
             rank,
             choice.label(app.locale).to_string(),
@@ -2604,7 +2553,7 @@ fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette)
         let current = app.settings.custom_theme.as_deref() == Some(theme.filename.as_str());
         let name = crate::settings::fancy_theme_name(&fastframe_theme::display_name(&theme.filename)).to_string();
         // chanceify's own theme comes second.
-        let rank = if name.eq_ignore_ascii_case("chanceify") { 1 } else if theme.palette.dark { 2 } else { 3 };
+        let rank = if name.eq_ignore_ascii_case("chanceify") { 2 } else if theme.palette.dark { 3 } else { 4 };
         tiles.push((
             rank,
             name,
@@ -2617,7 +2566,7 @@ fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette)
     // All, only the dark ones, or only the light ones.
     let filter_id = egui::Id::new("theme-grid-filter");
     let mut filter: u8 = ui.data(|data| data.get_temp(filter_id)).unwrap_or(0);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
         for (value, label) in [(0u8, "All"), (1, "Dark"), (2, "Light")] {
             if theme::soft_button(ui, palette, None, label, filter == value).clicked() {
@@ -2629,6 +2578,13 @@ fn theme_grid(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette)
         if widgets::switch_labeled(ui, palette, "Preview a theme when I point at it", &mut point).changed() {
             app.settings.theme_point_preview = point;
             app.mark_settings_dirty();
+        }
+        ui.add_space(10.0);
+        let mut from_cover = app.settings.theme_from_cover;
+        if widgets::switch_labeled(ui, palette, "Match the theme to the album cover", &mut from_cover).changed() {
+            app.settings.theme_from_cover = from_cover;
+            app.settings.accent_from_art = from_cover;
+            app.actions.push(Action::SettingsChanged);
         }
     });
     ui.data_mut(|data| data.insert_temp(filter_id, filter));

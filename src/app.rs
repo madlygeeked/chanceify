@@ -12471,8 +12471,9 @@ impl App {
             picks,
             look: self.settings.discord_look,
             links: true,
-            hide_paused: self.settings.discord_hide_paused,
-            files: self.settings.discord_files,
+            // Always shown, even paused (the clock reads "paused").
+            hide_paused: false,
+            files: true,
             listen_along: false,
             // Only once there is a real GitHub page to send people to.
             app_url: (crate::build_info::GITHUB_URL.trim_end_matches('/').len()
