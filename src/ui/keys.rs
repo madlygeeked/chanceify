@@ -124,7 +124,6 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "mute", label: "Mute", default: UNSET, action: || Action::ToggleMute },
     Bindable { id: "back10", label: "Seek back 10 seconds", default: UNSET, action: || Action::SeekBy(-10_000) },
     Bindable { id: "forward10", label: "Seek forward 10 seconds", default: UNSET, action: || Action::SeekBy(10_000) },
-    Bindable { id: "seekwidth", label: "Seek bar length", default: UNSET, action: || Action::CycleSeekWidth },
     Bindable { id: "sharediscord", label: "Copy the song for Discord", default: UNSET, action: || Action::ShareToDiscord },
     Bindable { id: "lastfmlove", label: "Love the song on Last.fm", default: UNSET, action: || Action::LastfmLove },
     Bindable { id: "defaultview", label: "Back to the default view", default: Key::Backtick, action: || Action::NormalView },
@@ -137,14 +136,12 @@ pub const BINDABLE: &[Bindable] = &[
     Bindable { id: "likeplaying", label: "Like the playing song", default: UNSET, action: || Action::LikePlaying },
     Bindable { id: "tap", label: "Bass jump", default: UNSET, action: || Action::TapTempo },
     Bindable { id: "jumptoggle", label: "Bass jump on or off", default: UNSET, action: || Action::ToggleJumpAuto },
-    Bindable { id: "cyclevis", label: "Next visualizer style", default: UNSET, action: || Action::CycleVisualiser },
     Bindable { id: "visgradient", label: "Gradient on or off", default: UNSET, action: || Action::ToggleVisGradient },
     Bindable { id: "visreverse", label: "Reverse the visualizer", default: UNSET, action: || Action::ToggleVisReverse },
     Bindable { id: "next", label: "Next song", default: UNSET, action: || Action::Next },
     Bindable { id: "previous", label: "Previous song", default: UNSET, action: || Action::Previous },
     Bindable { id: "volup", label: "Volume up", default: UNSET, action: || Action::VolumeBy(5) },
     Bindable { id: "voldown", label: "Volume down", default: UNSET, action: || Action::VolumeBy(-5) },
-    Bindable { id: "scenes", label: "Scenes panel", default: UNSET, action: || Action::ToggleSceneBrowser },
     // Going places.
     Bindable { id: "search", label: "Search", default: UNSET, action: || Action::FocusSearch },
     Bindable { id: "home", label: "Open Home", default: UNSET, action: || Action::Open(Page::Home) },
@@ -171,7 +168,7 @@ pub const BINDABLE: &[Bindable] = &[
     // Window.
     Bindable { id: "closewindow", label: "Close to the tray", default: UNSET, action: || Action::CloseWindow },
     // Other.
-    Bindable { id: "tutorial", label: "Shortcuts", default: Key::T, action: || Action::ShowDialog(Dialog::Shortcuts) },
+    Bindable { id: "tutorial", label: "Keybinds", default: Key::T, action: || Action::ShowDialog(Dialog::Shortcuts) },
 ];
 
 /// The key binds a new install starts with, baked in from
@@ -214,11 +211,11 @@ pub fn read_keys(text: &str) -> Option<std::collections::BTreeMap<String, String
 /// belongs in each.
 pub const CATEGORIES: &[(&str, &[&str])] = &[
     ("Views", &["views", "defaultview", "calmmode", "extrawindow", "closeextras", "normalview", "mini", "fullscreen", "lyricsfull", "visshapes", "art", "closewindow"]),
-    ("Panels", &["sidebar", "queuelyrics", "queue", "lyrics", "visualizer", "scenes"]),
+    ("Panels", &["sidebar", "queuelyrics", "queue", "lyrics", "visualizer"]),
     ("Playback", &["playpause", "playspace", "playonly", "pauseonly", "next", "previous", "shuffle", "repeat", "lastfmlove", "sharediscord", "queuehover", "queuehovertop", "likehover", "likeplaying"]),
     ("Volume", &["mute", "volup", "voldown"]),
-    ("Fun", &["tap", "jumptoggle", "cyclevis", "visgradient", "visreverse"]),
-    ("Jump in the song", &["back10", "forward10", "seekback5", "seekfwd5", "seekwidth", "tenth0", "tenth1", "tenth2", "tenth3", "tenth4", "tenth5", "tenth6", "tenth7", "tenth8", "tenth9"]),
+    ("Fun", &["tap", "jumptoggle", "visgradient", "visreverse"]),
+    ("Jump in the song", &["back10", "forward10", "seekback5", "seekfwd5", "tenth0", "tenth1", "tenth2", "tenth3", "tenth4", "tenth5", "tenth6", "tenth7", "tenth8", "tenth9"]),
     ("Going places", &["search", "home", "liked", "settings", "pageback", "pageforward", "artistpage", "albumpage", "tutorial"]),
 ];
 
@@ -568,7 +565,7 @@ pub fn shortcuts(locale: Locale) -> Vec<(Cow<'static, str>, Cow<'static, str>)> 
         ),
         (
             keys(platform_shortcut("Ctrl+/", "Cmd+/")),
-            gettext(locale, "Keyboard shortcuts"),
+            gettext(locale, "Keybinds"),
         ),
         (
             keys(platform_shortcut("Ctrl+W", "Cmd+W")),

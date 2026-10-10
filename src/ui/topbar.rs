@@ -584,7 +584,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                             ui,
                             &palette,
                             Some(Icon::Info),
-                            &gettext(locale, "Keyboard shortcuts"),
+                            &gettext(locale, "Keybinds"),
                         ) {
                             app.actions
                                 .push(Action::ShowDialog(crate::model::Dialog::Shortcuts));

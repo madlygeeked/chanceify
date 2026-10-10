@@ -2605,18 +2605,6 @@ fn track_row_contents(
         x = slot_at(crate::model::SortColumn::Bpm).unwrap_or(x);
         rule(x);
         let cell = Rect::from_min_size(pos2(x, rect.top()), vec2(cols.bpm, row_height));
-        let measured_key = app.live_key_for(row.item);
-        if app.bpm_for(row.item).is_none()
-            && let Some(key) = &measured_key
-        {
-            painter.text(
-                pos2(cell.left(), cell.center().y),
-                egui::Align2::LEFT_CENTER,
-                key,
-                theme::regular(12.0),
-                palette.dim,
-            );
-        }
         if let Some(tempo) = app.bpm_for(row.item) {
             // Whole beats per minute, always. Deezer answers with a
             // tempo it measured, so 103.9 is a real reading of a record
@@ -2625,25 +2613,9 @@ fn track_row_contents(
             // column read at a glance while scrolling. 104 is what the
             // record is.
             let label = format!("{}", tempo.round());
-            let drawn = {
-                let galley = fitted_galley(&painter, &label, &theme::regular(13.0), 8.0, (cell.width() - 8.0).max(10.0), palette.secondary);
-                let at = pos2(cell.left(), cell.center().y - galley.size().y / 2.0);
-                let shape_rect = Rect::from_min_size(at, galley.size());
-                painter.galley(at, galley, palette.secondary);
-                shape_rect
-            };
-            // The key from the sound, when the column is wide enough.
-            if let Some(key) = &measured_key
-                && cell.right() - drawn.right() > 36.0
-            {
-                painter.text(
-                    pos2(drawn.right() + 8.0, cell.center().y),
-                    egui::Align2::LEFT_CENTER,
-                    key,
-                    theme::regular(12.0),
-                    palette.dim,
-                );
-            }
+            let galley = fitted_galley(&painter, &label, &theme::regular(13.0), 8.0, (cell.width() - 8.0).max(10.0), palette.secondary);
+            let at = pos2(cell.left(), cell.center().y - galley.size().y / 2.0);
+            painter.galley(at, galley, palette.secondary);
         }
         x += cols.bpm;
     }

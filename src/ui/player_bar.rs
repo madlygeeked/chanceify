@@ -2060,9 +2060,6 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 if chip(ui, &palette, &gettext(app.locale, "On"), app.settings.vis_jump_on, 60.0).clicked() {
                     app.actions.push(Action::ToggleJumpAuto);
                 }
-                if chip(ui, &palette, &gettext(app.locale, "Preview"), false, 80.0).clicked() {
-                    app.actions.push(Action::TapTempo);
-                }
             });
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
@@ -2087,7 +2084,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 },
             );
             ui.add_space(6.0);
-            theme::subtle(ui, &palette, &gettext(app.locale, "COLOUR (ALL SHAPES)"));
+            theme::subtle(ui, &palette, &gettext(app.locale, "COLOUR"));
             if chip(
                 ui,
                 &palette,
@@ -2327,7 +2324,6 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             } else {
                 ui.vertical(|ui| shared(ui));
             }
-            vis_presets_row(app, ui);
         }
     }
 }
@@ -2542,6 +2538,7 @@ fn vis_font_family(ctx: &egui::Context, font_index: usize) -> egui::FontFamily {
 
 /// Saved visualizer looks: pick one to apply, x to remove, or save the
 /// current look under a name.
+#[allow(dead_code)]
 fn vis_presets_row(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
     ui.add_space(8.0);
@@ -5287,14 +5284,6 @@ fn row_menus(app: &mut App, ui: &mut egui::Ui, row: Rect, zones: [Rect; 3], name
                             super::widgets::menu_separator(ui, &palette);
                             arrange_strip(app, ui, &palette);
                             anchor_rows(app, ui, &palette, None);
-                            if super::widgets::menu_item(
-                                ui,
-                                &palette,
-                                None,
-                                &gettext(app.locale, "Default controls"),
-                            ) {
-                                app.actions.push(Action::ResetBlockNudge);
-                            }
                             super::widgets::menu_separator(ui, &palette);
                             bar_rows(app, ui, &palette);
                         }

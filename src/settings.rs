@@ -938,6 +938,8 @@ pub struct Settings {
     pub float_hide_bar: bool,
     /// Width of the Views panel.
     pub views_width: f32,
+    /// Height of the Views panel (0 = fit the content).
+    pub views_height: f32,
     /// The mini player window: x, y, width, height.
     pub mini_window: Option<[f32; 4]>,
     /// The extra visualizer window: x, y, width, height.
@@ -1337,6 +1339,7 @@ impl Default for Settings {
             float_controls: None,
             float_hide_bar: false,
             views_width: 316.0,
+            views_height: 0.0,
             mini_window: None,
             extra_window: None,
             mini_restore_size: None,

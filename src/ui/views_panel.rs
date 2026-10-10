@@ -68,7 +68,7 @@ pub fn topbar_disc(ui: &mut egui::Ui, app: &mut App) {
     ui.set_opacity(dim);
     ui.painter().circle_filled(rect.center(), size / 2.0, Color32::from_black_alpha(if over { 190 } else { 140 }));
     ui.painter().circle_stroke(rect.center(), size / 2.0, Stroke::new(1.0, Color32::from_white_alpha(if over { 90 } else { 40 })));
-    mono_logo(ui, rect.center(), 20.0, if over { palette.text } else { Color32::from_white_alpha(150) });
+    theme::paint_icon(ui, Icon::Disc, rect, 20.0, if over { palette.text } else { Color32::from_white_alpha(150) });
     ui.set_opacity(1.0);
     if over {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -76,26 +76,6 @@ pub fn topbar_disc(ui: &mut egui::Ui, app: &mut App) {
     if response.clicked() || response.secondary_clicked() {
         app.actions.push(Action::ToggleViewsPanel);
     }
-}
-
-/// The chanceify logo (a record with a play triangle) in one colour, for the
-/// views button.
-fn mono_logo(ui: &egui::Ui, center: egui::Pos2, diameter: f32, colour: Color32) {
-    let radius = diameter / 2.0;
-    let painter = ui.painter();
-    painter.circle_stroke(center, radius, Stroke::new((diameter * 0.09).max(1.2), colour));
-    painter.circle_stroke(center, radius * 0.72, Stroke::new(1.0, colour.gamma_multiply(0.5)));
-    let w = radius * 0.46;
-    let h = radius * 0.5;
-    painter.add(egui::Shape::convex_polygon(
-        vec![
-            center + egui::vec2(-w * 0.55, -h),
-            center + egui::vec2(w * 1.05, 0.0),
-            center + egui::vec2(-w * 0.55, h),
-        ],
-        colour,
-        Stroke::NONE,
-    ));
 }
 
 pub fn corner_disc(app: &mut App, ctx: &Context) {
@@ -181,9 +161,10 @@ pub fn corner_disc(app: &mut App, ctx: &Context) {
                 (size + 12.0) / 2.0,
                 Stroke::new(1.0, Color32::from_white_alpha(if hot { 90 } else { 40 })),
             );
-            mono_logo(
+            theme::paint_icon(
                 ui,
-                rect.center(),
+                Icon::Disc,
+                rect,
                 size,
                 if hot { palette.text } else { Color32::from_white_alpha(if app.mini_active { 110 } else { 150 }) },
             );
@@ -501,8 +482,13 @@ pub fn show(app: &mut App, ctx: &Context) {
             ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
             let screen_h = ctx.content_rect().height();
             egui::ScrollArea::vertical()
-                .max_height((screen_h - 120.0).max(200.0))
-                .auto_shrink([false, true])
+                .max_height(if app.settings.views_height > 0.0 {
+                    app.settings.views_height.clamp(160.0, (screen_h - 40.0).max(200.0))
+                } else {
+                    (screen_h - 120.0).max(200.0)
+                })
+                .min_scrolled_height(if app.settings.views_height > 0.0 { app.settings.views_height.clamp(160.0, (screen_h - 40.0).max(200.0)) } else { 0.0 })
+                .auto_shrink([false, app.settings.views_height <= 0.0])
                 .show(ui, |ui| {
                     // Icons only, one row: the four views of this window (exactly
                     // one is on) and the mini player, which is a window of its own.
@@ -588,13 +574,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                             app.mark_settings_dirty();
                         }
                         ui.horizontal_wrapped(|ui| {
-                            if theme::soft_button(ui, &palette, None, "Default controls", false).clicked() {
-                                app.actions.push(Action::ResetBlockNudge);
-                            }
-                            if theme::soft_button(ui, &palette, Some(Icon::Info), "Bug test guide", false).clicked() {
-                                app.show_bug_guide = !app.show_bug_guide;
-                            }
-                            if theme::soft_button(ui, &palette, Some(Icon::Info), "Shortcuts", false).clicked() {
+                            if theme::soft_button(ui, &palette, Some(Icon::Info), "Keybinds", false).clicked() {
                                 app.actions.push(Action::ShowDialog(crate::model::Dialog::Shortcuts));
                             }
                         });
@@ -623,11 +603,35 @@ pub fn show(app: &mut App, ctx: &Context) {
                     app.mark_settings_dirty();
                 }
             });
+        // A strip along the bottom edge: drag it to make the panel taller or shorter.
+        egui::Area::new(Id::new("views-panel-edge-bottom"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(egui::pos2(rect.left() + 10.0, rect.bottom() - 7.0))
+            .show(ctx, |ui| {
+                let (strip, response) = ui.allocate_exact_size(egui::vec2((rect.width() - 20.0).max(10.0), 10.0), egui::Sense::drag());
+                if response.hovered() || response.dragged() {
+                    ctx.set_cursor_icon(egui::CursorIcon::ResizeVertical);
+                    ui.painter().rect_filled(
+                        egui::Rect::from_center_size(strip.center(), egui::vec2(28.0, 3.0)),
+                        1.5,
+                        Color32::from_white_alpha(90),
+                    );
+                }
+                if response.dragged() {
+                    let max_h = (ctx.content_rect().height() - 40.0).max(200.0);
+                    let now = if app.settings.views_height > 0.0 { app.settings.views_height } else { rect.height() };
+                    app.settings.views_height = (now + response.drag_delta().y).clamp(160.0, max_h);
+                    app.mark_settings_dirty();
+                }
+                if response.double_clicked() {
+                    app.settings.views_height = 0.0;
+                    app.mark_settings_dirty();
+                }
+            });
     }
     if close {
         app.actions.push(Action::ToggleViewsPanel);
     }
-    bug_guide(app, ctx);
 }
 
 /// How visible the Views panel is: full while the pointer is near it, and
@@ -679,34 +683,5 @@ fn current_view(app: &App) -> ViewKind {
         ViewKind::Visualizer
     } else {
         ViewKind::Default
-    }
-}
-
-/// The bug test checklist, in a window of its own.
-fn bug_guide(app: &mut App, ctx: &Context) {
-    if !app.show_bug_guide {
-        return;
-    }
-    let mut open = true;
-    egui::Window::new("How to bug test chanceify")
-        .id(Id::new("bug-guide"))
-        .open(&mut open)
-        .default_width(480.0)
-        .default_height(420.0)
-        .resizable(true)
-        .show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                for line in include_str!("../../docs/BUG_TEST_GUIDE.md").lines() {
-                    let line = line.trim_start_matches('#').trim();
-                    if line.is_empty() {
-                        ui.add_space(4.0);
-                    } else {
-                        ui.label(line);
-                    }
-                }
-            });
-        });
-    if !open {
-        app.show_bug_guide = false;
     }
 }

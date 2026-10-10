@@ -102,7 +102,7 @@ impl Default for Tour {
                     "volume",
                     "right click the volume .",
                     "volume",
-                    &["speed", "scenes", "equalizer curves"],
+                    &["speed", "equalizer curves"],
                 ),
                 step(
                     "visualizer",

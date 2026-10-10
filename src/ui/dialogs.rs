@@ -146,7 +146,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     });
                 }
                 Dialog::Shortcuts => {
-                    theme::text(ui, gettext(locale, "Keyboard shortcuts"), theme::bold(20.0), palette.text);
+                    theme::text(ui, gettext(locale, "Keybinds"), theme::bold(20.0), palette.text);
                     ui.add_space(4.0);
                     // Only while a key is waiting for its new key.
                     if super::keys::rebinding(ui.ctx()).is_some() {
@@ -161,10 +161,11 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     }
                     ui.add_space(6.0);
                     // One live list: what is shown here is what the keys do now.
-                    ui.set_width((ui.ctx().content_rect().width() - 120.0).clamp(420.0, 1200.0));
+                    // The window can be dragged to any size; the list fills it.
+                    ui.set_min_width(420.0);
                     egui::ScrollArea::vertical()
-                        .max_height((ui.ctx().content_rect().height() - 260.0).max(160.0))
-                        .auto_shrink([false, true])
+                        .max_height((ui.available_height() - 8.0).max(160.0))
+                        .auto_shrink([false, false])
                         .show(ui, |ui| {
                     let waiting = super::keys::rebinding(ui.ctx());
                     // Anything not placed in a group still shows, under "More".
@@ -341,7 +342,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                         ("Visualizer", app.settings.vis_shapes_value() != 0, Action::ToggleVisShapes),
                         ("Big album art", app.settings.art_expanded, Action::ToggleArtExpanded),
                         ("Mini player", app.mini_active, Action::ToggleMiniPlayer),
-                        ("Shortcuts", false, Action::ShowDialog(Dialog::Shortcuts)),
+                        ("Keybinds", false, Action::ShowDialog(Dialog::Shortcuts)),
                     ];
                     for (label, on, action) in rows {
                         let mut value = on;
@@ -391,13 +392,19 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
     };
     if floating {
         let mut open = true;
-        let shown = egui::Window::new("Keyboard shortcuts")
+        let screen = ctx.content_rect();
+        let shown = egui::Window::new("Keybinds")
             .id(egui::Id::new("dialog"))
             .open(&mut open)
             .order(egui::Order::Foreground)
             .frame(frame)
             .default_pos(egui::pos2(80.0, 60.0))
-            .resizable(false)
+            .default_size([
+                (screen.width() - 160.0).clamp(420.0, 1200.0),
+                (screen.height() - 200.0).max(240.0),
+            ])
+            .min_size([420.0, 240.0])
+            .resizable(true)
             .collapsible(false)
             .show(ctx, body);
         if let Some(shown) = shown {
