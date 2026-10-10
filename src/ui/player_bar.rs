@@ -1362,7 +1362,14 @@ pub(super) fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
     let want_h = app.settings.vis_panel_h;
     let fixed_w = want_w > 0.0;
     let fixed_h = want_h > 0.0;
-    let panel_w = want_w.clamp(260.0, (screen.width() - 16.0).max(260.0));
+    // Never wider than what is in it: three columns on the shapes tab, one
+    // on the others.
+    let tab_now = ctx.data(|data| data.get_temp::<u8>(egui::Id::new("vis-menu-tab"))).unwrap_or(0);
+    let col_now = vis_col_w(screen.width());
+    let content_w = if tab_now == 0 && screen.width() >= 700.0 { 3.0 * col_now + 36.0 } else { col_now } + 28.0;
+    let panel_w = want_w
+        .clamp(260.0, (screen.width() - 16.0).max(260.0))
+        .min(content_w.max(260.0));
     let panel_h = want_h.clamp(160.0, max_h);
     panel = panel
         .resizable(false)
@@ -1381,7 +1388,7 @@ pub(super) fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
     if fixed_w {
         panel = panel.min_width(panel_w).max_width(panel_w);
     } else {
-        panel = panel.max_width(900.0);
+        panel = panel.max_width(content_w.max(260.0));
     }
     let window = panel.show(ctx, |ui| {
         let mut area = egui::ScrollArea::both().auto_shrink([!fixed_w, !fixed_h]);
@@ -1821,11 +1828,20 @@ fn audio_menu_body(app: &mut App, ui: &mut egui::Ui) {
     }
 }
 
+/// How wide one column of the visualizer menu is for a window this wide.
+fn vis_col_w(screen_w: f32) -> f32 {
+    if screen_w >= 700.0 {
+        ((screen_w - 136.0) / 3.0).clamp(200.0, 240.0)
+    } else {
+        (screen_w - 64.0).clamp(180.0, 240.0)
+    }
+}
+
 fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
     {
         {
-            ui.set_max_width(980.0_f32.min(ui.ctx().content_rect().width() - 24.0).max(200.0));
+            ui.set_max_width((3.0 * vis_col_w(ui.ctx().content_rect().width()) + 36.0).min(ui.ctx().content_rect().width() - 24.0).max(180.0));
             ui.spacing_mut().item_spacing.y = 3.0;
             // Three independent switches: any mix, or none (which closes
             // the visualizer down to the song-length bar).
@@ -1836,12 +1852,8 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             let screen_w = ui.ctx().content_rect().width();
             // Two columns from a modest width when the swirl's column is
             // not open, so the panel is shorter and fits one screen.
-            let columns_fit = screen_w >= 780.0;
-            let col_w = if columns_fit {
-                ((screen_w - 136.0) / 3.0).clamp(210.0, 300.0)
-            } else {
-                (screen_w - 64.0).clamp(200.0, 300.0)
-            };
+            let columns_fit = screen_w >= 700.0;
+            let col_w = vis_col_w(screen_w);
             // The settings sit in four tabs, one open at a time, so the
             // panel is only as big as what is in front of you.
             let tab_id = egui::Id::new("vis-menu-tab");

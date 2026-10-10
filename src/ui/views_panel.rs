@@ -604,6 +604,12 @@ pub fn show(app: &mut App, ctx: &Context) {
     // The panel can be drawn bigger or smaller: its layer is scaled about its
     // top-left corner, drawing and pointer alike.
     let scale = if app.settings.views_scale.is_finite() { app.settings.views_scale.clamp(0.7, 1.6) } else { 1.0 };
+    // Shrunk further when the window is too short for it, so it never needs a
+    // scroll bar: everything on it just gets smaller.
+    let scale = match last_rect {
+        Some(rect) if rect.height() > 1.0 => scale.min(((ctx.content_rect().height() - 16.0) / rect.height()).clamp(0.45, 1.6)),
+        _ => scale,
+    };
     let pivot = last_rect.map_or(egui::pos2(60.0, 60.0), |rect| rect.min);
     let to_global = |p: egui::Pos2| pivot + (p - pivot) * scale;
     let panel_layer = egui::LayerId::new(egui::Order::Foreground, panel_id);
@@ -638,8 +644,9 @@ pub fn show(app: &mut App, ctx: &Context) {
                 .max_height(if app.settings.views_height > 0.0 {
                     app.settings.views_height.clamp(160.0, (screen_h - 40.0).max(200.0))
                 } else {
-                    (screen_h - 120.0).max(200.0)
+                    f32::INFINITY
                 })
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
                 .min_scrolled_height(if app.settings.views_height > 0.0 { app.settings.views_height.clamp(160.0, (screen_h - 40.0).max(200.0)) } else { 0.0 })
                 .auto_shrink([false, app.settings.views_height <= 0.0])
                 .show(ui, |ui| {

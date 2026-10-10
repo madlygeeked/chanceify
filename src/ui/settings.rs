@@ -1630,15 +1630,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                             }
                         }
                     });
-                    ui.horizontal_wrapped(|ui| {
-                        theme::text(ui, "Card look", theme::regular(12.5), palette.secondary);
-                        for (value, label) in [(0u8, "Album big, swirl small"), (1, "Swirl big, album small"), (2, "chanceify badge only")] {
-                            if theme::soft_button(ui, &palette, None, label, app.settings.discord_look == value).clicked() {
-                                app.settings.discord_look = value;
-                                app.mark_settings_dirty();
-                            }
-                        }
-                    });
                     if theme::soft_button(ui, &palette, None, "Let chanceify:// links open chanceify (Windows)", false)
                         .on_hover_text("Adds one entry for your Windows user, so the song page's Open in chanceify button works.")
                         .clicked()
@@ -1646,24 +1637,29 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         app.actions.push(Action::RegisterLinks);
                     }
                     ui.add_space(4.0);
-                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 12] = [
+                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 10] = [
                         ("Show the album cover", |s| &mut s.discord_cover),
-                        ("Show a swirl in the cover's colour on the cover", |s| &mut s.discord_swirl),
-                        ("Show the small chanceify badge on the cover", |s| &mut s.discord_badge),
+                        ("Tiny chanceify badge in the corner of the cover", |s| &mut s.discord_badge),
                         ("Say which playlist I'm playing from", |s| &mut s.discord_playlist),
-                        ("Add a button to my Spotify profile", |s| &mut s.discord_profile),
-                        ("Add a button to the playlist I'm playing", |s| &mut s.discord_playlist_button),
-                        ("Song button opens the chanceify song page", |s| &mut s.discord_song_page),
-                        ("Make the song and artist links to Spotify", |s| &mut s.discord_links),
-                        ("Show buttons (Listen on Spotify, Get chanceify)", |s| &mut s.discord_buttons),
+                        ("Make the song and artist names links to Spotify", |s| &mut s.discord_links),
+                        ("Show buttons under the song (Discord shows two)", |s| &mut s.discord_buttons),
+                        ("Song button: open the chanceify song page, not Spotify", |s| &mut s.discord_song_page),
+                        ("Button to my Spotify profile", |s| &mut s.discord_profile),
+                        ("Button to the playlist I'm playing", |s| &mut s.discord_playlist_button),
                         ("Show songs I play from my own files", |s| &mut s.discord_files),
                         ("Show nothing while paused", |s| &mut s.discord_hide_paused),
-                        ("Listen along: friends can join my song, and I can join theirs", |s| &mut s.discord_listen_along),
                     ];
                     for (label, field) in rows {
                         let mut value = *field(&mut app.settings);
                         if widgets::switch_labeled(ui, &palette, label, &mut value).changed() {
                             *field(&mut app.settings) = value;
+                            app.mark_settings_dirty();
+                        }
+                    }
+                    {
+                        let mut value = app.settings.discord_listen_along;
+                        if widgets::switch_labeled(ui, &palette, "Listen along: friends can join my song (turns the buttons off)", &mut value).changed() {
+                            app.settings.discord_listen_along = value;
                             app.mark_settings_dirty();
                         }
                     }

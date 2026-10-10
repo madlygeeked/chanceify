@@ -16,6 +16,31 @@ const esc = (s) =>
 export default {
   async fetch(request) {
     const url = new URL(request.url);
+    // The cover, passed through from this address so the swirl behind the page
+    // is allowed to read its pixels (Spotify's picture server does not allow it).
+    const cover = url.pathname.match(/^\/c\/([A-Za-z0-9]{10,30})$/);
+    if (cover) {
+      try {
+        const meta = await fetch(
+          "https://open.spotify.com/oembed?url=" + encodeURIComponent("https://open.spotify.com/track/" + cover[1]),
+          { cf: { cacheTtl: 3600, cacheEverything: true } },
+        );
+        const thumb = (await meta.json()).thumbnail_url;
+        if (typeof thumb === "string" && /^https:\/\/i\.scdn\.co\//.test(thumb)) {
+          const picture = await fetch(thumb, { cf: { cacheTtl: 86400, cacheEverything: true } });
+          if (picture.ok) {
+            return new Response(picture.body, {
+              headers: {
+                "content-type": picture.headers.get("content-type") || "image/jpeg",
+                "access-control-allow-origin": "*",
+                "cache-control": "public, max-age=86400",
+              },
+            });
+          }
+        }
+      } catch (_) {}
+      return new Response("", { status: 404 });
+    }
     const match = url.pathname.match(/^\/t\/([A-Za-z0-9]{10,30})\/?$/);
     if (!match) {
       return new Response(page({ title: "chanceify™", artist: "A Spotify player by chance", id: null }), html());
@@ -100,7 +125,7 @@ ${id ? `<div class="row stack"><a class="btn" href="chanceify://track/${esc(id)}
   if(bear)bear.src=icons[Math.floor(Math.random()*icons.length)];
   var cv=document.getElementById("swirl");
   var gl=cv.getContext("webgl",{antialias:false});
-  var url=${JSON.stringify(image || "")};
+  var url=${JSON.stringify(id ? "/c/" + id : "")};
   if(!gl||!url)return;
   var still=matchMedia("(prefers-reduced-motion: reduce)").matches;
   function sh(type,src){var o=gl.createShader(type);gl.shaderSource(o,src);gl.compileShader(o);return o}

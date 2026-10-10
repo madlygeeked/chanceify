@@ -141,6 +141,22 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         if app.show_lyrics_panel {
             lyrics::side_panel(app, ui);
         }
+        // When the window is too narrow for the page beside the panels, they
+        // close one by one: the side lyrics first, then the queue, then the
+        // library, so the page itself is never squeezed away.
+        let page_w = ui.available_width();
+        let least = topbar::least_width(ctx).min(560.0);
+        if page_w < least - 8.0 && ctx.content_rect().width() > 300.0 {
+            if app.show_lyrics_panel {
+                app.show_lyrics_panel = false;
+            } else if app.show_queue_panel {
+                app.show_queue_panel = false;
+            } else if app.settings.sidebar_visible {
+                app.settings.sidebar_visible = false;
+                app.mark_settings_dirty();
+            }
+            ctx.request_repaint();
+        }
         central(app, ui);
         keep_room_for_panels(app, ctx);
     }

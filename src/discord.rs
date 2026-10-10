@@ -180,22 +180,15 @@ pub fn activity_for(
     } else {
         None
     };
-    let (large_image, small_image) = match (cover, style.look) {
-        // The swirl big, the album in the corner.
-        (Some(url), 1) if style.swirl.is_some() => (style.swirl.clone(), Some(url)),
-        // Only the chanceify badge.
-        (_, 2) => (Some(BADGE_KEY.to_string()), None),
-        (Some(url), _) => (
-            Some(url),
-            style
-                .swirl
-                .clone()
-                .or_else(|| style.badge.then(|| BADGE_KEY.to_string())),
-        ),
-        (None, _) => (style.badge.then(|| BADGE_KEY.to_string()), None),
+    // The album is the picture; chanceify is only a tiny badge in its corner.
+    let badge = style.badge.then(|| BADGE_KEY.to_string());
+    let (large_image, small_image) = match cover {
+        Some(url) => (Some(url), badge),
+        None => (badge, None),
     };
     let mut buttons: Vec<(String, String)> = Vec::new();
-    if style.buttons {
+    // Discord will not show buttons next to a join (listen along) card.
+    if style.buttons && !(style.listen_along && timed && !is_file && !now.is_episode) {
         let page = if style.song_page && !is_file {
             song_link(&now.uri, &now.title, &now.subtitle)
         } else {

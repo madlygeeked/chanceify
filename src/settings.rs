@@ -823,6 +823,8 @@ pub struct Settings {
     pub bar_layout: u8,
     /// Ask before removing one unavailable song from its playlist.
     pub unavailable_confirm_one: bool,
+    /// Ask before taking a song off "New from your artists".
+    pub release_confirm_remove: bool,
     /// Show the time as "1:23 / 3:45" before the bar instead of at both ends.
     #[serde(default)]
     pub seek_time_joined: bool,
@@ -1317,6 +1319,7 @@ impl Default for Settings {
             bar_stacked: false,
             bar_layout: 0,
             unavailable_confirm_one: true,
+            release_confirm_remove: true,
             anchor_volume: None,
             seek_time_joined: false,
             seek_time_mode: 0,

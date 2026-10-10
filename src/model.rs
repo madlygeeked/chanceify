@@ -1479,6 +1479,8 @@ pub enum Action {
     /// Look for albums and singles from the last weeks by the artists in
     /// every playlist (`None`) or in one playlist (its ID).
     CheckNewReleases(Option<String>),
+    /// Take one album off "New from your artists" for good.
+    DismissRelease(String),
     /// Move the play controls (0) or the volume (2) to a new place, in grid steps.
     SetBlockNudge(u8, i16),
     /// Put the play controls and the volume back where their side puts them.

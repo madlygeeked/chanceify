@@ -2547,6 +2547,8 @@ impl App {
                         .map(|playlist| playlist.name.clone())
                 });
                 self.releases_scan = None;
+                let mut found = found;
+                found.retain(|release| !self.releases.dismissed.contains(&release.album_id));
                 let count = found.len();
                 self.releases.found = found;
                 self.releases.scope = scope_name;
@@ -2570,7 +2572,9 @@ impl App {
             Ok(albums) => {
                 scan.queue.retain(|(queued, _)| queued != &id);
                 for album in &albums {
-                    if let Some(release) = crate::releases::release_from(album, &scan.cutoff) {
+                    if let Some(release) = crate::releases::release_from(album, &scan.cutoff)
+                        && !self.releases.dismissed.contains(&release.album_id)
+                    {
                         crate::releases::add(&mut scan.found, release);
                     }
                 }
@@ -11017,6 +11021,13 @@ impl App {
                     Err(error) => self.toast_error(format!("Could not save the list: {error}")),
                 }
             }
+            Action::DismissRelease(album_id) => {
+                self.releases.found.retain(|release| release.album_id != album_id);
+                if !self.releases.dismissed.contains(&album_id) {
+                    self.releases.dismissed.push(album_id);
+                }
+                self.releases.save(&self.dirs.cache.join("releases.json"));
+            }
             Action::CheckNewReleases(scope) => {
                 if scope.is_some() {
                     self.settings.home.tab = 0;
@@ -12386,16 +12397,7 @@ impl App {
 
     /// How the Discord profile is to look, from the settings and what plays.
     pub fn discord_style(&mut self) -> crate::discord::Style {
-        // The swirl takes the colour the app has already worked out for the cover.
-        let swirl = if self.settings.discord_swirl && self.settings.discord_cover {
-            let cover = self
-                .now_playing()
-                .and_then(|now| now.art_url.clone().or_else(|| now.art_small.clone()));
-            self.tint_for(cover.as_deref())
-                .map(|color| crate::discord::swirl_url(color.r(), color.g(), color.b()))
-        } else {
-            None
-        };
+        let swirl = None;
         let playlist = if self.settings.discord_playlist {
             self.playing_context_uri()
                 .filter(|uri| uri.starts_with("spotify:playlist:"))
