@@ -2361,6 +2361,10 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 if chip(ui, &palette, "Art bounces to the music", on, ui.available_width().min(290.0)).clicked() {
                     app.actions.push(Action::ToggleLyricsFlag(Settings::LYRICS_BOUNCE_ART));
                 }
+                let floats = app.settings.lyrics_flag(Settings::LYRICS_FLOAT_ART);
+                if chip(ui, &palette, "Floating art", floats, ui.available_width().min(290.0)).clicked() {
+                    app.actions.push(Action::ToggleLyricsFlag(Settings::LYRICS_FLOAT_ART));
+                }
             }
             // The lyrics options, one set for the page and for the lyrics over
             // the visualizer.
@@ -2375,7 +2379,7 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     (Settings::LYRICS_HIDE_ARTIST, "Artist name", true),
                 ] {
                     // The art options only mean something on the page.
-                    if !on_page && matches!(bit, Settings::LYRICS_HIDE_ART | Settings::LYRICS_FLOAT_ART | Settings::LYRICS_HIDE_ARTIST) {
+                    if !on_page && matches!(bit, Settings::LYRICS_HIDE_ART | Settings::LYRICS_HIDE_ARTIST) {
                         continue;
                     }
                     let on = app.settings.lyrics_flag(bit) != inverted;
@@ -3540,6 +3544,100 @@ fn fullscreen_title_size(rect: Rect) -> f32 {
     (rect.height() * 0.05).clamp(20.0, 64.0)
 }
 
+/// Draws the cover as a card that floats about on its own (when `floating`)
+/// and turns to face the pointer while it is over it, in 3D, with a shadow
+/// that turns with it: the full-screen lyrics' card. Returns whether it drew
+/// the cover; with the card flat and still, the caller draws it as usual.
+fn tilted_cover(ui: &egui::Ui, cover: Rect, url: Option<&str>, floating: bool) -> bool {
+    let ctx = ui.ctx().clone();
+    let side = cover.width();
+    let pointer = ui.input(|input| input.pointer.hover_pos());
+    let over = pointer.is_some_and(|p| cover.expand(30.0).contains(p));
+    let time = ui.input(|input| input.time) as f32;
+    let (nx, ny) = match pointer.filter(|_| over) {
+        Some(p) => (
+            ((p.x - cover.center().x) / (side * 0.5)).clamp(-1.0, 1.0),
+            ((p.y - cover.center().y) / (side * 0.5)).clamp(-1.0, 1.0),
+        ),
+        None if floating => (
+            0.75 * ((time * 0.37).sin() * 0.6 + (time * 0.91 + 1.3).sin() * 0.4),
+            0.75 * ((time * 0.43 + 2.1).sin() * 0.6 + (time * 0.77 + 0.4).sin() * 0.4),
+        ),
+        None => (0.0, 0.0),
+    };
+    if floating {
+        ctx.request_repaint();
+    }
+    let id = egui::Id::new("vis-cover-tilt");
+    let nx = ctx.animate_value_with_time(id.with("x"), nx, 0.15);
+    let ny = ctx.animate_value_with_time(id.with("y"), ny, 0.15);
+    if nx.abs() <= 0.002 && ny.abs() <= 0.002 && !over {
+        return false;
+    }
+    let Some(url) = url else {
+        return false;
+    };
+    let image = egui::Image::new(url).show_loading_spinner(false);
+    let Ok(egui::load::TexturePoll::Ready { texture }) = image.load_for_size(&ctx, cover.size()) else {
+        return false;
+    };
+    let depth = 3.2_f32;
+    let tilt = 0.55_f32;
+    let half = side * 0.5;
+    let corners: Vec<egui::Pos2> = [(-1.0_f32, -1.0_f32), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)]
+        .iter()
+        .map(|(x, y)| {
+            let z = (x * nx + y * ny) * tilt;
+            let f = depth / (depth + z);
+            pos2(cover.center().x + x * half * f, cover.center().y + y * half * f)
+        })
+        .collect();
+    for layer in 0..8 {
+        let grow = layer as f32 * 6.0;
+        let points: Vec<egui::Pos2> = corners
+            .iter()
+            .map(|p| {
+                let out = (*p - cover.center()).normalized();
+                *p + out * grow + vec2(0.0, 18.0)
+            })
+            .collect();
+        ui.painter().add(egui::Shape::convex_polygon(
+            points,
+            Color32::from_black_alpha(17),
+            egui::Stroke::NONE,
+        ));
+    }
+    let n = 12;
+    let mut mesh = egui::epaint::Mesh::with_texture(texture.id);
+    for row in 0..=n {
+        for column_index in 0..=n {
+            let u = column_index as f32 / n as f32;
+            let v = row as f32 / n as f32;
+            let x = u * 2.0 - 1.0;
+            let y = v * 2.0 - 1.0;
+            let z = (x * nx + y * ny) * tilt;
+            let f = depth / (depth + z);
+            let shade = (255.0 - z * 70.0).clamp(150.0, 255.0) as u8;
+            mesh.vertices.push(egui::epaint::Vertex {
+                pos: pos2(cover.center().x + x * half * f, cover.center().y + y * half * f),
+                uv: pos2(u, v),
+                color: Color32::from_gray(shade),
+            });
+        }
+    }
+    for row in 0..n {
+        for column_index in 0..n {
+            let a = (row * (n + 1) + column_index) as u32;
+            let b = a + 1;
+            let c = a + (n + 1) as u32;
+            let d = c + 1;
+            mesh.indices.extend_from_slice(&[a, b, c, b, d, c]);
+        }
+    }
+    ui.painter().add(egui::Shape::mesh(mesh));
+    true
+}
+
 fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying>) {
     let painter = ui.painter().with_clip_rect(rect);
     let palette = app.palette;
@@ -3560,15 +3658,22 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
     };
     let cover = Rect::from_center_size(resting.center(), resting.size() * (1.0 + 0.07 * swell));
     let loader = app.backend.art().clone();
-    super::widgets::paint_cover(
-        ui,
-        &palette,
-        now.art_url.as_deref().or(now.art_small.as_deref()),
-        cover,
-        0.0,
-        Icon::Music,
-        Some(&loader),
-    );
+    // Floating and tilting to the pointer, the same card as the full-screen
+    // lyrics have.
+    let floating = app.settings.lyrics_flag(crate::settings::Settings::LYRICS_FLOAT_ART);
+    let url = now.art_url.clone().or_else(|| now.art_small.clone());
+    let tilted = tilted_cover(ui, cover, url.as_deref(), floating);
+    if !tilted {
+        super::widgets::paint_cover(
+            ui,
+            &palette,
+            url.as_deref(),
+            cover,
+            0.0,
+            Icon::Music,
+            Some(&loader),
+        );
+    }
     big_art_missing_mark(app, ui, cover, "fullscreen-vis");
     if app.settings.vis_art_border {
         painter.rect_stroke(

@@ -683,6 +683,8 @@ pub fn show(app: &mut App, ctx: &Context) {
                         ViewKind::Calm => Vec::new(),
                         ViewKind::FullVisualizer => vec![
                             ("Lyrics on it", app.settings.vis_lyrics, Action::ToggleVisLyrics),
+                            flag(S::LYRICS_FLOAT_ART, "Floating art", false, app),
+                            flag(S::LYRICS_BOUNCE_ART, "Art bounces", false, app),
                             ("Artist name", !app.settings.vis_text_no_artist, Action::ToggleVisArtist),
                             ("Visualizer settings", app.vis_panel, Action::ToggleVisPanel),
                             (if app.extra_vis { "Close visualizer window" } else { "New visualizer window" }, app.extra_vis, Action::ToggleExtraWindow),
