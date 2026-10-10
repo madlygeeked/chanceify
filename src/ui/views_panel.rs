@@ -244,6 +244,52 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
             let Some(outer) = super::lyrics::controls_box_inner(app, ui, top_left, width, false) else {
                 return;
             };
+            // The small album art mode: the cover and the song's name sit
+            // just above the controls and travel with them.
+            if !app.settings.art_expanded
+                && let Some(now) = app.now_playing()
+            {
+                let side = (outer.width() * 0.26).clamp(64.0, 120.0);
+                let gap = 8.0;
+                let top = (outer.top() - side - gap).max(screen.top() + 4.0);
+                let cover = Rect::from_min_size(egui::pos2(outer.left(), top), egui::vec2(side, side));
+                let palette = dark_palette(app);
+                let loader = app.backend.art().clone();
+                super::widgets::paint_cover(
+                    ui,
+                    &palette,
+                    now.art_url.as_deref().or(now.art_small.as_deref()),
+                    cover,
+                    8.0,
+                    Icon::Music,
+                    Some(&loader),
+                );
+                let text_left = cover.right() + 12.0;
+                let text_w = (outer.right() - text_left).max(40.0);
+                let title = crate::bidi::layout(
+                    ui.painter(),
+                    &now.title,
+                    theme::bold((side * 0.2).clamp(14.0, 22.0)),
+                    Color32::WHITE,
+                    text_w,
+                    2,
+                    Some(crate::bidi::ELLIPSIS),
+                );
+                let artist = crate::bidi::layout(
+                    ui.painter(),
+                    &now.subtitle,
+                    theme::regular((side * 0.15).clamp(12.0, 16.0)),
+                    Color32::from_white_alpha(190),
+                    text_w,
+                    1,
+                    Some(crate::bidi::ELLIPSIS),
+                );
+                let block = title.size().y + 4.0 + artist.size().y;
+                let y = cover.center().y - block / 2.0;
+                let title_h = title.size().y;
+                ui.painter().galley(egui::pos2(text_left, y), title, Color32::WHITE);
+                ui.painter().galley(egui::pos2(text_left, y + title_h + 4.0), artist, Color32::WHITE);
+            }
             let grip = Rect::from_min_size(outer.min, egui::vec2(outer.width(), 12.0));
             let dots = Rect::from_center_size(egui::pos2(grip.center().x, grip.center().y + 1.0), egui::vec2(22.0, 4.0));
             for i in 0..3 {

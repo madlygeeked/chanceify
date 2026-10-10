@@ -930,6 +930,9 @@ fn tray_config() -> fastframe_tray::Config {
 
 impl App {
     pub fn new(waker: &Waker, dirs: AppDirs, mut settings: Settings, options: AppOptions) -> Self {
+        // Only the main window opens at launch, even if the mini player was
+        // open last time.
+        settings.mini_player = false;
         let bpm_cache = dirs.cache.clone();
         let search_cache_file = dirs.cache.join("search_cache.json");
         let bpm_store = crate::bpm::Store::load(&bpm_cache);
