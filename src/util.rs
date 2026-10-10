@@ -314,6 +314,25 @@ pub fn greeting(locale: Locale) -> Cow<'static, str> {
     Cow::Owned(format!("{hello}!"))
 }
 
+/// A small friendly line under the greeting. It reads the clock, and a new
+/// one is picked each time chanceify starts.
+pub fn welcome_line() -> &'static str {
+    static SEED: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    let seed = *SEED.get_or_init(|| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.subsec_nanos() as usize / 1000)
+    });
+    let pool: &[&str] = match local_hour() {
+        0..=4 => &["still up?", "late night listening", "the quiet hours are the best ones", "what are we playing?"],
+        5..=11 => &["welcome back to chanceify", "good to see you", "what are we playing?", "start the day with a song"],
+        12..=17 => &["welcome back to chanceify", "good to see you", "what are we playing?", "a song for the afternoon"],
+        18..=22 => &["welcome back to chanceify", "good to see you", "what are we playing?", "time to wind down with some music"],
+        _ => &["still up?", "late night listening", "what are we playing?"],
+    };
+    pool[seed % pool.len()]
+}
+
 fn local_hour() -> u8 {
     jiff::Zoned::now().hour() as u8
 }

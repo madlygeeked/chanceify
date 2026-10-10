@@ -17,6 +17,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     ui.add_space(6.0);
     let greeting = crate::util::greeting(app.locale);
     theme::text(ui, greeting.as_ref(), theme::bold(30.0), palette.text);
+    theme::text(ui, crate::util::welcome_line(), theme::regular(15.0), palette.secondary);
     ui.add_space(10.0);
     let tab = app.settings.home.tab.min(1);
     ui.horizontal(|ui| {
