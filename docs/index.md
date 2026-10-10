@@ -13,25 +13,47 @@ needs spotify premium.
 
 ## features
 
-- listen to music from your spotify.
-- scrobble to last.fm.
-- customize it and set your own keybinds.
+- **plays your spotify.** no, really.
+- **music stats.** top artists and songs, plus recommended.
+- **last.fm.** scrobbling, love, and missing cover art saved for you.
+- **lyrics.** a floating card that follows the song.
+- **looks.** themes, make your own, or let it follow the album cover.
+- **visualizer.** bars, flow and swirl, full screen, in its own window or behind the lyrics.
+- **views.** click the disc to switch parts of the screen on or off.
+- **keybinds.** every key can be changed.
+- **discord.** shows what you're playing.
+- **right-click anything** to bring up settings.
 
 {% assign anyshots = site.static_files | where_exp: "f", "f.path contains '/shots/'" %}
 {% if anyshots.size > 0 %}
-## every panel
-
 {% include gallery.html items=site.data.shots.panels %}
-
-## every setting
-
-{% include gallery.html items=site.data.shots.settings %}
-
-## every theme
-
-{% include gallery.html items=site.data.shots.themes %}
 {% endif %}
 
-## more
+## setup
 
-[features](features) · [setup](setup) · [questions](faq) · [files](files)
+**getting rate limited?** (optional) get more api requests with your own spotify app.
+
+1. open the [spotify developer dashboard](https://developer.spotify.com/dashboard) and sign in.
+2. create an app. any name.
+3. redirect uri: `http://127.0.0.1:8989/login`
+4. tick web api, save, copy the client id.
+5. in chanceify: settings, personal spotify app. paste it and authorize.
+
+**last.fm:** settings, last.fm, connect. allow access in your browser. your plays scrobble.
+
+## questions
+
+**do i need premium?** yes. blame spotify.
+
+**does it download songs?** nope. it streams using [librespot](https://github.com/librespot-org/librespot).
+
+**does it collect data?** nope.
+
+**where is everything saved?** in the folder beside `chanceify.exe`. delete that folder to remove every trace.
+
+- `index/settings`: settings, themes, shortcuts
+- `index/stats.json`: listening stats
+- `index/lastfm-art`: cover images from last.fm
+- `index/recaps`: weekly recap pictures
+
+**something broke?** [issues](https://github.com/madlygeeked/chanceify/issues).

@@ -1,14 +1,4 @@
 ---
-title: features
+layout: null
 ---
-
-# features
-
-- **plays your spotify.** no, really.
-- **music stats.** top artists and songs, plus recommended.
-- **last.fm.** scrobbling, love, and missing cover art saved for you.
-- **looks.** themes, make your own, or let it follow the album cover.
-- **visualizer.** bars, flow and swirl, full screen, in its own window or behind the lyrics.
-- **views.** click the disc to switch parts of the screen on or off.
-- **keybinds.** every key can be changed.
-- **your files stay with you.** everything lives in the folder beside the app.
+<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url={{ "/" | relative_url }}"><link rel="canonical" href="{{ "/" | relative_url }}"><a href="{{ "/" | relative_url }}">chanceify</a>
