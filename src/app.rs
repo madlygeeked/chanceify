@@ -10394,7 +10394,7 @@ impl App {
                     self.toast("Copied. Paste it in Discord (files have no Spotify link)");
                 }
                 Some(now) => {
-                    let line = match crate::discord::song_link(&now.uri, &now.title, &now.subtitle).or_else(|| util::open_spotify_url(&now.uri)) {
+                    let line = match crate::discord::song_link(&now.uri, &now.title, &now.subtitle) {
                         // A named link: Discord shows "chanceify™", not the long address.
                         Some(url) => format!("Listening to {} by {} on [{}]({})", now.title, now.subtitle, crate::build_info::DISPLAY_NAME, url),
                         None => format!("Listening to {} by {} on {}", now.title, now.subtitle, crate::build_info::DISPLAY_NAME),
@@ -12434,13 +12434,13 @@ impl App {
             .filter(|uri| uri.starts_with("spotify:playlist:"))
             .and_then(|uri| util::uri_id(&uri).map(str::to_string))
             .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric()))
-            .map(|id| format!("https://open.spotify.com/playlist/{id}"));
+            .and_then(|id| crate::discord::page_link('p', &id, playlist.as_deref().unwrap_or(""), ""));
         let profile_url = picks
             .contains(&4)
             .then(|| self.user_id().map(str::to_string))
             .flatten()
             .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)))
-            .map(|id| format!("https://open.spotify.com/user/{id}"));
+            .and_then(|id| crate::discord::page_link('u', &id, "", ""));
         let style = crate::discord::Style {
             // The name under "Listening to" is the first line that is on.
             status_line: 0,

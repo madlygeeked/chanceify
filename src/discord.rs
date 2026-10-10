@@ -184,7 +184,7 @@ pub fn activity_for(
             .first()
             .and_then(|artist| artist.id.as_deref())
             .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric()))
-            .map(|id| format!("https://open.spotify.com/artist/{id}"))
+            .and_then(|id| page_link('a', id, now.artists.first().map_or("", |a| a.name.as_str()), ""))
     };
     // A cover only this program can show (a file's) cannot be fetched by Discord.
     let cover = if style.cover {
@@ -233,8 +233,8 @@ pub fn activity_for(
     let large_url = if is_file {
         None
     } else {
-        // Clicking the cover opens chanceify's own song page.
-        song_link(&now.uri, &now.title, &now.subtitle).or_else(|| song_url.clone())
+        // Clicking the cover opens chanceify's own song page; never a Spotify address.
+        song_link(&now.uri, &now.title, &now.subtitle)
     };
     // The lines the reader wants, in order: song, artist. With neither on,
     // the card still needs a first line, so it says chanceify.
@@ -267,7 +267,7 @@ pub fn activity_for(
         details: lines[0].clone(),
         state: lines.get(1).cloned().unwrap_or_default(),
         details_url: if style.links && style.say[0] {
-            song_url
+            large_url.clone()
         } else if style.links && artist_only {
             artist_url.clone()
         } else {
@@ -399,10 +399,12 @@ pub const SITE_URL: &str = "https://madlygeeked.github.io/chanceify/";
 
 pub const EMBED_URL: &str = "https://chanceify-embed.chance-a10.workers.dev";
 
-/// The link "Copy the song for Discord" gives out for a Spotify track uri.
-pub fn song_link(uri: &str, title: &str, artist: &str) -> Option<String> {
-    let id = uri.strip_prefix("spotify:track:")?;
-    if EMBED_URL.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric()) {
+/// A chanceify page on the worker. `kind`: t song, a artist, p playlist, u profile.
+pub fn page_link(kind: char, id: &str, title: &str, artist: &str) -> Option<String> {
+    if EMBED_URL.is_empty()
+        || id.is_empty()
+        || !id.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c))
+    {
         return None;
     }
     let enc = |text: &str| -> String {
@@ -413,7 +415,21 @@ pub fn song_link(uri: &str, title: &str, artist: &str) -> Option<String> {
             })
             .collect()
     };
-    Some(format!("{}/t/{id}?t={}&a={}", EMBED_URL.trim_end_matches('/'), enc(title), enc(artist)))
+    let mut link = format!("{}/{kind}/{id}", EMBED_URL.trim_end_matches('/'));
+    let mut sep = '?';
+    if !title.is_empty() {
+        link.push_str(&format!("{sep}t={}", enc(title)));
+        sep = '&';
+    }
+    if !artist.is_empty() {
+        link.push_str(&format!("{sep}a={}", enc(artist)));
+    }
+    Some(link)
+}
+
+/// The link "Copy the song for Discord" gives out for a Spotify track uri.
+pub fn song_link(uri: &str, title: &str, artist: &str) -> Option<String> {
+    page_link('t', uri.strip_prefix("spotify:track:")?, title, artist)
 }
 
 /// What Discord last said when it refused the song, or why the pipe failed,
@@ -951,10 +967,7 @@ mod tests {
         assert_eq!(activity.small_image.as_deref(), Some(BADGE_KEY));
         assert_eq!(activity.buttons.len(), 2);
         assert_eq!(activity.buttons[0].1, "https://open.spotify.com/track/abc123");
-        assert_eq!(
-            activity.state_url.as_deref(),
-            Some("https://open.spotify.com/artist/def456")
-        );
+        assert!(activity.state_url.as_deref().unwrap().contains("/a/def456"));
         assert_eq!(activity.start, Some(10_000 - 50));
         assert_eq!(activity.end, Some(10_000 - 50 + 200));
     }
