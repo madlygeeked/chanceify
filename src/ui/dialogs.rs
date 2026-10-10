@@ -166,10 +166,13 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     // The list's height follows the window's own height, not what
                     // the content asks for, so the window can be made any size
                     // (it used to spring back to the full screen height).
-                    let list_height = app
-                        .dialog_rect
-                        .map_or(ctx.content_rect().height() - 330.0, |rect| rect.height() - 215.0)
-                        .max(100.0);
+                    // The window's own room, less the footer measured last frame:
+                    // nothing here depends on the content, so the window can be
+                    // dragged to any size.
+                    let footer_id = egui::Id::new("keybinds-footer-height");
+                    let footer_h = ctx.data(|data| data.get_temp::<f32>(footer_id)).unwrap_or(90.0);
+                    let outer_width = ui.available_width();
+                    let list_height = (ui.available_height() - footer_h - 8.0).clamp(60.0, ctx.content_rect().height());
                     egui::ScrollArea::vertical()
                         .max_height(list_height)
                         .min_scrolled_height(60.0)
@@ -209,9 +212,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     // The room is the window's own width (the list lives inside a
                     // scroll area, which can report less), so the columns follow the
                     // size the window is dragged to: as many as keep every label readable.
-                    let total = ui
-                        .available_width()
-                        .max(app.dialog_rect.map_or(0.0, |rect| rect.width() - 56.0));
+                    let total = (outer_width - 14.0).max(240.0);
                     let column_count = (((total + 16.0) / 316.0).floor() as usize).clamp(1, 5);
                     let mut lanes: Vec<Vec<usize>> = vec![Vec::new(); column_count];
                     let mut heights = vec![0usize; column_count];
@@ -310,6 +311,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                         }
                     });
                         });
+                    let footer_top = ui.cursor().top();
                     ui.add_space(12.0);
                     // Wrapping rows, so a narrow window never has to grow to
                     // fit the footer.
@@ -341,6 +343,8 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                             app.actions.push(Action::CloseDialog);
                         }
                     });
+                    let used = ui.min_rect().bottom() - footer_top;
+                    ctx.data_mut(|data| data.insert_temp(footer_id, used.max(40.0)));
                 }
                 Dialog::Views => {
                     theme::text(ui, "Views", theme::bold(20.0), palette.text);
@@ -417,7 +421,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                 (screen.width() - 160.0).clamp(420.0, 1200.0),
                 (screen.height() - 200.0).max(240.0),
             ])
-            .min_size([300.0, 330.0])
+            .min_size([300.0, 240.0])
             .resizable(true)
             .collapsible(false)
             .show(ctx, body);
