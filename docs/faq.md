@@ -8,8 +8,8 @@ title: questions
 
 **does it download songs?** nope. it streams using [librespot](https://github.com/librespot-org/librespot).
 
-**does it collect data?** nope. it only talks to spotify through librespot, discord through rich presence, and last.fm for scrobbling. [privacy](https://github.com/madlygeeked/chanceify/blob/main/PRIVACY.md).
+**does it collect data?** nope.
 
-**where is everything saved?** in the folder beside `chanceify.exe`. [files](files).
+**where is everything saved?** [files](files).
 
-**something broke?** [open an issue](https://github.com/madlygeeked/chanceify/issues).
+**something broke?** [issues](https://github.com/madlygeeked/chanceify/issues).

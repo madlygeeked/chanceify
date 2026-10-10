@@ -34,4 +34,4 @@ needs spotify premium.
 
 ## more
 
-[all features](features) · [setup](setup) · [questions](faq) · [settings](settings) · [files](files)
+[features](features) · [setup](setup) · [questions](faq) · [files](files)
