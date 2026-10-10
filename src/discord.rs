@@ -307,17 +307,15 @@ pub fn activity_for(
         },
         status_display,
         large_image,
-        // The third line is only the playlist's name; with no playlist it is the album.
-        large_text: match &style.playlist {
-            Some(playlist) => playlist.clone(),
-            None if now.album_name.is_empty() => crate::build_info::DISPLAY_NAME.to_string(),
-            None => now.album_name.clone(),
+        // The third line is the album's name (Discord shows this same text when
+        // the cover is hovered). The playlist has its own button.
+        large_text: if now.album_name.is_empty() {
+            now.title.clone()
+        } else {
+            now.album_name.clone()
         },
         small_image,
-        small_text: match &style.playlist {
-            Some(playlist) => format!("Playing from {playlist}"),
-            None => crate::build_info::DISPLAY_NAME.to_string(),
-        },
+        small_text: format!("Get {}", crate::build_info::DISPLAY_NAME),
         buttons,
         large_url,
         small_url: style
@@ -961,8 +959,8 @@ mod tests {
         chosen.profile_url = Some("https://open.spotify.com/user/abc".into());
         chosen.picks = [2, 4];
         let activity = activity_for(&playing(), &chosen, 0).unwrap();
-        assert_eq!(activity.large_text, "Road trip");
-        assert_eq!(activity.small_text, "Playing from Road trip");
+        assert_eq!(activity.large_text, "Album");
+        assert_eq!(activity.small_text, "Get chanceify™");
         assert_eq!(activity.buttons.len(), 2);
         assert_eq!(activity.buttons[1].0, "My Spotify profile");
     }
