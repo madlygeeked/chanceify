@@ -4293,12 +4293,16 @@ pub fn now_playing_overlay(app: &mut App, ui: &mut egui::Ui, art: Rect, now: &No
 
     // The title is sized to fit, and the card to the title.
     let biggest = (art.width() * 0.2).clamp(20.0, 56.0);
+    // The same face as the visualizer's title, and it sways the same way.
+    let font_index = vis_font_in_use(ui.ctx(), app.settings.vis_text_font, app.settings.vis_font_random, &now.uri);
+    let family = vis_font_family(ui.ctx(), font_index);
     let (title_galley, title_size) = fit_title(
         ui.painter(),
         &now.title,
         max_text_width,
         biggest,
         palette.text,
+        &family,
     );
 
     // The artists show while the pointer is over the art, faded in over a
@@ -4363,8 +4367,31 @@ pub fn now_playing_overlay(app: &mut App, ui: &mut egui::Ui, art: Rect, now: &No
     let title = ui
         .interact(title_rect, egui::Id::new("now-playing-card-title"), Sense::click())
         .on_hover_cursor(egui::CursorIcon::PointingHand);
-    ui.painter()
-        .galley(title_pos, title_galley.clone(), palette.text);
+    {
+        let sway = app.settings.vis_sway_preset();
+        let strength = app.settings.vis_sway_strength();
+        let still = app.settings.vis_text_still;
+        let angle = if still {
+            0.0
+        } else {
+            let time = ui.input(|input| input.time) as f32;
+            let bass = app.music_bass_level();
+            let t = time * sway.speed;
+            let bass_lean = 1.0 + 2.0 * bass * sway.bass;
+            let damp = (420.0 / title_extent.x.max(1.0)).clamp(0.3, 1.0);
+            ((0.05 * (t * 0.9).sin() + 0.03 * (t * 1.7 + 1.0).sin()) * bass_lean
+                + 0.04 * bass * sway.bass * (t * 4.1).sin())
+                * damp
+                * sway.lean
+                * strength
+        };
+        let shape = egui::epaint::TextShape::new(title_pos, title_galley.clone(), palette.text)
+            .with_angle_and_anchor(angle, egui::Align2::CENTER_BOTTOM);
+        ui.painter().add(shape);
+        if angle != 0.0 {
+            ui.ctx().request_repaint();
+        }
+    }
     if title.hovered() {
         ui.painter().hline(
             title_rect.x_range(),
@@ -4460,14 +4487,23 @@ fn fit_title(
     wrap: f32,
     biggest: f32,
     color: Color32,
+    family: &egui::FontFamily,
 ) -> (std::sync::Arc<egui::Galley>, f32) {
     const LADDER: [f32; 8] = [46.0, 40.0, 34.0, 29.0, 25.0, 22.0, 19.0, 16.0];
     /// Sizes above this must fit on a single line; at or below it a second
     /// line is allowed, so a long name is small rather than enormous.
     const TWO_ROW_BELOW: f32 = 25.0;
+    // The visualizer's title face, or Inter's semibold when it is the default.
+    let font = |size: f32| {
+        if *family == egui::FontFamily::Proportional {
+            theme::semibold(size)
+        } else {
+            egui::FontId::new(size, family.clone())
+        }
+    };
     let width_at = |size: f32| {
         painter
-            .layout_no_wrap(title.to_owned(), theme::semibold(size), color)
+            .layout_no_wrap(title.to_owned(), font(size), color)
             .size()
             .x
     };
@@ -4493,7 +4529,7 @@ fn fit_title(
     let galley = crate::bidi::layout(
         painter,
         title,
-        theme::semibold(chosen),
+        font(chosen),
         color,
         wrap,
         rows,

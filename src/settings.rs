@@ -103,6 +103,9 @@ pub struct TrackColumns {
     /// 3 date added, 4 release date, 5 tempo. The title takes whatever room
     /// the others leave, wherever it is.
     pub order: [u8; 6],
+    /// The columns share the width of the list between them instead of
+    /// keeping the widths they were dragged to.
+    pub spread: bool,
 }
 
 impl Default for TrackColumns {
@@ -121,6 +124,7 @@ impl Default for TrackColumns {
             hide_plus: false,
             grid: false,
             order: Self::DEFAULT_ORDER,
+            spread: false,
         }
     }
 }

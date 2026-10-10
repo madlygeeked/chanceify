@@ -1778,6 +1778,30 @@ pub(crate) fn table_layout(
 /// column is dropped instead.
 const TITLE_MIN: f32 = 150.0;
 
+/// Lets the shown columns share `region` between them: the song names count
+/// double, every other column once, so a wide window fills out evenly.
+pub(crate) fn spread_columns(laid: &mut Columns, region: f32) {
+    let shown = [laid.playlists, laid.album, laid.added, laid.release, laid.bpm]
+        .iter()
+        .filter(|w| **w > 0.0)
+        .count();
+    if shown == 0 || region <= 0.0 {
+        return;
+    }
+    let each = (region / (shown as f32 + 2.0)).max(crate::settings::TrackColumns::MIN);
+    for width in [
+        &mut laid.playlists,
+        &mut laid.album,
+        &mut laid.added,
+        &mut laid.release,
+        &mut laid.bpm,
+    ] {
+        if *width > 0.0 {
+            *width = each;
+        }
+    }
+}
+
 /// Where the title and each shown column sit, left to right, in the order the
 /// reader arranged them: `(column, x, width)`. The title takes whatever the
 /// others leave, so it can sit anywhere, even in the middle.
@@ -2141,6 +2165,9 @@ fn track_row_contents(
     let ago_w = if ago_label.is_some() { 78.0 } else { 0.0 };
     // The reader's arrangement: every column, the title too, has a slot.
     let region_right = rect.right() - right_fixed;
+    if app.settings.track_columns.spread && !bare {
+        spread_columns(&mut cols, region_right - x);
+    }
     let slots = column_slots(x, region_right, app.settings.track_columns.order(), &cols);
     let slot_at = |column: crate::model::SortColumn| {
         slots.iter().find(|(c, _, _)| *c == column).map(|(_, at, _)| *at)
@@ -3452,7 +3479,7 @@ pub fn table_header(
     // The columns sit where the reader put them. The song names take
     // whatever the others leave, wherever they are, so a column added or
     // widened takes its room from them.
-    let laid = table_layout(
+    let mut laid = table_layout(
         width,
         ColumnsShown {
             album: show_album,
@@ -3468,6 +3495,9 @@ pub fn table_header(
         false,
     );
     let right_fixed = columns.buttons_width() + if columns.hide_duration { 0.0 } else { 56.0 } + 8.0;
+    if columns.spread {
+        spread_columns(&mut laid, rect.right() - right_fixed - x);
+    }
     // The headings must be drawn in exactly the order `track_row` draws the
     // cells (both use `column_slots`), or every heading sits over the wrong data.
     let slots = column_slots(x, rect.right() - right_fixed, columns.order(), &laid);
@@ -3556,6 +3586,9 @@ pub fn table_header(
     // menu as a right-click anywhere else on the header.
     let mut menu_anchor = None;
     let mut placed: Vec<f32> = Vec::new();
+    if columns.spread {
+        edges.clear();
+    }
     for (edge, column, grows_right) in edges {
         if let Some(handle) = column_divider(
             ui,
@@ -3594,6 +3627,9 @@ pub fn table_header(
                     ui.spacing_mut().item_spacing.y = 1.0;
                     if checkbox_row(ui, palette, &gettext(locale, "GRID VIEW"), widths.grid) {
                         widths.grid = !widths.grid;
+                    }
+                    if checkbox_row(ui, palette, &gettext(locale, "SPREAD EVENLY"), widths.spread) {
+                        widths.spread = !widths.spread;
                     }
                     menu_separator(ui, palette);
                     if checkbox_row(
