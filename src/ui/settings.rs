@@ -1965,9 +1965,7 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                         app.actions.push(Action::RegisterLinks);
                     }
                     ui.add_space(4.0);
-                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 4] = [
-                        ("Playlist name after the artist, linking to the playlist", |s| &mut s.discord_playlist_line),
-                        ("Make the song and artist names links to Spotify", |s| &mut s.discord_links),
+                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 2] = [
                         ("Show songs I play from my own files", |s| &mut s.discord_files),
                         ("Show nothing while paused", |s| &mut s.discord_hide_paused),
                     ];

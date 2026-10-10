@@ -10395,7 +10395,8 @@ impl App {
                 }
                 Some(now) => {
                     let line = match crate::discord::song_link(&now.uri, &now.title, &now.subtitle).or_else(|| util::open_spotify_url(&now.uri)) {
-                        Some(url) => format!("Listening to {} by {} on {} {}", now.title, now.subtitle, crate::build_info::DISPLAY_NAME, url),
+                        // A named link: Discord shows "chanceify™", not the long address.
+                        Some(url) => format!("Listening to {} by {} on [{}]({})", now.title, now.subtitle, crate::build_info::DISPLAY_NAME, url),
                         None => format!("Listening to {} by {} on {}", now.title, now.subtitle, crate::build_info::DISPLAY_NAME),
                     };
                     ctx.copy_text(line);
@@ -12424,7 +12425,9 @@ impl App {
         // Fixed on: the playlist being played from shows, with a profile and a
         // playlist button.
         let playlist = playlist_name.clone();
-        let playlist_line = playlist_name.filter(|_| self.settings.discord_playlist_line);
+        // Discord cannot link the third line, so the playlist has its button instead.
+        let playlist_line: Option<String> = None;
+        let _ = playlist_name;
         let picks = [4u8, 3u8];
         let playlist_url = self
             .playing_context_uri()
@@ -12453,7 +12456,7 @@ impl App {
             song_page: picks.contains(&1),
             picks,
             look: self.settings.discord_look,
-            links: self.settings.discord_links,
+            links: true,
             hide_paused: self.settings.discord_hide_paused,
             files: self.settings.discord_files,
             listen_along: false,

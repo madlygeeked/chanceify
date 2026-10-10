@@ -233,9 +233,8 @@ pub fn activity_for(
     let large_url = if is_file {
         None
     } else {
-        song_link(&now.uri, &now.title, &now.subtitle)
-            .filter(|_| style.picks.contains(&1))
-            .or_else(|| song_url.clone())
+        // Clicking the cover opens chanceify's own song page.
+        song_link(&now.uri, &now.title, &now.subtitle).or_else(|| song_url.clone())
     };
     // The lines the reader wants, in order: song, artist. With neither on,
     // the card still needs a first line, so it says chanceify.
