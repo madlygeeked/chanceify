@@ -3844,8 +3844,13 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
             egui::StrokeKind::Middle,
         );
     }
-    // The words keep to the card's resting size.
+    // The words keep to the card's resting size, and sit below the lowest the
+    // art can reach: a bounce swells it, and a floating card tips towards the
+    // viewer and grows past its edge.
     let cover = resting;
+    let clear = cover.height()
+        * (if app.settings.lyrics_flag(crate::settings::Settings::LYRICS_BOUNCE_ART) { 0.04 } else { 0.0 }
+            + if floating { 0.18 } else { 0.0 });
     let ink = if app.swirl_art_is_light() {
         Color32::BLACK
     } else {
@@ -3984,7 +3989,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
             ((sum / samples.len() as f32).sqrt() * 4.0).clamp(0.0, 1.0)
         }
     } else {
-        0.0
+        app.music_bass_level()
     };
     let bass = ui
         .ctx()
@@ -3994,6 +3999,15 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
     // On the beat only: the title moves with each hit and holds still between.
     let gate = sway_gate(app);
     let strength = app.settings.vis_sway_strength() * gate;
+    // How hard the music is hitting right now, 0 to 1: what the sways follow.
+    let punch = ((bass - 0.05) / 0.35).clamp(0.0, 1.0);
+    // Shake moves the whole text together, never letter by letter.
+    let shake = if still || sway.kind != 4 {
+        vec2(0.0, 0.0)
+    } else {
+        let reach = sway.amp * title_size * strength * punch;
+        vec2((time * 43.0).sin() * reach, (time * 37.0).cos() * reach)
+    };
     let contrast = if ink == Color32::WHITE { Color32::BLACK } else { Color32::WHITE };
     let outline = !app.settings.vis_text_no_outline;
     let show_artist = !app.settings.vis_text_no_artist && !now.subtitle.is_empty();
@@ -4012,7 +4026,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
     // Where the title's first line starts, and where the artist goes.
     let (top, artist_top) = match layout {
         // Above the cover, the artist below it.
-        3 => (cover.top() - 18.0 - line_h, cover.bottom() + 14.0),
+        3 => (cover.top() - 18.0 - line_h, cover.bottom() + 14.0 + clear),
         // Beside it: the words as one block, centred on the cover.
         1 | 2 => {
             let block = words_height
@@ -4025,7 +4039,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
             (top, top + words_height + 8.0)
         }
         // Under it, the artist beneath the title.
-        _ => (cover.bottom() + 18.0, cover.bottom() + 18.0 + line_h + 6.0),
+        _ => (cover.bottom() + 18.0 + clear, cover.bottom() + 18.0 + clear + line_h + 6.0),
     };
     // Each line's left edge: centred on the cover, or flush with the text
     // column beside it.
@@ -4097,10 +4111,10 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
                 (420.0 / whole_width.max(1.0)).clamp(0.3, 1.0)
             };
             let t = time * sway.speed;
-            let bass_lean = 1.0 + 2.0 * bass * sway.bass;
+            let bass_lean = 0.6 + 4.0 * punch * sway.bass;
             (((0.05 * (t * 0.9 - phase * 0.6).sin() + 0.03 * (t * 1.7 - phase * 0.9 + 1.0).sin())
                 * bass_lean
-                + 0.04 * bass * sway.bass * (t * 4.1 - phase * 0.7).sin())
+                + 0.07 * punch * sway.bass * (t * 4.1 - phase * 0.7).sin())
                 * damp
                 * sway.lean
                 * strength)
@@ -4125,30 +4139,29 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
             let mut bob = if still || sway.bob <= 0.0 {
                 0.0
             } else {
-                (time * 3.0 * sway.speed - i as f32 * 0.55).sin() * sway.bob * h * strength
+                (time * 3.0 * sway.speed - i as f32 * 0.55).sin() * sway.bob * h * strength * (0.3 + 1.6 * punch)
             };
             if back_on {
                 bob = bob.clamp(-back_vpad.max(3.0), back_vpad.max(3.0));
             }
-            // Bounce, slide and shake move the letters without turning them.
-            let motion = if still || sway.kind == 0 || sway.kind == 3 {
+            // Bounce and slide move letters without turning them. Slide moves a
+            // whole line together so letters never run into each other, and
+            // shake moves everything together.
+            let motion = if still || matches!(sway.kind, 0 | 3) {
                 vec2(0.0, 0.0)
             } else {
                 let t = time * sway.speed;
-                let drive = 0.4 + 0.6 * (bass * sway.bass).clamp(0.0, 1.6);
                 match sway.kind {
-                    1 => vec2(
-                        0.0,
-                        -(t * 2.4 - i as f32 * 0.12).sin().abs() * sway.amp * line_h * strength * drive,
-                    ),
+                    1 => {
+                        let hop = (t * 2.4 - i as f32 * 0.08).sin().powi(2);
+                        let lift = 0.2 * hop + punch * (0.8 + 0.2 * hop);
+                        vec2(0.0, -lift * sway.amp * line_h * strength)
+                    }
                     2 => vec2(
-                        (t * 1.6 - i as f32 * 0.1).sin() * sway.amp * line_h * strength * (0.6 + 0.4 * drive),
+                        (t * 1.1 + row as f32 * 0.8).sin() * sway.amp * line_h * strength * (0.25 + punch),
                         0.0,
                     ),
-                    _ => vec2(
-                        (time * 41.0 + i as f32 * 7.3).sin() * sway.amp * line_h * strength * drive,
-                        (time * 37.0 + i as f32 * 5.1).cos() * sway.amp * line_h * strength * drive,
-                    ),
+                    _ => shake,
                 }
             };
             let motion = if back_on {
@@ -4206,7 +4219,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
         }
     }
     if let Some(artist) = artist {
-        let at = pos2(line_left(artist.size().x), artist_top);
+        let at = pos2(line_left(artist.size().x), artist_top) + shake;
         if outline {
             let reach = (artist_size * 0.05).clamp(1.0, 3.0);
             for step in 0..8 {
@@ -5005,7 +5018,8 @@ pub fn now_playing_overlay(app: &mut App, ui: &mut egui::Ui, art: Rect, now: &No
             let time = ui.input(|input| input.time) as f32;
             let t = time * sway.speed;
             let reach = title_extent.y * sway.amp * strength;
-            let drive = 0.4 + 0.6 * (app.music_bass_level() * sway.bass).clamp(0.0, 1.6);
+            let punch = ((app.music_bass_level() - 0.05) / 0.35).clamp(0.0, 1.0);
+            let drive = 0.25 + 0.75 * punch;
             match sway.kind {
                 1 => vec2(0.0, -(t * 2.4).sin().abs() * reach * drive),
                 2 => vec2((t * 1.6).sin() * reach * (0.6 + 0.4 * drive), 0.0),
