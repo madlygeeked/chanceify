@@ -39,10 +39,12 @@ on the [github page](https://github.com/madlygeeked/chanceify), click **code**, 
 
 **3. last.fm (optional)**
 
-the code points at the author's own last.fm helper, so you should point it at yours (or leave scrobbling out). first get your own key at [last.fm/api/account/create](https://www.last.fm/api/account/create): you get an api key and a shared secret. never share the secret, post it or commit it. then pick one:
+the code ships with no last.fm key and no helper address, so you set up your own. get a key at [last.fm/api/account/create](https://www.last.fm/api/account/create): you get an api key and a shared secret. never share the secret, post it or commit it. then pick one:
 
-- *easy:* make a file called `lastfm-keys.txt` in the folder with `Cargo.toml`. put the key on the first line and the secret on the second, nothing else. then open `src/lastfm.rs` in notepad, find the line `pub const PROXY_URL: &str = "https://...";` and change the address to `""` (two quotes, nothing between). the keys are built into your copy and git never uploads the file.
-- *safer, if you will share your build:* keep the secret off your computer's app entirely with a free [cloudflare worker](https://dash.cloudflare.com). open [`worker/README.md`](worker/README.md) and follow it (about 5 minutes: make a worker, paste in `worker/lastfm-proxy.js`, add two secrets called `LASTFM_KEY` and `LASTFM_SECRET`). then in `src/lastfm.rs` change the `PROXY_URL` address to your own worker's.
+- *easy:* make a file called `lastfm-keys.txt` in the folder with `Cargo.toml`. put the key on the first line and the secret on the second, nothing else. the keys are built into your own copy, and git never uploads the file. do not share a build made this way.
+- *safer, if you will share your build:* keep the secret out of the app with a free [cloudflare worker](https://dash.cloudflare.com). open [`worker/README.md`](worker/README.md) and follow it (about 5 minutes: make a worker, paste in `worker/lastfm-proxy.js`, add two secrets called `LASTFM_KEY` and `LASTFM_SECRET`). then make a file called `lastfm-proxy.txt` in the folder with `Cargo.toml`, put your worker's address in it (one line), and build.
+
+if you do neither, chanceify still works, and asks for a last.fm key in settings if you want scrobbling.
 
 **4. build it**
 

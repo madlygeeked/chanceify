@@ -54,10 +54,23 @@ fn lastfm_keys() {
     }
 }
 
+/// The address of the builder's own Last.fm helper (a Cloudflare Worker),
+/// from `lastfm-proxy.txt`: one line, never committed. Without it the source
+/// has no address at all and the Last.fm key goes in `lastfm-keys.txt`.
+fn lastfm_proxy() {
+    println!("cargo:rerun-if-changed=lastfm-proxy.txt");
+    let text = std::fs::read_to_string("lastfm-proxy.txt").unwrap_or_default();
+    let address = text.lines().map(str::trim).find(|line| !line.is_empty());
+    if let Some(address) = address {
+        println!("cargo:rustc-env=CHANCEIFY_LASTFM_PROXY={address}");
+    }
+}
+
 fn main() {
     fastframe_i18n::build::compile_catalogs("assets/i18n");
     build_stamp();
     lastfm_keys();
+    lastfm_proxy();
     #[cfg(windows)]
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         println!("cargo:rerun-if-changed=assets/chanceify.ico");

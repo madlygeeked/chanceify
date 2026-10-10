@@ -558,8 +558,8 @@ pub fn show(app: &mut App, ctx: &Context) {
         if ctx.data(|data| data.get_temp::<bool>(open_id)).unwrap_or(false) {
             ctx.data_mut(|data| {
                 data.insert_temp(open_id, false);
-                let gen: u32 = data.get_temp(gen_id).unwrap_or(0);
-                data.insert_temp(gen_id, gen.wrapping_add(1));
+                let generation: u32 = data.get_temp(gen_id).unwrap_or(0);
+                data.insert_temp(gen_id, generation.wrapping_add(1));
                 data.remove::<Rect>(Id::new("views-panel-rect"));
             });
         }
