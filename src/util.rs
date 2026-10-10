@@ -602,3 +602,31 @@ mod tests {
         assert_eq!(strip_html("ONE&#x2F;TWO&#x2F;THREE"), "ONE/TWO/THREE");
     }
 }
+
+/// Memory this program is using right now, in megabytes, for the About page.
+pub fn memory_used_mb() -> Option<u64> {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
+        use windows_sys::Win32::System::Threading::GetCurrentProcess;
+        // SAFETY: a zeroed counters struct with its size set is what the call expects.
+        unsafe {
+            let mut counters: PROCESS_MEMORY_COUNTERS = std::mem::zeroed();
+            counters.cb = std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
+            if K32GetProcessMemoryInfo(GetCurrentProcess(), &mut counters, counters.cb) != 0 {
+                return Some(counters.WorkingSetSize as u64 / (1024 * 1024));
+            }
+        }
+        None
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let text = std::fs::read_to_string("/proc/self/statm").ok()?;
+        let pages: u64 = text.split_whitespace().nth(1)?.parse().ok()?;
+        Some(pages * 4096 / (1024 * 1024))
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        None
+    }
+}

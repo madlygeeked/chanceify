@@ -1632,6 +1632,15 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                         theme::semibold(15.0),
                         palette.text,
                     );
+                    if let Some(mb) = crate::util::memory_used_mb() {
+                        theme::text(
+                            ui,
+                            format!("memory used: {mb} MB"),
+                            theme::regular(12.0),
+                            palette.dim,
+                        );
+                        ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
+                    }
                 });
             });
             ui.add_space(8.0);
