@@ -187,7 +187,7 @@ const TABS: [&str; 6] = ["Accounts", "Playback", "Look", "Library", "Network", "
 fn tab_of(title: &str) -> Option<u8> {
     let title = title.to_lowercase();
     let has = |words: &[&str]| words.iter().any(|word| title.contains(word));
-    if has(&["account", "last.fm"]) {
+    if has(&["account", "last.fm", "discord"]) {
         Some(0)
     } else if has(&["playback", "equalizer"]) {
         Some(1)
@@ -224,7 +224,38 @@ fn section(
         return;
     }
     ui.add_space(10.0);
-    theme::text(ui, crate::i18n::ui_text(title), theme::bold(18.0), palette.text);
+    // A heading that folds the section away; which ones are folded is kept.
+    let closed_id = egui::Id::new("settings-closed");
+    let mut closed: Vec<String> = ui.data(|data| data.get_temp(closed_id)).unwrap_or_default();
+    let is_closed = !searching && closed.iter().any(|name| name == title);
+    let head = ui
+        .horizontal(|ui| {
+            let (slot, _) = ui.allocate_exact_size(egui::vec2(20.0, 24.0), egui::Sense::hover());
+            theme::paint_icon(
+                ui,
+                if is_closed { Icon::ChevronRight } else { Icon::ChevronDown },
+                slot,
+                16.0,
+                palette.secondary,
+            );
+            theme::text(ui, crate::i18n::ui_text(title), theme::bold(18.0), palette.text);
+        })
+        .response;
+    let head_click = ui
+        .interact(head.rect, egui::Id::new(("settings-head", title)), egui::Sense::click())
+        .on_hover_cursor(egui::CursorIcon::PointingHand);
+    if head_click.clicked() && !searching {
+        if is_closed {
+            closed.retain(|name| name != title);
+        } else {
+            closed.push(title.to_string());
+        }
+        ui.data_mut(|data| data.insert_temp(closed_id, closed));
+    }
+    if is_closed {
+        ui.add_space(6.0);
+        return;
+    }
     ui.add_space(8.0);
     Frame::new()
         .fill(
@@ -243,6 +274,21 @@ fn section(
 }
 
 pub fn show(app: &mut App, ui: &mut egui::Ui) {
+    // Which sections are folded away is remembered between launches.
+    let closed_id = egui::Id::new("settings-closed");
+    if ui.data(|data| data.get_temp::<Vec<String>>(closed_id)).is_none() {
+        let saved = app.settings.settings_closed.clone();
+        ui.data_mut(|data| data.insert_temp(closed_id, saved));
+    }
+    show_inner(app, ui);
+    let now: Vec<String> = ui.data(|data| data.get_temp(closed_id)).unwrap_or_default();
+    if now != app.settings.settings_closed {
+        app.settings.settings_closed = now;
+        app.mark_settings_dirty();
+    }
+}
+
+fn show_inner(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
     let locale = app.locale;
     ui.add_space(8.0);
@@ -1599,207 +1645,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 }
             });
             ui.add_space(8.0);
-            {
-                let mut on = app.settings.discord_presence;
-                if widgets::switch_labeled(ui, &palette, "Show what I'm listening to on Discord", &mut on).changed() {
-                    app.settings.discord_presence = on;
-                    app.mark_settings_dirty();
-                }
-                if app.settings.discord_presence {
-                    theme::subtle(
-                        ui,
-                        &palette,
-                        "Shows on your Discord profile like Spotify does: the song and artist, the cover and a progress bar, with a small chanceify badge. Discord's desktop app has to be open.",
-                    );
-                    ui.add_space(4.0);
-                    ui.horizontal_wrapped(|ui| {
-                        ui.spacing_mut().item_spacing = egui::vec2(8.0, 6.0);
-                        theme::text(ui, "Status line says", theme::regular(12.5), palette.secondary);
-                        for (value, label) in [(0u8, "The song"), (1, "The artist"), (2, "chanceify™")] {
-                            if theme::soft_button(
-                                ui,
-                                &palette,
-                                None,
-                                label,
-                                app.settings.discord_status_line == value,
-                            )
-                            .clicked()
-                            {
-                                app.settings.discord_status_line = value;
-                                app.mark_settings_dirty();
-                            }
-                        }
-                    });
-                    if theme::soft_button(ui, &palette, None, "Let chanceify:// links open chanceify (Windows)", false)
-                        .on_hover_text("Adds one entry for your Windows user, so the song page's Open in chanceify button works.")
-                        .clicked()
-                    {
-                        app.actions.push(Action::RegisterLinks);
-                    }
-                    ui.add_space(4.0);
-                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 7] = [
-                        ("Show the album cover", |s| &mut s.discord_cover),
-                        ("Tiny chanceify badge in the corner of the cover", |s| &mut s.discord_badge),
-                        ("Say which playlist I'm playing from", |s| &mut s.discord_playlist),
-                        ("Make the song and artist names links to Spotify", |s| &mut s.discord_links),
-                        ("Show buttons under the song (Discord shows two)", |s| &mut s.discord_buttons),
-                        ("Show songs I play from my own files", |s| &mut s.discord_files),
-                        ("Show nothing while paused", |s| &mut s.discord_hide_paused),
-                    ];
-                    for (label, field) in rows {
-                        let mut value = *field(&mut app.settings);
-                        if widgets::switch_labeled(ui, &palette, label, &mut value).changed() {
-                            *field(&mut app.settings) = value;
-                            app.mark_settings_dirty();
-                        }
-                    }
-                    if app.settings.discord_buttons {
-                        ui.add_space(4.0);
-                        theme::text(
-                            ui,
-                            &*gettext(app.locale, "Pick the two buttons under the song. The top one shows first."),
-                            theme::regular(12.5),
-                            palette.secondary,
-                        );
-                        let names = [
-                            "None",
-                            "Open in chanceify",
-                            "Open in Spotify",
-                            "The playlist",
-                            "My profile",
-                            "Get chanceify",
-                        ];
-                        for slot in 0..2usize {
-                            ui.add_space(2.0);
-                            theme::text(
-                                ui,
-                                &*if slot == 0 { gettext(app.locale, "First button") } else { gettext(app.locale, "Second button") },
-                                theme::bold(13.0),
-                                palette.text,
-                            );
-                            ui.horizontal_wrapped(|ui| {
-                                ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
-                                for (kind, name) in names.iter().enumerate() {
-                                    let kind = kind as u8;
-                                    let (mine, other) = if slot == 0 {
-                                        (app.settings.discord_button_1, app.settings.discord_button_2)
-                                    } else {
-                                        (app.settings.discord_button_2, app.settings.discord_button_1)
-                                    };
-                                    if theme::pill_button(ui, &palette, &gettext(app.locale, name), mine == kind)
-                                        .clicked()
-                                        && mine != kind
-                                    {
-                                        // Never the same button twice: they swap.
-                                        let other = if other == kind && kind != 0 { mine } else { other };
-                                        let (first, second) = if slot == 0 { (kind, other) } else { (other, kind) };
-                                        app.settings.discord_button_1 = first;
-                                        app.settings.discord_button_2 = second;
-                                        app.mark_settings_dirty();
-                                    }
-                                }
-                            });
-                        }
-                    }
-                    ui.add_space(6.0);
-                    {
-                        let (text, colour) = match crate::discord::link_state() {
-                            2 => ("Discord: connected, and the song was sent.", palette.accent),
-                            1 => ("Discord: found. Waiting for a song to send.", palette.secondary),
-                            _ => (
-                                "Discord: not found yet. Open the Discord desktop app (not the website), and turn on Settings > Activity Privacy > Share my activity in Discord.",
-                                palette.secondary,
-                            ),
-                        };
-                        theme::text(ui, text, theme::regular(12.5), colour);
-                        let problem = crate::discord::last_error();
-                        if !problem.is_empty() {
-                            theme::text(ui, &problem, theme::regular(12.0), palette.warning);
-                        }
-                        ui.ctx().request_repaint_after(std::time::Duration::from_secs(2));
-                    }
-                    ui.add_space(6.0);
-                    // A live preview: exactly what is being sent to Discord for the song now playing.
-                    {
-                        let style = app.discord_style();
-                        let seconds = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map_or(0, |elapsed| elapsed.as_secs() as i64);
-                        let activity = app
-                            .now_playing()
-                            .and_then(|now| crate::discord::activity_for(&now, &style, seconds));
-                        let playing_from = match app.playing_context_uri() {
-                            Some(uri) if uri.starts_with("spotify:playlist:") => {
-                                if style.playlist.is_some() {
-                                    "Playing from one of your playlists: named on the card".to_string()
-                                } else if app.settings.discord_playlist {
-                                    "Playing from a playlist whose name is not loaded yet (open Your Library once)".to_string()
-                                } else {
-                                    "Playing from a playlist (turn on \"Say which playlist\" to name it)".to_string()
-                                }
-                            }
-                            Some(_) => "Not playing from a playlist (an album, artist or liked songs)".to_string(),
-                            None => "chanceify does not know what you are playing from yet".to_string(),
-                        };
-                        theme::subtle(ui, &palette, "PREVIEW (what Discord shows right now)");
-                        theme::text(ui, &playing_from, theme::regular(12.0), palette.dim);
-                        egui::Frame::new()
-                            .fill(palette.surface)
-                            .corner_radius(8)
-                            .inner_margin(10)
-                            .show(ui, |ui| match &activity {
-                                Some(activity) => {
-                                    theme::text(ui, &activity.details, theme::bold(13.5), palette.text);
-                                    theme::text(ui, &activity.state, theme::regular(12.5), palette.secondary);
-                                    theme::text(
-                                        ui,
-                                        &format!("Cover hover: {}", activity.large_text),
-                                        theme::regular(12.0),
-                                        palette.dim,
-                                    );
-                                    theme::text(
-                                        ui,
-                                        &format!("Small picture hover: {}", activity.small_text),
-                                        theme::regular(12.0),
-                                        palette.dim,
-                                    );
-                                    if let Some(image) = &activity.small_image {
-                                        theme::text(ui, &format!("Small picture: {image}"), theme::regular(11.5), palette.dim);
-                                    }
-                                    for (label, _) in &activity.buttons {
-                                        theme::text(ui, &format!("[ {label} ]"), theme::regular(12.5), palette.accent);
-                                    }
-                                }
-                                None => {
-                                    theme::text(
-                                        ui,
-                                        "Nothing to show: play a song (or it is paused and \"Show nothing while paused\" is on).",
-                                        theme::regular(12.5),
-                                        palette.secondary,
-                                    );
-                                }
-                            });
-                    }
-                    ui.add_space(4.0);
-                    if theme::soft_button(ui, &palette, None, "Copy what I'm playing for Discord", false).clicked() {
-                        app.actions.push(Action::ShareToDiscord);
-                    }
-                    ui.add_space(4.0);
-                    ui.horizontal(|ui| {
-                        theme::text(ui, "Discord Application ID (optional)", theme::regular(12.5), palette.secondary);
-                        if ui
-                            .add(
-                                egui::TextEdit::singleline(&mut app.settings.discord_client_id)
-                                    .desired_width(210.0)
-                                    .hint_text("empty = chanceify's own"),
-                            )
-                            .changed()
-                        {
-                            app.mark_settings_dirty();
-                        }
-                    });
-                }
-            }
             ui.add_space(8.0);
             ui.label(
                 egui::RichText::new(format!(
@@ -2084,6 +1929,216 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     }
                 });
                 missing_lists(ui, app, &palette);
+            }
+        });
+    }
+
+    if needle.is_empty() || "discord rich presence status buttons".contains(needle.as_str()) {
+        any_visible = true;
+        section(ui, &palette, "Discord", |ui| {
+            {
+                let mut on = app.settings.discord_presence;
+                if widgets::switch_labeled(ui, &palette, "Show what I'm listening to on Discord", &mut on).changed() {
+                    app.settings.discord_presence = on;
+                    app.mark_settings_dirty();
+                }
+                if app.settings.discord_presence {
+                    theme::subtle(
+                        ui,
+                        &palette,
+                        "Shows on your Discord profile like Spotify does: the song and artist, the cover and a progress bar, with a small chanceify badge. Discord's desktop app has to be open.",
+                    );
+                    ui.add_space(4.0);
+                    ui.add_space(4.0);
+                    theme::text(ui, "What the card says", theme::bold(13.0), palette.text);
+                    for (label, which) in [
+                        ("The song", 0u8),
+                        ("The artist", 1),
+                        ("chanceify (third line)", 2),
+                    ] {
+                        let mut on = match which {
+                            0 => app.settings.discord_say_song,
+                            1 => app.settings.discord_say_artist,
+                            _ => app.settings.discord_say_app,
+                        };
+                        if widgets::switch_labeled(ui, &palette, label, &mut on).changed() {
+                            match which {
+                                0 => app.settings.discord_say_song = on,
+                                1 => app.settings.discord_say_artist = on,
+                                _ => app.settings.discord_say_app = on,
+                            }
+                            app.mark_settings_dirty();
+                        }
+                    }
+                    if theme::soft_button(ui, &palette, None, "Let chanceify:// links open chanceify (Windows)", false)
+                        .on_hover_text("Adds one entry for your Windows user, so the song page's Open in chanceify button works.")
+                        .clicked()
+                    {
+                        app.actions.push(Action::RegisterLinks);
+                    }
+                    ui.add_space(4.0);
+                    let rows: [(&str, fn(&mut crate::settings::Settings) -> &mut bool); 7] = [
+                        ("Show the album cover", |s| &mut s.discord_cover),
+                        ("Tiny chanceify badge in the corner of the cover", |s| &mut s.discord_badge),
+                        ("Say which playlist I'm playing from", |s| &mut s.discord_playlist),
+                        ("Make the song and artist names links to Spotify", |s| &mut s.discord_links),
+                        ("Show buttons under the song (Discord shows two)", |s| &mut s.discord_buttons),
+                        ("Show songs I play from my own files", |s| &mut s.discord_files),
+                        ("Show nothing while paused", |s| &mut s.discord_hide_paused),
+                    ];
+                    for (label, field) in rows {
+                        let mut value = *field(&mut app.settings);
+                        if widgets::switch_labeled(ui, &palette, label, &mut value).changed() {
+                            *field(&mut app.settings) = value;
+                            app.mark_settings_dirty();
+                        }
+                    }
+                    if app.settings.discord_buttons {
+                        ui.add_space(4.0);
+                        theme::text(
+                            ui,
+                            &*gettext(app.locale, "Pick the two buttons under the song. The top one shows first."),
+                            theme::regular(12.5),
+                            palette.secondary,
+                        );
+                        let names = [
+                            "None",
+                            "Open in chanceify",
+                            "Open in Spotify",
+                            "The playlist",
+                            "My profile",
+                            "Get chanceify",
+                        ];
+                        for slot in 0..2usize {
+                            ui.add_space(2.0);
+                            theme::text(
+                                ui,
+                                &*if slot == 0 { gettext(app.locale, "First button") } else { gettext(app.locale, "Second button") },
+                                theme::bold(13.0),
+                                palette.text,
+                            );
+                            ui.horizontal_wrapped(|ui| {
+                                ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+                                for (kind, name) in names.iter().enumerate() {
+                                    let kind = kind as u8;
+                                    let (mine, other) = if slot == 0 {
+                                        (app.settings.discord_button_1, app.settings.discord_button_2)
+                                    } else {
+                                        (app.settings.discord_button_2, app.settings.discord_button_1)
+                                    };
+                                    if theme::pill_button(ui, &palette, &gettext(app.locale, name), mine == kind)
+                                        .clicked()
+                                        && mine != kind
+                                    {
+                                        // Never the same button twice: they swap.
+                                        let other = if other == kind && kind != 0 { mine } else { other };
+                                        let (first, second) = if slot == 0 { (kind, other) } else { (other, kind) };
+                                        app.settings.discord_button_1 = first;
+                                        app.settings.discord_button_2 = second;
+                                        app.mark_settings_dirty();
+                                    }
+                                }
+                            });
+                        }
+                    }
+                    ui.add_space(6.0);
+                    {
+                        let (text, colour) = match crate::discord::link_state() {
+                            2 => ("Discord: connected, and the song was sent.", palette.accent),
+                            1 => ("Discord: found. Waiting for a song to send.", palette.secondary),
+                            _ => (
+                                "Discord: not found yet. Open the Discord desktop app (not the website), and turn on Settings > Activity Privacy > Share my activity in Discord.",
+                                palette.secondary,
+                            ),
+                        };
+                        theme::text(ui, text, theme::regular(12.5), colour);
+                        let problem = crate::discord::last_error();
+                        if !problem.is_empty() {
+                            theme::text(ui, &problem, theme::regular(12.0), palette.warning);
+                        }
+                        ui.ctx().request_repaint_after(std::time::Duration::from_secs(2));
+                    }
+                    ui.add_space(6.0);
+                    // A live preview: exactly what is being sent to Discord for the song now playing.
+                    {
+                        let style = app.discord_style();
+                        let seconds = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map_or(0, |elapsed| elapsed.as_secs() as i64);
+                        let activity = app
+                            .now_playing()
+                            .and_then(|now| crate::discord::activity_for(&now, &style, seconds));
+                        let playing_from = match app.playing_context_uri() {
+                            Some(uri) if uri.starts_with("spotify:playlist:") => {
+                                if style.playlist.is_some() {
+                                    "Playing from one of your playlists: named on the card".to_string()
+                                } else if app.settings.discord_playlist {
+                                    "Playing from a playlist whose name is not loaded yet (open Your Library once)".to_string()
+                                } else {
+                                    "Playing from a playlist (turn on \"Say which playlist\" to name it)".to_string()
+                                }
+                            }
+                            Some(_) => "Not playing from a playlist (an album, artist or liked songs)".to_string(),
+                            None => "chanceify does not know what you are playing from yet".to_string(),
+                        };
+                        theme::subtle(ui, &palette, "PREVIEW (what Discord shows right now)");
+                        theme::text(ui, &playing_from, theme::regular(12.0), palette.dim);
+                        egui::Frame::new()
+                            .fill(palette.surface)
+                            .corner_radius(8)
+                            .inner_margin(10)
+                            .show(ui, |ui| match &activity {
+                                Some(activity) => {
+                                    theme::text(ui, &activity.details, theme::bold(13.5), palette.text);
+                                    theme::text(ui, &activity.state, theme::regular(12.5), palette.secondary);
+                                    theme::text(
+                                        ui,
+                                        &format!("Cover hover: {}", activity.large_text),
+                                        theme::regular(12.0),
+                                        palette.dim,
+                                    );
+                                    theme::text(
+                                        ui,
+                                        &format!("Small picture hover: {}", activity.small_text),
+                                        theme::regular(12.0),
+                                        palette.dim,
+                                    );
+                                    if let Some(image) = &activity.small_image {
+                                        theme::text(ui, &format!("Small picture: {image}"), theme::regular(11.5), palette.dim);
+                                    }
+                                    for (label, _) in &activity.buttons {
+                                        theme::text(ui, &format!("[ {label} ]"), theme::regular(12.5), palette.accent);
+                                    }
+                                }
+                                None => {
+                                    theme::text(
+                                        ui,
+                                        "Nothing to show: play a song (or it is paused and \"Show nothing while paused\" is on).",
+                                        theme::regular(12.5),
+                                        palette.secondary,
+                                    );
+                                }
+                            });
+                    }
+                    ui.add_space(4.0);
+                    if theme::soft_button(ui, &palette, None, "Copy what I'm playing for Discord", false).clicked() {
+                        app.actions.push(Action::ShareToDiscord);
+                    }
+                    ui.add_space(4.0);
+                    ui.horizontal(|ui| {
+                        theme::text(ui, "Discord Application ID (optional)", theme::regular(12.5), palette.secondary);
+                        if ui
+                            .add(
+                                egui::TextEdit::singleline(&mut app.settings.discord_client_id)
+                                    .desired_width(210.0)
+                                    .hint_text("empty = chanceify's own"),
+                            )
+                            .changed()
+                        {
+                            app.mark_settings_dirty();
+                        }
+                    });
+                }
             }
         });
     }
@@ -2538,6 +2593,7 @@ fn missing_lists(ui: &mut egui::Ui, app: &mut App, palette: &Palette) {
             }
             egui::ScrollArea::vertical()
                 .id_salt(("missing-scroll", artists))
+                .min_scrolled_height(380.0)
                 .max_height((ui.ctx().content_rect().height() * 1.3).max(900.0))
                 .auto_shrink([false, true])
                 .show(ui, |ui| {

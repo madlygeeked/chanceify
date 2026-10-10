@@ -988,6 +988,12 @@ pub struct Settings {
     /// 0 album big, swirl small; 1 swirl big, album small; 2 chanceify badge only.
     pub discord_look: u8,
     pub discord_song_page: bool,
+    /// Which lines the Discord card says: the song, the artist, chanceify.
+    pub discord_say_song: bool,
+    pub discord_say_artist: bool,
+    pub discord_say_app: bool,
+    /// Settings sections folded away (kept between launches).
+    pub settings_closed: Vec<String>,
     /// The two buttons under the song: 0 none, 1 open in chanceify, 2 open in
     /// Spotify, 3 the playlist, 4 the reader's profile, 5 get chanceify.
     pub discord_button_1: u8,
@@ -1401,6 +1407,10 @@ impl Default for Settings {
             discord_playlist_button: false,
             discord_look: 0,
             discord_song_page: false,
+            discord_say_song: true,
+            discord_say_artist: true,
+            discord_say_app: true,
+            settings_closed: Vec::new(),
             discord_button_1: 2,
             discord_button_2: 5,
             discord_buttons: true,

@@ -110,6 +110,8 @@ pub fn swirl_url(red: u8, green: u8, blue: u8) -> String {
 pub struct Style {
     /// 0 the song, 1 the artist, 2 chanceify: what the status line says.
     pub status_line: u8,
+    /// Which lines the card says: the song, the artist, chanceify (the third line).
+    pub say: [bool; 3],
     pub cover: bool,
     pub badge: bool,
     /// A swirl picture (web address) in the cover's colour, shown small on the cover.
@@ -230,22 +232,55 @@ pub fn activity_for(
             .filter(|_| style.picks.contains(&1))
             .or_else(|| song_url.clone())
     };
-    Some(Activity {
-        details: now.title.clone(),
-        state: if now.playing || now.subtitle.is_empty() {
-            now.subtitle.clone()
-        } else {
-            format!("{} (paused)", now.subtitle)
-        },
-        details_url: if style.links { song_url } else { None },
-        state_url: if style.links { artist_url } else { None },
-        status_display: match style.status_line {
+    // The lines the reader wants, in order: song, artist. With neither on,
+    // the card still needs a first line, so it says chanceify.
+    let artist_text = if now.playing || now.subtitle.is_empty() {
+        now.subtitle.clone()
+    } else {
+        format!("{} (paused)", now.subtitle)
+    };
+    let mut lines: Vec<String> = Vec::new();
+    if style.say[0] {
+        lines.push(now.title.clone());
+    }
+    if style.say[1] && !artist_text.is_empty() {
+        lines.push(artist_text);
+    }
+    if lines.is_empty() {
+        lines.push(crate::build_info::DISPLAY_NAME.to_string());
+    }
+    let both = style.say[0] && lines.len() >= 2;
+    let artist_only = !style.say[0] && style.say[1];
+    let status_display = if lines.len() >= 2 {
+        match style.status_line {
             1 => 1,
             2 => 0,
             _ => 2,
+        }
+    } else if style.say[0] || artist_only {
+        2
+    } else {
+        0
+    };
+    Some(Activity {
+        details: lines[0].clone(),
+        state: lines.get(1).cloned().unwrap_or_default(),
+        details_url: if style.links && style.say[0] {
+            song_url
+        } else if style.links && artist_only {
+            artist_url.clone()
+        } else {
+            None
         },
+        state_url: if style.links && both { artist_url } else { None },
+        status_display,
         large_image,
-        large_text: {
+        large_text: if style.say[2] {
+            match &style.playlist {
+                Some(playlist) => format!("{} - from {playlist}", crate::build_info::DISPLAY_NAME),
+                None => crate::build_info::DISPLAY_NAME.to_string(),
+            }
+        } else {
             let album = if now.album_name.is_empty() {
                 crate::build_info::DISPLAY_NAME.to_string()
             } else {
@@ -651,8 +686,10 @@ fn activity_json_level(activity: &Activity, level: u8) -> Value {
         // 2 is "Listening to".
         "type": 2,
         "details": line(&activity.details),
-        "state": line(&activity.state),
     });
+    if !activity.state.is_empty() {
+        value["state"] = json!(line(&activity.state));
+    }
     let mut stamps = serde_json::Map::new();
     if let Some(start) = activity.start {
         stamps.insert("start".into(), json!(start));
@@ -832,6 +869,7 @@ mod tests {
     fn style() -> Style {
         Style {
             status_line: 0,
+            say: [true, true, true],
             cover: true,
             badge: true,
             swirl: None,

@@ -12439,7 +12439,19 @@ impl App {
             .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)))
             .map(|id| format!("https://open.spotify.com/user/{id}"));
         let style = crate::discord::Style {
-            status_line: self.settings.discord_status_line,
+            // The name under "Listening to" is the first line that is on.
+            status_line: if self.settings.discord_say_song {
+                0
+            } else if self.settings.discord_say_artist {
+                1
+            } else {
+                2
+            },
+            say: [
+                self.settings.discord_say_song,
+                self.settings.discord_say_artist,
+                self.settings.discord_say_app,
+            ],
             cover: self.settings.discord_cover,
             badge: self.settings.discord_badge,
             swirl,
