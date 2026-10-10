@@ -834,7 +834,7 @@ dependencies = [
 
 [[package]]
 name = "chanceify"
-version = "0.91.10"
+version = "0.91.11"
 dependencies = [
  "aes 0.8.4",
  "anyhow",

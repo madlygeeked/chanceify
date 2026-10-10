@@ -210,9 +210,23 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
         detached_controls(app, ctx);
         return;
     }
-    if app.fullscreen_vis || app.calm_mode || app.mini_active {
+    if app.calm_mode || app.mini_active {
         return;
     }
+    // In the full screen visualizer there is no bar, so the panel is here
+    // too, fading away when the pointer is not near, like the views panel.
+    let dim = if app.fullscreen_vis {
+        let last: Option<Rect> = ctx.data(|data| data.get_temp(Id::new("pop-out-last")));
+        let near = last.is_some_and(|rect| {
+            ctx.input(|input| {
+                input.pointer.hover_pos().is_some_and(|p| rect.expand(30.0).contains(p))
+                    || (input.pointer.any_down() && input.pointer.interact_pos().is_some_and(|p| rect.expand(40.0).contains(p)))
+            })
+        }) || last.is_none();
+        fade(ctx, near, "pop-out-seen")
+    } else {
+        1.0
+    };
     let screen = ctx.content_rect();
     let width = super::lyrics::controls_width(app, width);
     let mut change: Option<Option<[f32; 3]>> = None;
@@ -230,6 +244,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
         .fixed_pos(egui::pos2(0.0, 0.0))
         .interactable(true)
         .show(ctx, |ui| {
+            ui.set_opacity(dim);
             // The whole panel is a handle: this is registered first, so the
             // buttons and bars drawn over it still take their own clicks.
             let body = Rect::from_min_size(top_left, egui::vec2(width, super::lyrics::controls_height(app)));
@@ -237,6 +252,7 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
             let Some(outer) = super::lyrics::controls_box_inner(app, ui, top_left, width, false) else {
                 return;
             };
+            ui.ctx().data_mut(|data| data.insert_temp(Id::new("pop-out-last"), outer));
             // The now playing card: the cover and the song's name sit just
             // above the controls and travel with them. Under the full screen
             // lyrics the big cover is already on the page, so the card is
@@ -819,7 +835,13 @@ pub fn show(app: &mut App, ctx: &Context) {
 /// How visible the Views panel is: full while the pointer is near it, and
 /// almost gone (5%) a couple of seconds after it leaves.
 fn panel_dim(ctx: &Context, over: bool) -> f32 {
-    let seen_id = Id::new("views-panel-seen");
+    fade(ctx, over, "views-panel-seen")
+}
+
+/// The same fade for any panel: full while the pointer is near, nearly gone
+/// two seconds after it leaves. `key` keeps each panel's timer apart.
+fn fade(ctx: &Context, over: bool, key: &str) -> f32 {
+    let seen_id = Id::new(key);
     let now_t = ctx.input(|input| input.time);
     if over {
         ctx.data_mut(|data| data.insert_temp(seen_id, now_t));

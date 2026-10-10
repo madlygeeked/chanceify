@@ -198,7 +198,13 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                             .iter()
                             .filter(|(name, list)| !list.is_empty() || !super::keys::fixed_for(name).is_empty())
                             .collect();
-                    let column_count = if ui.available_width() >= 900.0 { 4 } else { 3 };
+                    // The room is the window's own width (the list lives inside a
+                    // scroll area, which can report less), so the columns follow the
+                    // size the window is dragged to: as many as keep every label readable.
+                    let total = ui
+                        .available_width()
+                        .max(app.dialog_rect.map_or(0.0, |rect| rect.width() - 56.0));
+                    let column_count = (((total + 16.0) / 316.0).floor() as usize).clamp(1, 5);
                     let mut lanes: Vec<Vec<usize>> = vec![Vec::new(); column_count];
                     let mut heights = vec![0usize; column_count];
                     for (index, (group, list)) in shown.iter().enumerate() {
@@ -206,9 +212,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                         lanes[lane].push(index);
                         heights[lane] += list.len() + super::keys::fixed_for(group).len() + 2;
                     }
-                    let lane_width = ((ui.available_width() - 16.0 * column_count as f32)
-                        / column_count as f32)
-                        .max(180.0);
+                    let lane_width = ((total - 16.0 * column_count as f32) / column_count as f32).max(240.0);
                     ui.horizontal_top(|ui| {
                         ui.spacing_mut().item_spacing.x = 16.0;
                         for lane in &lanes {

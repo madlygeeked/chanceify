@@ -1494,9 +1494,13 @@ pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egu
             armed = None;
         }
     }
-    ctx.data_mut(|data| match armed {
-        Some(value) => data.insert_temp(armed_id, value),
-        None => data.remove::<(usize, f64)>(armed_id),
+    ctx.data_mut(|data| {
+        match armed {
+            Some(value) => {
+                data.insert_temp(armed_id, value);
+            }
+            None => data.remove::<(usize, f64)>(armed_id),
+        }
     });
     let mut bar_drag = egui::Vec2::ZERO;
     for (i, bar) in bars.iter().enumerate() {
