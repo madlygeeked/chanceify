@@ -553,7 +553,30 @@ pub fn show(app: &mut App, ctx: &Context) {
                     if !chips.is_empty() {
                         ui.horizontal_wrapped(|ui| {
                             for (label, on, action) in chips {
-                                let response = theme::soft_button(ui, &palette, None, label, on);
+                                let icon = match label {
+                                    "Library" => Icon::LayoutGrid,
+                                    "Side lyrics" => Icon::LayoutList,
+                                    "Queue" => Icon::ListEnd,
+                                    "Big album art" | "Album art" => Icon::Square,
+                                    "Visualizer" | "Visualizer behind" => Icon::AudioLines,
+                                    "Visualizer settings" => Icon::Settings,
+                                    "Always on top" => Icon::Pin,
+                                    "Lyrics on it" => Icon::Mic,
+                                    "Artist name" => Icon::User,
+                                    "Floating art" => Icon::Expand,
+                                    "Art bounces" => Icon::Zap,
+                                    "Timestamps" => Icon::Clock,
+                                    "Countdown" => Icon::Loader,
+                                    "Close visualizer window" | "New visualizer window" => Icon::AudioLines,
+                                    _ => Icon::Info,
+                                };
+                                let response = view_button(ui, &palette, icon, label, on, 38.0);
+                                if label.ends_with("visualizer window") {
+                                    // A small plus (or cross, when it is open) on the corner.
+                                    let badge = egui::Rect::from_center_size(response.rect.right_top() + egui::vec2(-9.0, 9.0), egui::Vec2::splat(12.0));
+                                    ui.painter().circle_filled(badge.center(), 7.0, palette.accent);
+                                    theme::paint_icon(ui, if on { Icon::X } else { Icon::Plus }, badge, 10.0, palette.window);
+                                }
                                 if response.clicked() {
                                     app.actions.push(action);
                                 }

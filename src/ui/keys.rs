@@ -335,6 +335,13 @@ pub fn handle(app: &mut App, ctx: &egui::Context) {
     if capture_rebind(app, ctx) {
         return;
     }
+    // Each window answers only its own keys: while the extra visualizer
+    // window has the focus, this one stays quiet.
+    if (app.extra_vis || app.mini_active)
+        && ctx.input(|input| input.viewport().focused == Some(false))
+    {
+        return;
+    }
     // The default keys were rearranged in 0.22 (W lyrics, F and D the two
     // full screens). Old saved choices would hide that, so they are dropped
     // once; keys changed after this stay.

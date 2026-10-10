@@ -908,6 +908,12 @@ pub struct Settings {
     pub vis_text_font: u8,
     /// Hide the artist name under the full-screen title.
     pub vis_text_no_artist: bool,
+    /// A thin border round the album art in the full screen visualizer.
+    pub vis_art_border: bool,
+    /// What the lyrics page of the extra window names: the song, the artist, a heart.
+    pub extra_show_title: bool,
+    pub extra_show_artist: bool,
+    pub extra_show_heart: bool,
     /// Show the playing song on the reader's Discord profile.
     pub discord_presence: bool,
     /// The Application ID of the Discord app that presence is shown as.
@@ -940,6 +946,9 @@ pub struct Settings {
     pub views_width: f32,
     /// Height of the Views panel (0 = fit the content).
     pub views_height: f32,
+    /// Size of the visualizer settings panel (0 = fit the content).
+    pub vis_panel_w: f32,
+    pub vis_panel_h: f32,
     /// The mini player window: x, y, width, height.
     pub mini_window: Option<[f32; 4]>,
     /// The extra visualizer window: x, y, width, height.
@@ -1326,6 +1335,10 @@ impl Default for Settings {
             vis_font_random: false,
             vis_text_font: 0,
             vis_text_no_artist: false,
+            vis_art_border: true,
+            extra_show_title: true,
+            extra_show_artist: true,
+            extra_show_heart: true,
             discord_presence: false,
             discord_client_id: String::new(),
             discord_status_line: 0,
@@ -1340,6 +1353,8 @@ impl Default for Settings {
             float_hide_bar: false,
             views_width: 316.0,
             views_height: 0.0,
+            vis_panel_w: 0.0,
+            vis_panel_h: 0.0,
             mini_window: None,
             extra_window: None,
             mini_restore_size: None,

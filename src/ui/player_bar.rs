@@ -1358,8 +1358,14 @@ pub(super) fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
         (false, Some(x)) => x - 180.0,
         _ => screen.right() - (screen.width() * 0.5).min(560.0) - 14.0,
     };
+    let want_w = app.settings.vis_panel_w;
+    let want_h = app.settings.vis_panel_h;
+    let fixed_w = want_w > 0.0;
+    let fixed_h = want_h > 0.0;
+    let panel_w = want_w.clamp(260.0, (screen.width() - 16.0).max(260.0));
+    let panel_h = want_h.clamp(160.0, max_h);
     panel = panel
-        .resizable([true, false])
+        .resizable(false)
         .default_width(if floating { (screen.width() * 0.4).clamp(300.0, 460.0) } else { 360.0 })
         .min_width(260.0)
         .movable(true)
@@ -1371,14 +1377,62 @@ pub(super) fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
             } else {
                 (screen_h - above - 440.0).max(screen.top() + 8.0)
             },
-        ))
-        .max_size(vec2(900.0, max_h));
+        ));
+    if fixed_w {
+        panel = panel.min_width(panel_w).max_width(panel_w);
+    } else {
+        panel = panel.max_width(900.0);
+    }
     let window = panel.show(ctx, |ui| {
-        egui::ScrollArea::vertical()
-            .auto_shrink([false, true])
-            .max_height(max_h - 24.0)
-            .show(ui, |ui| vis_menu_body(app, ui));
+        let mut area = egui::ScrollArea::both().auto_shrink([!fixed_w, !fixed_h]);
+        area = area.max_height(if fixed_h { panel_h } else { max_h - 24.0 });
+        if fixed_h {
+            area = area.min_scrolled_height(panel_h);
+        }
+        area.show(ui, |ui| vis_menu_body(app, ui));
     });
+    if let Some(window) = &window {
+        // Grips on the right edge, the bottom edge and the corner.
+        let rect = window.response.rect;
+        let grip = |name: &str, pos: egui::Pos2, size: egui::Vec2, cursor: egui::CursorIcon| {
+            egui::Area::new(egui::Id::new(name))
+                .order(egui::Order::Foreground)
+                .fixed_pos(pos)
+                .show(ctx, |ui| {
+                    let (strip, response) = ui.allocate_exact_size(size, egui::Sense::drag());
+                    if response.hovered() || response.dragged() {
+                        ctx.set_cursor_icon(cursor);
+                        ui.painter().rect_filled(
+                            egui::Rect::from_center_size(strip.center(), if size.x > size.y { egui::vec2(28.0, 3.0) } else { egui::vec2(3.0, 28.0) }),
+                            1.5,
+                            Color32::from_white_alpha(90),
+                        );
+                    }
+                    response
+                })
+                .inner
+        };
+        let right = grip("vis-panel-edge-r", egui::pos2(rect.right() - 6.0, rect.top() + 10.0), egui::vec2(10.0, (rect.height() - 30.0).max(10.0)), egui::CursorIcon::ResizeHorizontal);
+        let bottom = grip("vis-panel-edge-b", egui::pos2(rect.left() + 10.0, rect.bottom() - 6.0), egui::vec2((rect.width() - 30.0).max(10.0), 10.0), egui::CursorIcon::ResizeVertical);
+        let corner = grip("vis-panel-edge-c", egui::pos2(rect.right() - 16.0, rect.bottom() - 16.0), egui::vec2(20.0, 20.0), egui::CursorIcon::ResizeNwSe);
+        let mut dx = 0.0;
+        let mut dy = 0.0;
+        if right.dragged() { dx += right.drag_delta().x; }
+        if bottom.dragged() { dy += bottom.drag_delta().y; }
+        if corner.dragged() { dx += corner.drag_delta().x; dy += corner.drag_delta().y; }
+        if dx != 0.0 || dy != 0.0 {
+            let w = if fixed_w { want_w } else { rect.width() };
+            let h = if fixed_h { want_h } else { rect.height() };
+            app.settings.vis_panel_w = (w + dx).clamp(260.0, (screen.width() - 16.0).max(260.0));
+            app.settings.vis_panel_h = (h + dy).clamp(160.0, max_h);
+            app.mark_settings_dirty();
+        }
+        if right.double_clicked() || bottom.double_clicked() || corner.double_clicked() {
+            app.settings.vis_panel_w = 0.0;
+            app.settings.vis_panel_h = 0.0;
+            app.mark_settings_dirty();
+        }
+    }
     // A click anywhere outside the panel closes it. (A right-click on the
     // visualizer toggles it, so only the primary button counts here.)
     crate::crash::stage("visualizer panel: close check");
@@ -2174,6 +2228,18 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             {
                 app.actions.push(Action::ToggleVisTextSway);
             }
+            if chip(
+                ui,
+                &palette,
+                "Art border",
+                app.settings.vis_art_border,
+                ui.available_width().min(290.0),
+            )
+            .clicked()
+            {
+                app.settings.vis_art_border = !app.settings.vis_art_border;
+                app.mark_settings_dirty();
+            }
             {
                 let presets = crate::settings::Settings::SWAY_PRESETS;
                 let names: Vec<&str> = presets.iter().map(|preset| preset.name).collect();
@@ -2314,6 +2380,24 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 for (value, label) in [(0u8, "Left"), (2, "Right"), (4, "Focus on the current line")] {
                     if chip(ui, &palette, label, current == value, ui.available_width().min(290.0)).clicked() {
                         app.actions.push(Action::SetLyricsAlign(value));
+                    }
+                }
+            }
+            if app.extra_vis {
+                ui.add_space(6.0);
+                theme::subtle(ui, &palette, "NEW WINDOW LYRICS");
+                for (label, on, which) in [
+                    ("Song name", app.settings.extra_show_title, 0u8),
+                    ("Artist", app.settings.extra_show_artist, 1),
+                    ("Heart", app.settings.extra_show_heart, 2),
+                ] {
+                    if chip(ui, &palette, label, on, ui.available_width().min(290.0)).clicked() {
+                        match which {
+                            0 => app.settings.extra_show_title = !on,
+                            1 => app.settings.extra_show_artist = !on,
+                            _ => app.settings.extra_show_heart = !on,
+                        }
+                        app.mark_settings_dirty();
                     }
                 }
             }
@@ -3407,6 +3491,14 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
         Some(&loader),
     );
     big_art_missing_mark(app, ui, cover, "fullscreen-vis");
+    if app.settings.vis_art_border {
+        painter.rect_stroke(
+            cover.expand(1.5),
+            3.0,
+            egui::Stroke::new(2.0, Color32::from_white_alpha(120)),
+            egui::StrokeKind::Middle,
+        );
+    }
     // The words keep to the card's resting size.
     let cover = resting;
     let ink = if app.swirl_art_is_light() {
@@ -3616,15 +3708,15 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
             let left = line_left(width);
             let y = top + row as f32 * line_h;
             strips.push(Rect::from_min_max(
-                pos2(left - pad, y - 2.0),
-                pos2(left + width + pad, y + line_h + 4.0),
+                pos2(left - pad, y),
+                pos2(left + width + pad, y + line_h),
             ));
         }
         if let Some(artist) = artist.as_ref() {
             let left = line_left(artist.size().x);
             strips.push(Rect::from_min_max(
-                pos2(left - pad, artist_top - 4.0),
-                pos2(left + artist.size().x + pad, artist_top + artist.size().y + 4.0),
+                pos2(left - pad, artist_top),
+                pos2(left + artist.size().x + pad, artist_top + artist.size().y),
             ));
         }
         if app.settings.vis_back_block {

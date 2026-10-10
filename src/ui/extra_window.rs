@@ -86,6 +86,41 @@ pub fn show(app: &mut App, ctx: &Context) {
             if had.is_none() {
                 app.lyrics_fullscreen = None;
             }
+            // The song, the artist and the heart, in a corner of the page.
+            if let Some(song) = now.as_ref() {
+                let (title_on, artist_on, heart_on) = (
+                    app.settings.extra_show_title,
+                    app.settings.extra_show_artist && !song.subtitle.is_empty(),
+                    app.settings.extra_show_heart && !song.uri.is_empty(),
+                );
+                if title_on || artist_on || heart_on {
+                    let painter = ui.painter().clone();
+                    let mut y = rect.bottom() - 28.0;
+                    let left = rect.left() + 28.0;
+                    let mut width = 0.0_f32;
+                    if artist_on {
+                        let g = painter.layout_no_wrap(song.subtitle.clone(), theme::regular(14.0), Color32::from_white_alpha(190));
+                        y -= g.size().y;
+                        width = width.max(g.size().x);
+                        painter.rect_filled(egui::Rect::from_min_size(pos2(left - 8.0, y - 2.0), g.size() + egui::vec2(16.0, 4.0)), 6.0, Color32::from_black_alpha(120));
+                        painter.galley(pos2(left, y), g, Color32::WHITE);
+                        y -= 4.0;
+                    }
+                    let mut title_top = y;
+                    if title_on {
+                        let g = painter.layout_no_wrap(song.title.clone(), theme::semibold(20.0), Color32::WHITE);
+                        y -= g.size().y;
+                        title_top = y;
+                        width = width.max(g.size().x);
+                        painter.rect_filled(egui::Rect::from_min_size(pos2(left - 8.0, y - 2.0), g.size() + egui::vec2(16.0, 4.0)), 6.0, Color32::from_black_alpha(120));
+                        painter.galley(pos2(left, y), g, Color32::WHITE);
+                    }
+                    if heart_on {
+                        let centre = pos2(left + width + 34.0, (title_top + rect.bottom() - 28.0) / 2.0);
+                        super::player_bar::like_heart(app, ui, "extra-window", centre, 22.0, &song.uri);
+                    }
+                }
+            }
         } else {
             egui::CentralPanel::default()
                 .frame(Frame::new().fill(Color32::BLACK))

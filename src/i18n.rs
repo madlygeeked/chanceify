@@ -11,7 +11,7 @@ use fastframe_i18n::Locale as CatalogLocale;
 const KEEP_CAPITALS: &[&str] = &[
     "Spotify", "Spotifast", "Spicetify", "Last.fm", "Discord", "MusicBrainz", "Windows", "Linux", "macOS",
     "GitHub", "Wi-Fi", "Bluetooth", "Chromecast", "AirPlay", "YouTube", "Cloudflare",
-    "Ctrl", "Shift", "Alt", "Enter", "Esc", "Escape", "Backspace", "Tab", "Cmd", "Premium", "BPM", "EQ", "ID",
+    "Ctrl", "Shift", "Alt", "Enter", "Esc", "Escape", "Backspace", "Tab", "Cmd", "Premium", "EQ", "ID",
     "URL", "API", "HTTP", "HTTPS", "SOCKS5", "MP3", "FLAC", "OGG", "WAV", "AAC", "USB", "UI", "PNG", "JPG",
     "JPEG", "GIF", "JSON", "DJ", "OK", "MB", "GB", "kHz", "Hz", "dB", "FPS", "GPU", "CPU", "DNS", "VPN",
     "OAuth", "PKCE", "DPI", "MIDI", "CD", "TV", "PC", "SSL", "TLS", "LAN", "HDR", "RGB", "AM", "PM",
