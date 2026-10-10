@@ -47,13 +47,8 @@ needs spotify premium.
 
 **does it download songs?** nope. it streams using [librespot](https://github.com/librespot-org/librespot).
 
-**does it collect data?** nope.
+**does it collect data?** nope. [privacy policy](https://github.com/madlygeeked/chanceify/blob/main/PRIVACY.md).
 
-**where is everything saved?** in the folder beside `chanceify.exe`. delete that folder to remove every trace.
-
-- `index/settings`: settings, themes, shortcuts
-- `index/stats.json`: listening stats
-- `index/lastfm-art`: cover images from last.fm
-- `index/recaps`: weekly recap pictures
+**where is everything saved?** in the folder beside `chanceify.exe`. delete it to remove everything.
 
 **something broke?** [issues](https://github.com/madlygeeked/chanceify/issues).
