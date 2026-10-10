@@ -1823,12 +1823,14 @@ pub(crate) fn column_slots(
     end: f32,
     order: [u8; 6],
     laid: &Columns,
+    number: Option<(usize, f32)>,
+    length: Option<(usize, f32)>,
 ) -> Vec<(crate::model::SortColumn, f32, f32)> {
     use crate::model::SortColumn as Sc;
     let others = laid.playlists + laid.album + laid.added + laid.release + laid.bpm;
-    let title = (end - start - others).max(0.0);
-    let mut x = start;
-    let mut out = Vec::new();
+    let extra = number.map_or(0.0, |(_, w)| w) + length.map_or(0.0, |(_, w)| w);
+    let title = (end - start - others - extra).max(0.0);
+    let mut cells: Vec<(Sc, f32)> = Vec::new();
     for code in order {
         let (column, width) = match code {
             0 => (Sc::Title, title),
@@ -1839,9 +1841,21 @@ pub(crate) fn column_slots(
             _ => (Sc::Bpm, laid.bpm),
         };
         if width > 0.0 || column == Sc::Title {
-            out.push((column, x, width));
-            x += width;
+            cells.push((column, width));
         }
+    }
+    // The length first, then the # (whose place counts the length).
+    if let Some((at, width)) = length {
+        cells.insert(at.min(cells.len()), (Sc::Duration, width));
+    }
+    if let Some((at, width)) = number {
+        cells.insert(at.min(cells.len()), (Sc::Index, width));
+    }
+    let mut x = start;
+    let mut out = Vec::new();
+    for (column, width) in cells {
+        out.push((column, x, width));
+        x += width;
     }
     out
 }
@@ -2065,6 +2079,17 @@ fn track_row_contents(
     } else if bare && row.compact && cols.number == 0.0 && row.number.is_some() {
         cols.number = 30.0;
     }
+    // The # and the length can be dragged in among the other columns; then
+    // they are drawn at their place there, not at the row's ends.
+    let tcols = app.settings.track_columns;
+    let number_w = cols.number;
+    let length_w = cols.duration;
+    let number_embedded = if bare || cols.number <= 0.0 { None } else { tcols.number_at.map(usize::from) };
+    let length_embedded = if bare || !row.show_time || cols.duration <= 0.0 { None } else { tcols.length_at.map(usize::from) };
+    if number_embedded.is_some() {
+        cols.number = 0.0;
+    }
+    let embedded_w = number_embedded.map_or(0.0, |_| number_w) + length_embedded.map_or(0.0, |_| length_w);
     let painter = ui.painter().clone();
     // A faint vertical rule at the left edge of each optional column.
     let rule = |at: f32| {
@@ -2077,17 +2102,17 @@ fn track_row_contents(
     // The song name alone in a wide list sits in the middle, and the number
     // and cover go with it, so the cover stays next to the name.
     let lone_shift = {
-        let others = cols.playlists + cols.album + cols.added + cols.release + cols.bpm;
-        let right_fixed = cols.heart + if row.show_time { cols.duration } else { 0.0 } + cols.more + 8.0;
+        let others = cols.playlists + cols.album + cols.added + cols.release + cols.bpm + embedded_w;
+        let right_fixed = cols.heart + if row.show_time && length_embedded.is_none() { cols.duration } else { 0.0 } + cols.more + 8.0;
         let region = rect.right() - right_fixed - (rect.left() + 8.0 + cols.number + cols.cover);
         if bare { 0.0 } else { centred_shift(region, others, &app.settings.track_columns) }
     };
     let mut x = rect.left() + 8.0 + lone_shift;
 
     // Number / play.
-    if cols.number > 0.0 {
-        let cell = Rect::from_min_size(pos2(x, rect.top()), vec2(cols.number, row_height));
-        if app.play_pending(row.item.uri()) {
+    let pending = app.play_pending(row.item.uri());
+    let draw_number = |ui: &mut Ui, cell: Rect| {
+        if pending {
             let mut child = ui.new_child(
                 UiBuilder::new()
                     .max_rect(cell)
@@ -2110,7 +2135,7 @@ fn track_row_contents(
                 palette.secondary
             };
             let label = row.number.unwrap_or(row.index + 1).to_string();
-            painter.text(
+            ui.painter().text(
                 cell.center(),
                 egui::Align2::CENTER_CENTER,
                 label,
@@ -2118,6 +2143,12 @@ fn track_row_contents(
                 color,
             );
         }
+    };
+    let mut number_cell: Option<Rect> = None;
+    if cols.number > 0.0 {
+        let cell = Rect::from_min_size(pos2(x, rect.top()), vec2(cols.number, row_height));
+        draw_number(ui, cell);
+        number_cell = Some(cell);
         x += cols.number;
     }
     // Cover.
@@ -2173,8 +2204,10 @@ fn track_row_contents(
         }
         x += cols.cover;
     }
-    let right_fixed =
-        cols.heart + if row.show_time { cols.duration } else { 0.0 } + cols.more + 8.0;
+    let right_fixed = cols.heart
+        + if row.show_time && length_embedded.is_none() { cols.duration } else { 0.0 }
+        + cols.more
+        + 8.0;
     // "3 min ago" and the like, when there is no date column to hold them:
     // a column of their own, at the same spot on every row, instead of
     // trailing after each artist name wherever that happens to end.
@@ -2189,9 +2222,35 @@ fn track_row_contents(
     // centred block, so they sit right after the last column, not at the edge.
     let region_right = rect.right() - right_fixed - lone_shift;
     if app.settings.track_columns.spread && !bare {
-        spread_columns(&mut cols, region_right - x);
+        spread_columns(&mut cols, region_right - x - embedded_w);
     }
-    let slots = column_slots(x, region_right, app.settings.track_columns.order(), &cols);
+    let slots = column_slots(
+        x,
+        region_right,
+        app.settings.track_columns.order(),
+        &cols,
+        number_embedded.map(|at| (at, number_w)),
+        length_embedded.map(|at| (at, length_w)),
+    );
+    for (column, at, width) in &slots {
+        match column {
+            crate::model::SortColumn::Index => {
+                let cell = Rect::from_min_size(pos2(*at, rect.top()), vec2(*width, row_height));
+                draw_number(ui, cell);
+                number_cell = Some(cell);
+            }
+            crate::model::SortColumn::Duration => {
+                painter.text(
+                    pos2(at + width - 6.0, rect.center().y),
+                    egui::Align2::RIGHT_CENTER,
+                    util::format_duration_ms(row.item.duration_ms()),
+                    theme::regular(13.0),
+                    palette.secondary,
+                );
+            }
+            _ => {}
+        }
+    }
     let slot_at = |column: crate::model::SortColumn| {
         slots.iter().find(|(c, _, _)| *c == column).map(|(_, at, _)| *at)
     };
@@ -2691,7 +2750,7 @@ fn track_row_contents(
 
     // Duration. Off in the queue panel when the reader has traded it for the
     // song name, which is what that panel is for.
-    if row.show_time && cols.duration > 0.0 {
+    if row.show_time && cols.duration > 0.0 && length_embedded.is_none() {
         let duration_rect =
             Rect::from_min_size(pos2(x, rect.top()), vec2(cols.duration, row_height));
         painter.text(
@@ -2773,6 +2832,8 @@ fn track_row_contents(
             response
                 .interact_pointer_pos()
                 .is_some_and(|pos| control_rect.contains(pos))
+        }) || number_cell.is_some_and(|cell| {
+            response.interact_pointer_pos().is_some_and(|pos| cell.contains(pos))
         });
         if on_control && !unavailable {
             if is_current {
@@ -3416,14 +3477,16 @@ pub fn table_header(
     // A heading dragged sideways and let go: which one, and where the pointer was.
     let mut dropped: Option<(SortColumn, f32)> = None;
     let mut heading =
-        |ui: &mut Ui, x: f32, text: &str, column: SortColumn, room: f32, anchors: &mut Vec<egui::Response>| {
-            let active = sort.and_then(|sort| sort.direction(column));
+        |ui: &mut Ui, x: f32, text: &str, column: SortColumn, room: f32, glyph: Option<Icon>, lit: Option<bool>, anchors: &mut Vec<egui::Response>| {
+            let active = sort.and_then(|sort| sort.direction(column)).or(lit);
             let arrow_room = if active.is_some() { 13.0 } else { 0.0 };
             // In a squeezed column the heading shrinks to fit, then is cut
             // with an ellipsis, instead of running into the next one.
             let avail = (room - 12.0 - arrow_room).max(12.0);
-            let galley = fitted_galley(ui.painter(), text, &font, 8.0, avail, egui::Color32::PLACEHOLDER);
-            let size = galley.size();
+            let galley = glyph
+                .is_none()
+                .then(|| fitted_galley(ui.painter(), text, &font, 8.0, avail, egui::Color32::PLACEHOLDER));
+            let size = galley.as_ref().map_or(vec2(15.0, 15.0), |galley| galley.size());
             let top_left = pos2(x, rect.center().y - size.y / 2.0);
             let head =
                 Rect::from_min_size(top_left, size + vec2(arrow_room, 0.0)).expand2(vec2(4.0, 8.0));
@@ -3460,7 +3523,15 @@ pub fn table_header(
             } else {
                 color
             };
-            ui.painter().galley(top_left, galley, color);
+            match (galley, glyph) {
+                (Some(galley), _) => {
+                    ui.painter().galley(top_left, galley, color);
+                }
+                (None, Some(icon)) => {
+                    icon.image(color, 15.0).paint_at(ui, Rect::from_min_size(top_left, size));
+                }
+                (None, None) => {}
+            }
             if let Some(ascending) = active {
                 // Drawn, not typed: an arrow glyph relies on the loaded fonts
                 // and rendered as a hollow box on some machines.
@@ -3499,85 +3570,58 @@ pub fn table_header(
         &widths,
         false,
     );
-    let right_fixed = columns.buttons_width() + if columns.hide_duration { 0.0 } else { 56.0 } + 8.0;
+    // The # and the length can be dragged in among the other columns.
+    let show_number = !columns.hide_number && !grid;
+    let show_length = !columns.hide_duration;
+    let number_embedded = if show_number { columns.number_at.map(usize::from) } else { None };
+    let length_embedded = if show_length { columns.length_at.map(usize::from) } else { None };
+    let embedded_w = number_embedded.map_or(0.0, |_| 44.0) + length_embedded.map_or(0.0, |_| 56.0);
+    let right_fixed = columns.buttons_width() + if show_length && length_embedded.is_none() { 56.0 } else { 0.0 } + 8.0;
     // Unless it is locked to the left, the whole table sits in the middle:
     // the number, cover, song name and columns move together and grow out
     // from the centre as columns are added.
-    let prefix = if !columns.hide_number && !grid { 44.0 } else { 0.0 } + if show_cover { 52.0 } else { 0.0 };
+    let prefix = if show_number && number_embedded.is_none() { 44.0 } else { 0.0 } + if show_cover { 52.0 } else { 0.0 };
     let shift = centred_shift(
         rect.right() - right_fixed - (rect.left() + 8.0 + prefix),
-        laid.playlists + laid.album + laid.added + laid.release + laid.bpm,
+        laid.playlists + laid.album + laid.added + laid.release + laid.bpm + embedded_w,
         columns,
     );
-    let mut number_clicked = false;
     let mut x = rect.left() + 8.0 + shift;
-    // In the grid the songs carry their numbers on their covers, so there
-    // is no # heading.
-    let show_number = !columns.hide_number && !grid;
-    if show_number {
-        let number = Rect::from_center_size(pos2(x + 22.0, rect.center().y), vec2(30.0, 22.0));
-        // With no sort chosen the list already plays its own order, and
-        // the # says so: lit, arrow pointing down the list.
-        let natural = sort.is_none_or(|sort| sort.is_empty());
-        let active = sort.and_then(|sort| sort.direction(SortColumn::Index));
-        let response = ui.interact(number, ui.id().with("table-header-number"), Sense::click());
-        response.widget_info(|| {
-            egui::WidgetInfo::labeled(
-                egui::WidgetType::Button,
-                ui.is_enabled(),
-                gettext(locale, "Sort by playlist order"),
-            )
-        });
-        theme::focus_ring(ui, &response);
-        let number_color = if natural || active.is_some() {
-            palette.accent
-        } else if response.hovered() {
-            palette.text
-        } else {
-            color
-        };
-        ui.painter().text(
-            number.center(),
-            egui::Align2::CENTER_CENTER,
-            "#",
-            font.clone(),
-            number_color,
-        );
-        if let Some(ascending) = active.or(natural.then_some(true)) {
-            let center = pos2(number.center().x + 12.0, rect.center().y);
-            let (wing, tip) = if ascending { (2.8, -3.2) } else { (-2.8, 3.2) };
-            ui.painter().add(egui::Shape::convex_polygon(
-                vec![
-                    center + vec2(-4.0, wing),
-                    center + vec2(4.0, wing),
-                    center + vec2(0.0, tip),
-                ],
-                number_color,
-                egui::Stroke::NONE,
-            ));
-        }
-        let hover = response.on_hover_text(gettext(locale, "Original order, reversed"));
-        if hover.clicked() {
-            number_clicked = true;
-        }
-        anchors.push(hover);
-    }
-    if show_number {
+    // With no sort chosen the list already plays its own order, and the #
+    // says so: lit, arrow pointing down the list.
+    let natural = sort.is_none_or(|sort| sort.is_empty());
+    if show_number && number_embedded.is_none() {
+        heading(ui, x + 18.0, "#", SortColumn::Index, 44.0, None, natural.then_some(true), &mut anchors);
         x += 44.0;
     }
     if show_cover {
         x += 52.0;
     }
     if columns.spread {
-        spread_columns(&mut laid, rect.right() - right_fixed - x);
+        spread_columns(&mut laid, rect.right() - right_fixed - x - embedded_w);
     }
     // The headings must be drawn in exactly the order `track_row` draws the
     // cells (both use `column_slots`), or every heading sits over the wrong data.
-    let slots = column_slots(x, rect.right() - right_fixed - shift, columns.order(), &laid);
+    let slots = column_slots(
+        x,
+        rect.right() - right_fixed - shift,
+        columns.order(),
+        &laid,
+        number_embedded.map(|at| (at, 44.0)),
+        length_embedded.map(|at| (at, 56.0)),
+    );
     let title_at = slots.iter().position(|(c, _, _)| *c == SortColumn::Title);
     // (edge, column, whether dragging right makes the column wider)
     let mut edges: Vec<(f32, SortColumn, bool)> = Vec::new();
     for (index, (column, at, room)) in slots.iter().enumerate() {
+        if *column == SortColumn::Index {
+            heading(ui, at + 18.0, "#", SortColumn::Index, *room, None, natural.then_some(true), &mut anchors);
+            continue;
+        }
+        if *column == SortColumn::Duration {
+            heading(ui, at + room - 21.0, "length", SortColumn::Duration, *room, Some(Icon::Clock), None, &mut anchors);
+            continue;
+        }
         let label = match column {
             SortColumn::Title => pgettext(locale, "column heading", "TITLE"),
             SortColumn::Playlists => pgettext(locale, "column heading", "PLAYLISTS"),
@@ -3587,7 +3631,7 @@ pub fn table_header(
             _ => pgettext(locale, "column heading", "BPM"),
         };
         let room = if *column == SortColumn::Title { f32::INFINITY } else { *room };
-        heading(ui, *at, &label, *column, room, &mut anchors);
+        heading(ui, *at, &label, *column, room, None, None, &mut anchors);
         if *column != SortColumn::Title {
             // The title gives way to its neighbours: a column after it is
             // resized from its left edge, one before it from its right edge.
@@ -3597,62 +3641,35 @@ pub fn table_header(
             }
         }
     }
+    if show_length && length_embedded.is_none() {
+        heading(ui, rect.right() - shift - 34.0 - 7.5, "length", SortColumn::Duration, 56.0, Some(Icon::Clock), None, &mut anchors);
+    }
     if let Some((column, at)) = dropped {
-        let shown: Vec<SortColumn> = slots.iter().map(|(c, _, _)| *c).collect();
-        let target = slots
-            .iter()
-            .filter(|(c, x, w)| *c != column && x + w / 2.0 < at)
-            .count();
-        widths.move_column(column, &shown, target);
-    }
-    if number_clicked {
-        clicked = Some(SortColumn::Index);
-    }
-    if !columns.hide_duration {
-    let clock = Rect::from_center_size(
-        pos2(rect.right() - shift - 56.0 / 2.0 - 6.0, rect.center().y),
-        Vec2::splat(15.0),
-    );
-    let duration_active = sort.and_then(|sort| sort.direction(SortColumn::Duration));
-    let response = ui.interact(
-        clock.expand(8.0),
-        ui.id().with("table-header-duration"),
-        Sense::click(),
-    );
-    response.widget_info(|| {
-        egui::WidgetInfo::labeled(
-            egui::WidgetType::Button,
-            ui.is_enabled(),
-            gettext(locale, "Sort by duration"),
-        )
-    });
-    theme::focus_ring(ui, &response);
-    let clock_color = if duration_active.is_some() {
-        palette.accent
-    } else if response.hovered() {
-        palette.text
-    } else {
-        color
-    };
-    Icon::Clock.image(clock_color, 15.0).paint_at(ui, clock);
-    if let Some(ascending) = duration_active {
-        let center = pos2(clock.right() + 9.0, rect.center().y);
-        let (wing, tip) = if ascending { (2.8, -3.2) } else { (-2.8, 3.2) };
-        ui.painter().add(egui::Shape::convex_polygon(
-            vec![
-                center + vec2(-4.0, wing),
-                center + vec2(4.0, wing),
-                center + vec2(0.0, tip),
-            ],
-            clock_color,
-            egui::Stroke::NONE,
-        ));
-    }
-    let hover = response.on_hover_text(gettext(locale, "Sort by duration"));
-    if hover.clicked() {
-        clicked = Some(SortColumn::Duration);
-    }
-    anchors.push(hover);
+        let before = |x: f32, w: f32| x + w / 2.0 < at;
+        match column {
+            SortColumn::Index => {
+                let places = slots.iter().filter(|(c, x, w)| *c != SortColumn::Index && before(*x, *w)).count();
+                widths.number_at = (places > 0).then_some(places.min(250) as u8);
+            }
+            SortColumn::Duration => {
+                let others: Vec<_> = slots
+                    .iter()
+                    .filter(|(c, _, _)| *c != SortColumn::Duration && *c != SortColumn::Index)
+                    .collect();
+                let places = others.iter().filter(|(_, x, w)| before(*x, *w)).count();
+                widths.length_at = (places < others.len()).then_some(places.min(250) as u8);
+            }
+            _ => {
+                let shown: Vec<SortColumn> = slots.iter().map(|(c, _, _)| *c).collect();
+                let target = slots
+                    .iter()
+                    .filter(|(c, x, w)| {
+                        *c != column && crate::settings::TrackColumns::code(*c).is_some() && before(*x, *w)
+                    })
+                    .count();
+                widths.move_column(column, &shown, target);
+            }
+        }
     }
     // Drawn after the headings, so a handle sits over the column edge
     // rather than under its text. A right-click on a handle opens the same

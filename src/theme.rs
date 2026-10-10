@@ -581,6 +581,8 @@ fastframe_icons::icons! {
         Info => lucide "info",
         Laptop => "laptop",
         Library => "library",
+        Grid3x3 => "grid-3x3",
+        Menu => "menu",
         LayoutGrid => "layout-grid",
         LayoutList => "layout-list",
         ListEnd => "list-end",

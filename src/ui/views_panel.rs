@@ -202,6 +202,10 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
     let Some([x, y, width]) = app.float_slot(default_float(ctx)) else {
         return;
     };
+    if app.settings.float_detached && !app.calm_mode && !app.mini_active {
+        detached_controls(app, ctx);
+        return;
+    }
     if app.fullscreen_vis || app.calm_mode || app.mini_active {
         return;
     }
@@ -393,25 +397,32 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                     ui.ctx().set_cursor_icon(cursor);
                 }
             }
-            // Never so wide that the song bar runs the whole screen.
-            let max_w = (screen.width() - 16.0).clamp(300.0, 640.0);
+            // Wider and taller are one thing: the panel only scales, between
+            // the smallest and the biggest it can be, so it is never long
+            // and thin.
             let grow_right = right_response.drag_delta().x + corner_right_response.drag_delta().x;
             let grow_left = -(left_response.drag_delta().x + corner_left_response.drag_delta().x);
             let grow_down = bottom_response.drag_delta().y
                 + corner_right_response.drag_delta().y
                 + corner_left_response.drag_delta().y;
-            if grow_right != 0.0 || grow_left != 0.0 {
-                let wider = (width + grow_right + grow_left).clamp(300.0, max_w);
-                let x = (top_left.x + width - wider).max(screen.left());
-                let x = if grow_left != 0.0 { x } else { top_left.x.min((screen.right() - wider).max(screen.left())) };
-                change = Some(Some([x, top_left.y, wider]));
-            }
-            if grow_down != 0.0 {
-                // Height is the controls' size: dragging down makes them bigger.
-                let scale = (app.settings.controls_scale_value() + grow_down / 56.0).clamp(0.7, 1.8);
+            let steps = (grow_right + grow_left) / 232.0 + grow_down / 56.0;
+            if steps != 0.0 {
+                let before = app.settings.controls_scale_value();
+                let scale = (before + steps).clamp(0.7, 1.8);
                 app.actions.push(Action::SetControlsScale(scale));
+                if grow_left != 0.0 {
+                    // The far edge stays where it is.
+                    let wider = super::lyrics::controls_width_for(scale);
+                    let x = (top_left.x + width - wider).max(screen.left());
+                    change = Some(Some([x, top_left.y, wider]));
+                }
             }
             grip_response.context_menu(|ui| {
+                if ui.button("Move out of the window").clicked() {
+                    app.settings.float_detached = true;
+                    app.mark_settings_dirty();
+                    ui.close();
+                }
                 if ui.button("Snap to the library sidebar").clicked() {
                     let side = app.settings.sidebar_width.clamp(300.0, 460.0);
                     change = Some(Some([
@@ -429,6 +440,87 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
         });
     if let Some(place) = change {
         app.actions.push(Action::SetFloatControls(place));
+    }
+}
+
+/// The controls in a window of their own: it can be dragged anywhere on any
+/// screen, off the app. It keeps its place between launches, stays on top,
+/// and scales as the panel does.
+fn detached_controls(app: &mut App, ctx: &Context) {
+    use egui::{ViewportBuilder, ViewportClass, ViewportCommand, ViewportId};
+    let id = ViewportId::from_hash_of("chanceify-pop-out-controls");
+    let width = super::lyrics::controls_width(app, 0.0);
+    let height = super::lyrics::controls_height(app);
+    let saved = app.settings.float_window;
+    let mut builder = ViewportBuilder::default()
+        .with_title("chanceify controls")
+        .with_decorations(false)
+        .with_resizable(false)
+        .with_always_on_top()
+        .with_inner_size([width, height]);
+    if let Some(at) = saved
+        && at[0] > -20000.0
+        && at[1] > -20000.0
+    {
+        builder = builder.with_position(at);
+    }
+    let mut put_back = false;
+    let mut place: Option<[f32; 2]> = None;
+    ctx.show_viewport_immediate(id, builder, |ui, class| {
+        let ctx = ui.ctx().clone();
+        if class != ViewportClass::Immediate && class != ViewportClass::Root {
+            put_back = true;
+            return;
+        }
+        if ctx.input(|input| input.viewport().close_requested()) {
+            put_back = true;
+            return;
+        }
+        // The window is exactly the panel, whatever size it has been scaled to.
+        let size = ctx.content_rect().size();
+        if (size.x - width).abs() > 1.0 || (size.y - height).abs() > 1.0 {
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(egui::vec2(width, height)));
+        }
+        egui::CentralPanel::default()
+            .frame(Frame::new().fill(app.palette.window))
+            .show(ui, |ui| {
+                let body = Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(width, height));
+                let grip = ui.interact(body, Id::new("detached-grip"), egui::Sense::click_and_drag());
+                if grip.drag_started() {
+                    ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+                }
+                let _ = super::lyrics::controls_box_inner(app, ui, egui::pos2(0.0, 0.0), width, false);
+                // Scaling: the bottom-right corner, like the one in the app.
+                let corner = Rect::from_min_size(body.max - egui::vec2(18.0, 18.0), egui::vec2(18.0, 18.0));
+                let handle = ui.interact(corner, Id::new("detached-corner"), egui::Sense::drag());
+                if handle.hovered() || handle.dragged() {
+                    ctx.set_cursor_icon(egui::CursorIcon::ResizeNwSe);
+                }
+                if handle.dragged() {
+                    let d = handle.drag_delta();
+                    let scale = (app.settings.controls_scale_value() + d.x / 232.0 + d.y / 56.0).clamp(0.7, 1.8);
+                    app.actions.push(Action::SetControlsScale(scale));
+                }
+                grip.context_menu(|ui| {
+                    if ui.button("Put back in the window").clicked() {
+                        put_back = true;
+                        ui.close();
+                    }
+                });
+            });
+        if let Some(outer) = ctx.input(|input| input.viewport().outer_rect) {
+            place = Some([outer.min.x, outer.min.y]);
+        }
+        ctx.request_repaint_after(std::time::Duration::from_millis(33));
+    });
+    if put_back {
+        app.settings.float_detached = false;
+        app.mark_settings_dirty();
+    } else if let Some(now) = place
+        && saved.is_none_or(|old| (old[0] - now[0]).abs() > 1.0 || (old[1] - now[1]).abs() > 1.0)
+    {
+        app.settings.float_window = Some(now);
+        app.mark_settings_dirty();
     }
 }
 
@@ -554,9 +646,9 @@ pub fn show(app: &mut App, ctx: &Context) {
                         ui.horizontal_wrapped(|ui| {
                             for (label, on, action) in chips {
                                 let icon = match label {
-                                    "Library" => Icon::LayoutGrid,
+                                    "Library" => Icon::Grid3x3,
                                     "Side lyrics" => Icon::LayoutList,
-                                    "Queue" => Icon::ListEnd,
+                                    "Queue" => Icon::Menu,
                                     "Big album art" | "Album art" => Icon::Square,
                                     "Visualizer" | "Visualizer behind" => Icon::AudioLines,
                                     "Visualizer settings" => Icon::Settings,

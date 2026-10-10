@@ -108,6 +108,14 @@ pub struct TrackColumns {
     /// 3 date added, 4 release date, 5 tempo. The title takes whatever room
     /// the others leave, wherever it is.
     pub order: [u8; 6],
+    /// Where the # column sits when it has been dragged off the left edge:
+    /// the number of places from the left, among the columns shown (the
+    /// length included). `None` keeps it first, before the cover.
+    pub number_at: Option<u8>,
+    /// Where the length column sits once dragged off the right edge: the
+    /// number of places from the left among the columns shown (the # not
+    /// counted). `None` keeps it at the right end.
+    pub length_at: Option<u8>,
     /// The columns share the width of the list between them instead of
     /// keeping the widths they were dragged to.
     pub spread: bool,
@@ -131,6 +139,8 @@ impl Default for TrackColumns {
             lock_left: false,
             grid: false,
             order: Self::DEFAULT_ORDER,
+            number_at: None,
+            length_at: None,
             spread: false,
         }
     }
@@ -942,6 +952,10 @@ pub struct Settings {
     pub float_controls: Option<[f32; 3]>,
     /// Where the controls panel sits while the album art is big, and in full-screen lyrics.
     pub float_hide_bar: bool,
+    /// The pop-out controls live in a window of their own, off the app.
+    pub float_detached: bool,
+    /// That window's place on the screen.
+    pub float_window: Option<[f32; 2]>,
     /// Width of the Views panel.
     pub views_width: f32,
     /// Height of the Views panel (0 = fit the content).
@@ -1353,6 +1367,8 @@ impl Default for Settings {
             float_hide_bar: false,
             views_width: 316.0,
             views_height: 0.0,
+            float_detached: false,
+            float_window: None,
             vis_panel_w: 0.0,
             vis_panel_h: 0.0,
             mini_window: None,

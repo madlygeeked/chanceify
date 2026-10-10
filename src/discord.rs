@@ -372,6 +372,21 @@ pub fn song_link(uri: &str, title: &str, artist: &str) -> Option<String> {
 /// for the Settings page (empty when all is well).
 static LAST_ERROR: Mutex<String> = Mutex::new(String::new());
 
+static LOG_FILE: Mutex<Option<std::path::PathBuf>> = Mutex::new(None);
+
+/// Where to write what was last sent and what Discord answered, so a card
+/// that looks wrong can be checked against the facts.
+pub fn set_log_file(path: std::path::PathBuf) {
+    *LOG_FILE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(path);
+}
+
+fn write_log(text: &str) {
+    let path = LOG_FILE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone();
+    if let Some(path) = path {
+        let _ = std::fs::write(path, text);
+    }
+}
+
 fn note_error(text: String) {
     *LAST_ERROR.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = text;
 }
@@ -685,6 +700,11 @@ fn set_activity(
     let nonce = payload["nonce"].as_str().unwrap_or_default().to_string();
     let answer = read_answer(pipe, &nonce)?;
     let refused = answer.get("evt").and_then(Value::as_str) == Some("ERROR");
+    write_log(&format!(
+        "sent (plain: {plain}):\n{}\n\nDiscord answered:\n{}\n",
+        serde_json::to_string_pretty(&payload["args"]["activity"]).unwrap_or_default(),
+        serde_json::to_string_pretty(&answer).unwrap_or_default()
+    ));
     if refused {
         log::debug!("discord presence: refused: {answer}");
         note_error(format!("Discord refused the song: {}", answer.get("data").and_then(|d| d.get("message")).and_then(Value::as_str).unwrap_or("no reason given")));

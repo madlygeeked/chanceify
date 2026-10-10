@@ -1383,11 +1383,16 @@ fn controls_slim(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: 
 }
 
 /// How wide the pop-out controls panel is, for the width asked for.
-pub(super) fn controls_width(app: &App, width: f32) -> f32 {
-    let k = app.settings.controls_scale_value();
-    let kc = 1.0 + (k - 1.0) * 0.5;
-    // Wide enough for the buttons and, beside them, a volume bar that is never squeezed small.
-    width.max(218.0 * kc + 200.0).clamp(300.0, 640.0)
+pub(super) fn controls_width(app: &App, _width: f32) -> f32 {
+    controls_width_for(app.settings.controls_scale_value())
+}
+
+/// The panel's width follows its size: the smallest it goes is wide enough
+/// for the buttons and a volume bar, the biggest is 640, and nothing in
+/// between is wider or narrower than its height asks for.
+pub(super) fn controls_width_for(scale: f32) -> f32 {
+    let t = ((scale - 0.7) / 1.1).clamp(0.0, 1.0);
+    385.0 + t * (640.0 - 385.0)
 }
 
 /// How tall the pop-out controls panel is: buttons, song bar, volume.

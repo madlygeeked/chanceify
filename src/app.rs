@@ -12460,6 +12460,7 @@ impl App {
             return;
         }
         crate::discord::set_listen(self.settings.discord_listen_along);
+        crate::discord::set_log_file(self.dirs.index_dir().join("discord-last.txt"));
         self.poll_discord_join();
         // The swirl takes the colour the app has already worked out for the cover.
         let style = self.discord_style();
