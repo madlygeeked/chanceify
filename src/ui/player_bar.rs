@@ -5563,6 +5563,33 @@ fn bar_rows(app: &mut App, ui: &mut egui::Ui, palette: &crate::theme::Palette) {
     }
 }
 
+/// The volume buttons for the pop-out panel: click one to jump to it.
+pub(super) fn popout_presets(app: &mut App, ui: &mut egui::Ui, rect: Rect, presets: &[u8]) {
+    let palette = app.palette;
+    let now = app.now_playing();
+    let volume = now
+        .as_ref()
+        .map(|now| now.volume_percent)
+        .unwrap_or_else(|| crate::app::volume_to_percent(app.local.volume));
+    let shown = match app.volume_preview {
+        Some(fraction) => (fraction * 100.0).round() as u8,
+        None => volume,
+    };
+    let adjustable = now.as_ref().is_none_or(|now| now.can_set_volume);
+    let mut child = ui.new_child(
+        UiBuilder::new()
+            .max_rect(rect)
+            .layout(Layout::left_to_right(Align::Center)),
+    );
+    child.spacing_mut().item_spacing.x = 6.0;
+    for preset in presets {
+        if chip(&mut child, &palette, &format!("{preset}"), shown == *preset, 40.0).clicked() && adjustable {
+            app.volume_preview = None;
+            app.actions.push(Action::SetVolume(*preset));
+        }
+    }
+}
+
 fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, presets: &[u8]) {
     let palette = app.palette;
     ui.spacing_mut().item_spacing.x = 6.0;

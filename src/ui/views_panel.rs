@@ -336,20 +336,12 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                 );
                 ui.painter().galley(egui::pos2(text_left, y + title_h + 4.0), artist, Color32::WHITE);
             }
-            let grip = Rect::from_min_size(outer.min, egui::vec2(outer.width(), 12.0));
-            let dots = Rect::from_center_size(egui::pos2(grip.center().x, grip.center().y + 1.0), egui::vec2(22.0, 4.0));
-            for i in 0..3 {
-                ui.painter().circle_filled(
-                    egui::pos2(dots.left() + 3.0 + i as f32 * 8.0, dots.center().y),
-                    1.6,
-                    Color32::from_white_alpha(if grip_response.hovered() { 150 } else { 70 }),
-                );
-            }
             if grip_response.hovered() || grip_response.dragged() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
             }
-            if grip_response.dragged() || card_dragging {
-                let to = top_left + grip_response.drag_delta() + card_drag;
+            let bar_drag: egui::Vec2 = ui.ctx().data(|data| data.get_temp(Id::new("popout-bar-drag"))).unwrap_or(egui::Vec2::ZERO);
+            if grip_response.dragged() || card_dragging || bar_drag != egui::Vec2::ZERO {
+                let to = top_left + grip_response.drag_delta() + card_drag + bar_drag;
                 top_left = egui::pos2(
                     to.x.clamp(screen.left(), (screen.right() - width).max(screen.left())),
                     to.y.clamp(screen.top(), (screen.bottom() - outer.height()).max(screen.top())),
@@ -490,6 +482,11 @@ fn detached_controls(app: &mut App, ctx: &Context) {
                     ctx.send_viewport_cmd(ViewportCommand::StartDrag);
                 }
                 let _ = super::lyrics::controls_box_inner(app, ui, egui::pos2(0.0, 0.0), width, false);
+                // A press that begins on a bar drags the window too.
+                let bar_drag: egui::Vec2 = ctx.data(|data| data.get_temp(Id::new("popout-bar-drag"))).unwrap_or(egui::Vec2::ZERO);
+                if bar_drag != egui::Vec2::ZERO {
+                    ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+                }
                 // Scaling: the bottom-right corner, like the one in the app.
                 let corner = Rect::from_min_size(body.max - egui::vec2(18.0, 18.0), egui::vec2(18.0, 18.0));
                 let handle = ui.interact(corner, Id::new("detached-corner"), egui::Sense::drag());

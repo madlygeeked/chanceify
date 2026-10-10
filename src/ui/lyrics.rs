@@ -1399,7 +1399,8 @@ pub(super) fn controls_width_for(scale: f32) -> f32 {
 pub(super) fn controls_height(app: &App) -> f32 {
     let k = app.settings.controls_scale_value();
     let kc = 1.0 + (k - 1.0) * 0.5;
-    10.0 + 36.0 * kc + 4.0 + 26.0 * k + 10.0
+    let presets = if app.settings.volume_presets_value().is_empty() { 0.0 } else { 28.0 * kc };
+    10.0 + 36.0 * kc + 4.0 + 26.0 * k + presets + 10.0
 }
 
 pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egui::Pos2, width: f32, centred: bool) -> Option<Rect> {
@@ -1433,6 +1434,7 @@ pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egu
     );
     // The song-length bar always fills the panel, however wide it is made.
     ui.ctx().data_mut(|data| data.insert_temp(egui::Id::new("popout-full-seek"), true));
+    let before_seek = app.actions.len();
     super::player_bar::transport(
         app,
         ui,
@@ -1449,7 +1451,77 @@ pub(super) fn controls_box_inner(app: &mut App, ui: &mut egui::Ui, top_left: egu
         pos2(volume_left, buttons_row.center().y - volume_h / 2.0),
         pos2(outer.right() - 14.0, buttons_row.center().y + volume_h / 2.0),
     );
+    let before_volume = app.actions.len();
     super::player_bar::volume_row(app, ui, volume_row);
+    // The volume buttons, one row under the song bar.
+    let presets = app.settings.volume_presets_value();
+    if !presets.is_empty() {
+        let row = Rect::from_min_size(
+            pos2(outer.left() + 14.0, seek_row.bottom() + 2.0),
+            vec2(width - 28.0, 24.0 * kc),
+        );
+        super::player_bar::popout_presets(app, ui, row, &presets);
+    }
+    // The bars need a double-click before they answer: a single press on
+    // one only moves the panel, so a slip while dragging never seeks or
+    // changes the volume.
+    let ctx = ui.ctx().clone();
+    let bars = [seek_row.expand2(vec2(0.0, 4.0)), volume_row.expand2(vec2(6.0, 4.0))];
+    let armed_id = egui::Id::new("popout-bar-armed");
+    let (double, down, pos, origin, delta, t) = ctx.input(|input| {
+        (
+            input.pointer.button_double_clicked(egui::PointerButton::Primary),
+            input.pointer.primary_down(),
+            input.pointer.interact_pos(),
+            input.pointer.press_origin(),
+            input.pointer.delta(),
+            input.time,
+        )
+    });
+    let mut armed: Option<(usize, f64)> = ctx.data(|data| data.get_temp(armed_id));
+    if double
+        && let Some(p) = pos
+        && let Some(i) = bars.iter().position(|bar| bar.contains(p))
+    {
+        armed = Some((i, t));
+    }
+    if let Some((i, at)) = armed {
+        // Held while it is being used; otherwise it lapses after a few seconds.
+        let using = down && pos.is_some_and(|p| bars[i].contains(p));
+        if using {
+            armed = Some((i, t));
+        } else if t - at > 4.0 {
+            armed = None;
+        }
+    }
+    ctx.data_mut(|data| match armed {
+        Some(value) => data.insert_temp(armed_id, value),
+        None => data.remove::<(usize, f64)>(armed_id),
+    });
+    let mut bar_drag = egui::Vec2::ZERO;
+    for (i, bar) in bars.iter().enumerate() {
+        let touched = pos.is_some_and(|p| bar.contains(p)) || origin.is_some_and(|p| bar.contains(p) && down);
+        if touched && armed.map(|(a, _)| a) != Some(i) {
+            let from = if i == 0 { before_seek } else { before_volume };
+            let mut index = from;
+            while index < app.actions.len() {
+                if matches!(app.actions[index], Action::Seek(_) | Action::SetVolume(_) | Action::PreviewVolume(_)) {
+                    app.actions.remove(index);
+                } else {
+                    index += 1;
+                }
+            }
+            if i == 0 {
+                app.seek_preview = None;
+            } else {
+                app.volume_preview = None;
+            }
+            if down && origin.is_some_and(|p| bar.contains(p)) {
+                bar_drag += delta;
+            }
+        }
+    }
+    ctx.data_mut(|data| data.insert_temp(egui::Id::new("popout-bar-drag"), bar_drag));
     if now.playing {
         ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
     }
