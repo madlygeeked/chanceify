@@ -1189,10 +1189,10 @@ pub fn item_menu(
             labels.push((gettext(locale, "Go to artist").into_owned(), 22.0));
             labels.push((gettext(locale, "Go to album").into_owned(), 0.0));
             labels.push(("Open in Last.fm".to_string(), 0.0));
-            labels.push((format!("Open in {}", crate::build_info::DISPLAY_NAME), 0.0));
-            labels.push(("Copy for Discord".to_string(), 0.0));
+            labels.push((format!("open in {}", crate::build_info::DISPLAY_NAME), 0.0));
+            labels.push(("copy for Discord".to_string(), 0.0));
             if !app.settings.lastfm_session.is_empty() {
-                labels.push(("Love on Last.fm".to_string(), 0.0));
+                labels.push(("love on Last.fm".to_string(), 0.0));
             }
         } else {
             labels.push((gettext(locale, "Save episode").into_owned(), 0.0));
@@ -1240,7 +1240,7 @@ pub fn item_menu(
     }
     if let PlayableItem::Track(track) = item
         && !app.settings.lastfm_session.is_empty()
-        && menu_item(ui, &palette, Some(Icon::Heart), "Love on Last.fm")
+        && menu_item(ui, &palette, Some(Icon::Heart), "love on Last.fm")
     {
         app.actions.push(Action::LastfmLoveSong {
             artist: track
@@ -1445,11 +1445,11 @@ pub fn item_menu(
                 ui,
                 &palette,
                 Some(Icon::ExternalLink),
-                &format!("Open in {}", crate::build_info::DISPLAY_NAME),
+                &format!("open in {}", crate::build_info::DISPLAY_NAME),
             ) {
                 app.actions.push(Action::OpenUrl(url));
             }
-            if menu_item(ui, &palette, Some(Icon::Copy), "Copy for Discord") {
+            if menu_item(ui, &palette, Some(Icon::Copy), "copy for Discord") {
                 app.actions.push(Action::CopyForDiscord {
                     uri: item.uri().to_string(),
                     title: track.name.clone(),

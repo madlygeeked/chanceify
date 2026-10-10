@@ -1947,16 +1947,11 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                     app.mark_settings_dirty();
                 }
                 if app.settings.discord_presence {
-                    theme::subtle(
-                        ui,
-                        &palette,
-                        "Shows on your Discord profile like Spotify does: the song and artist, the cover and a progress bar, with a small chanceify badge. Discord's desktop app has to be open.",
-                    );
                     ui.add_space(4.0);
                     ui.add_space(6.0);
                     {
                         let (text, colour) = match crate::discord::link_state() {
-                            2 => ("Discord: connected, and the song was sent.", palette.accent),
+                            2 => ("Discord connected, song sent.", palette.accent),
                             1 => ("Discord: found. Waiting for a song to send.", palette.secondary),
                             _ => (
                                 "Discord: not found yet. Open the Discord desktop app (not the website), and turn on Settings > Activity Privacy > Share my activity in Discord.",
@@ -1969,10 +1964,6 @@ fn show_inner(app: &mut App, ui: &mut egui::Ui) {
                             theme::text(ui, &problem, theme::regular(12.0), palette.warning);
                         }
                         ui.ctx().request_repaint_after(std::time::Duration::from_secs(2));
-                    }
-                    ui.add_space(4.0);
-                    if theme::soft_button(ui, &palette, None, "Copy what I'm playing for Discord", false).clicked() {
-                        app.actions.push(Action::ShareToDiscord);
                     }
                 }
             }
