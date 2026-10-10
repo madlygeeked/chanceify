@@ -4,9 +4,9 @@ title: setup
 
 # setup
 
-## your own spotify app (optional)
+## getting rate limited? (optional)
 
-a private connection to spotify. it avoids shared limits.
+get more api requests with your own spotify app.
 
 1. open the [spotify developer dashboard](https://developer.spotify.com/dashboard) and sign in.
 2. create an app. any name.
