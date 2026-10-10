@@ -13,8 +13,6 @@ pub(super) const fn platform_shortcut<'a>(ctrl: &'a str, cmd: &'a str) -> &'a st
 }
 
 pub(super) const QUIT_SHORTCUT: &str = platform_shortcut("Ctrl+Q", "Cmd+Q");
-pub(super) const WINAMP_SHORTCUT: &str = platform_shortcut("Ctrl+M", "Cmd+Shift+M");
-pub(super) const MILKDROP_SHORTCUT: &str = platform_shortcut("Ctrl+Shift+K", "Cmd+Shift+K");
 
 /// A shortcut the user may move to another plain key.
 pub struct Bindable {
@@ -751,18 +749,11 @@ mod tests {
     #[test]
     fn shortcut_constants_name_the_platform_modifier() {
         let expected = if cfg!(target_os = "macos") {
-            ["Cmd+Q", "Cmd+Shift+M", "Cmd+Shift+K"]
+            "Cmd+Q"
         } else {
-            ["Ctrl+Q", "Ctrl+M", "Ctrl+Shift+K"]
+            "Ctrl+Q"
         };
-        assert_eq!(
-            [
-                QUIT_SHORTCUT,
-                WINAMP_SHORTCUT,
-                MILKDROP_SHORTCUT,
-            ],
-            expected
-        );
+        assert_eq!(QUIT_SHORTCUT, expected);
     }
 
     #[test]

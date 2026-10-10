@@ -878,7 +878,7 @@ fn fullscreen_edge_bars(
         return false;
     }
     let samples = if sounding {
-        app.winamp.tap.window(vis::WIDE_SAMPLES, vis::LAG)
+        app.audio.tap.window(vis::WIDE_SAMPLES, vis::LAG)
     } else {
         Vec::new()
     };
@@ -1025,7 +1025,7 @@ fn swirl_phase(app: &mut App, ui: &egui::Ui, now: Option<&NowPlaying>) -> f64 {
     // (a kick shoves it, quiet in between), 3 nothing.
     let mode = app.settings.swirl_react_mode.min(3);
     let energy = if sounding && mode != 3 {
-        let samples = app.winamp.tap.window(vis::FFT_SAMPLES, vis::LAG);
+        let samples = app.audio.tap.window(vis::FFT_SAMPLES, vis::LAG);
         if samples.is_empty() {
             0.0
         } else if mode == 1 {
@@ -1202,7 +1202,7 @@ pub(super) fn visualizer_shape(
                 return false;
             }
             let samples = if sounding {
-                app.winamp.tap.window(vis::WIDE_SAMPLES, vis::LAG)
+                app.audio.tap.window(vis::WIDE_SAMPLES, vis::LAG)
             } else {
                 Vec::new()
             };
@@ -1243,7 +1243,7 @@ pub(super) fn visualizer_shape(
                 + FLOW_DRIFT * app.settings.player_bar_vis_flow_speed() / 60.0)
                 .fract();
             let samples = if sounding {
-                app.winamp.tap.window(vis::WIDE_SAMPLES, vis::LAG)
+                app.audio.tap.window(vis::WIDE_SAMPLES, vis::LAG)
             } else {
                 Vec::new()
             };
@@ -1284,7 +1284,7 @@ pub(super) fn visualizer_shape(
             }
             // Winamp's scope with a column every eight points or so.
             let count = (rect.width() / 8.0).clamp(75.0, 320.0) as usize;
-            let samples = app.winamp.tap.window(count * vis::SCOPE_STEP, vis::LAG);
+            let samples = app.audio.tap.window(count * vis::SCOPE_STEP, vis::LAG);
             waveform(
                 &painter,
                 rect,
@@ -1416,7 +1416,7 @@ fn eq_preview_watchdog(app: &mut App, ctx: &egui::Context) {
         .data(|data| data.get_temp::<f64>(egui::Id::new("eq-preview-at")))
         .unwrap_or(0.0);
     if ctx.input(|input| input.time) - seen > 0.3 {
-        if let Ok(mut shared) = app.winamp.eq.lock() {
+        if let Ok(mut shared) = app.audio.eq.lock() {
             *shared = crate::app::eq_settings(&app.settings);
         }
         ctx.data_mut(|data| data.insert_temp(flag, false));
@@ -1669,7 +1669,7 @@ fn audio_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 let mut heard = crate::app::eq_settings(&app.settings);
                 heard.on = true;
                 heard.bands_db = bands;
-                if let Ok(mut shared) = app.winamp.eq.lock() {
+                if let Ok(mut shared) = app.audio.eq.lock() {
                     *shared = heard;
                 }
                 ui.data_mut(|data| {
@@ -1677,7 +1677,7 @@ fn audio_menu_body(app: &mut App, ui: &mut egui::Ui) {
                     data.insert_temp(egui::Id::new("eq-preview-at"), ui_time);
                 });
             } else if previewing {
-                if let Ok(mut shared) = app.winamp.eq.lock() {
+                if let Ok(mut shared) = app.audio.eq.lock() {
                     *shared = crate::app::eq_settings(&app.settings);
                 }
                 ui.data_mut(|data| data.insert_temp(preview_flag, false));
@@ -3537,7 +3537,7 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
     // The bass makes it sway far harder: the low notes of what is playing,
     // smoothed a little so the letters lean into each hit rather than jitter.
     let bass = if now.playing && now.local {
-        let samples = app.winamp.tap.window(crate::vis::FFT_SAMPLES, crate::vis::LAG);
+        let samples = app.audio.tap.window(crate::vis::FFT_SAMPLES, crate::vis::LAG);
         let mut low = 0.0_f32;
         let mut sum = 0.0_f32;
         for x in &samples {

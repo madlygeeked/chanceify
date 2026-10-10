@@ -41,7 +41,7 @@ impl App {
         let energy = if mode == 1 {
             self.music_bass_level_raw()
         } else {
-            let window = self.winamp.tap.window(1536, 0);
+            let window = self.audio.tap.window(1536, 0);
             if window.is_empty() {
                 return;
             }
@@ -66,7 +66,7 @@ impl App {
         if !self.now_playing().is_some_and(|now| now.playing) {
             return 0.0;
         }
-        let window = self.winamp.tap.window(1536, 0);
+        let window = self.audio.tap.window(1536, 0);
         if window.is_empty() {
             return 0.0;
         }
@@ -168,9 +168,9 @@ impl App {
                 .clone()
                 .filter(|device| !device.trim().is_empty()),
             buffer_ms: self.settings.audio_buffer_ms,
-            tap: Arc::clone(&self.winamp.tap),
-            eq: Arc::clone(&self.winamp.eq),
-            speed: Arc::clone(&self.winamp.speed),
+            tap: Arc::clone(&self.audio.tap),
+            eq: Arc::clone(&self.audio.eq),
+            speed: Arc::clone(&self.audio.speed),
             crossfade_ms: u32::from(self.settings.crossfade_secs) * 1000,
             volume: self.settings.volume,
         }

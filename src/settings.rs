@@ -1173,28 +1173,8 @@ pub struct Settings {
     pub library_sort: std::collections::BTreeMap<LibraryShelf, LibrarySort>,
     /// Interface zoom, egui's zoom factor; Ctrl+plus/minus changes it.
     pub zoom: f32,
-    /// The Winamp window is open.
-    pub winamp_window: bool,
-    /// Windows and X11: keep a taskbar button while the Winamp window is visible.
-    pub winamp_show_taskbar: bool,
-    /// Skin file or folder name. `None` selects the built-in skin.
-    pub skin: Option<String>,
-    /// Pick a different skin each time the mini player opens; `skin` holds
-    /// the one picked.
-    pub random_skin: bool,
-    /// Screen pixels per skin pixel; `None` picks double size for the
-    /// display.
-    pub skin_scale: Option<u8>,
-    /// The Winamp window stays above other windows.
-    pub winamp_on_top: bool,
     /// The mini player's visualiser: bars, scope, or off.
     pub vis: VisMode,
-    /// The playlist window is open under the mini player.
-    pub playlist_open: bool,
-    /// How tall the playlist window is, in skin pixels.
-    pub playlist_height: u32,
-    /// The equalizer window is open under the mini player.
-    pub eq_open: bool,
     /// The equalizer shapes local playback.
     pub eq_on: bool,
     /// The preamp, in decibels, never above zero.
@@ -1205,27 +1185,6 @@ pub struct Settings {
     pub balance: f32,
     /// Play both channels the same.
     pub mono: bool,
-    /// The playlist window is rolled up to its title bar.
-    pub playlist_shaded: bool,
-    /// The equalizer window is rolled up to its title bar.
-    pub eq_shaded: bool,
-    /// The main window is rolled up to its title bar.
-    pub winamp_shaded: bool,
-    /// The MilkDrop window is open (its own window, not part of the skin).
-    pub milkdrop_open: bool,
-    /// How long each preset plays before the next, in seconds.
-    pub milkdrop_seconds: u32,
-    /// How many frames a second the MilkDrop window draws; 0 is uncapped.
-    pub milkdrop_fps: u32,
-    /// Last reported MilkDrop screen refresh rate. The first value sets the
-    /// default frame rate; this field is not directly configurable.
-    pub milkdrop_screen_hz: u32,
-    /// The picture's inner resolution: 1 full, 2 half, 4 quarter.
-    pub milkdrop_scale: u32,
-    /// The MilkDrop window fills the screen.
-    pub milkdrop_fullscreen: bool,
-    /// The MilkDrop window's size in logical points, when not full-screen.
-    pub milkdrop_size: [f32; 2],
     /// Which proxy to use. Older files without this field stay on `system`.
     #[serde(default, skip_serializing_if = "proxy_mode_is_system")]
     pub proxy_mode: ProxyMode,
@@ -1475,31 +1434,12 @@ impl Default for Settings {
             sidebar_order: Vec::new(),
             library_sort: std::collections::BTreeMap::new(),
             zoom: 1.0,
-            winamp_window: false,
-            winamp_show_taskbar: true,
-            skin: None,
-            random_skin: false,
-            skin_scale: None,
-            winamp_on_top: false,
             vis: VisMode::default(),
-            playlist_open: false,
-            playlist_height: 174,
-            eq_open: false,
             eq_on: false,
             eq_preamp_db: 0.0,
             eq_bands_db: [0.0; 10],
             balance: 0.0,
             mono: false,
-            playlist_shaded: false,
-            eq_shaded: false,
-            winamp_shaded: false,
-            milkdrop_open: false,
-            milkdrop_seconds: crate::milkdrop::DEFAULT_SECONDS,
-            milkdrop_fps: crate::milkdrop::DEFAULT_FPS,
-            milkdrop_screen_hz: 0,
-            milkdrop_scale: 1,
-            milkdrop_fullscreen: false,
-            milkdrop_size: crate::milkdrop::DEFAULT_SIZE,
             proxy_mode: ProxyMode::System,
             proxy: String::new(),
             proxy_host: String::new(),
@@ -2845,23 +2785,13 @@ mod tests {
     }
 
     #[test]
-    fn older_settings_keep_the_winamp_window_closed_and_the_built_in_skin() {
+    fn older_settings_keep_the_equalizer_and_visualiser_defaults() {
         let settings: Settings = serde_json::from_str(r#"{"zoom": 1.2}"#).unwrap();
-        assert!(!settings.winamp_window);
-        assert!(settings.winamp_show_taskbar);
-        assert_eq!(settings.skin, None);
-        assert_eq!(settings.skin_scale, None);
-        assert!(!settings.winamp_on_top);
         assert_eq!(settings.vis, super::VisMode::Bars);
-        assert!(!settings.playlist_open);
-        assert_eq!(settings.playlist_height, 174);
         assert!(!settings.eq_on);
         assert_eq!(settings.eq_bands_db, [0.0; 10]);
         assert_eq!(settings.balance, 0.0);
         assert!(!settings.mono);
-        assert!(!settings.playlist_shaded);
-        assert!(!settings.eq_shaded);
-        assert!(!settings.winamp_shaded);
     }
 
     #[test]
@@ -2872,19 +2802,6 @@ mod tests {
         assert_eq!(VisMode::Off.next(), VisMode::Bars);
         let settings: Settings = serde_json::from_str(r#"{"vis": "scope"}"#).unwrap();
         assert_eq!(settings.vis, VisMode::Scope);
-    }
-
-    #[test]
-    fn a_chosen_skin_round_trips() {
-        let settings = Settings {
-            winamp_window: true,
-            skin: Some("Zaxon.wsz".into()),
-            skin_scale: Some(3),
-            ..Settings::default()
-        };
-        let json = serde_json::to_string(&settings).unwrap();
-        let restored: Settings = serde_json::from_str(&json).unwrap();
-        assert_eq!(restored, settings);
     }
 
     #[test]
@@ -3051,13 +2968,6 @@ mod tests {
         assert_eq!(PlayerBarVis::Flow.next(), PlayerBarVis::Swirl);
         assert_eq!(PlayerBarVis::Swirl.next(), PlayerBarVis::Waveform);
         assert_eq!(PlayerBarVis::Waveform.next(), PlayerBarVis::Off);
-    }
-
-    #[test]
-    fn older_settings_keep_the_chosen_skin() {
-        let settings: Settings = serde_json::from_str(r#"{"skin":"A.wsz"}"#).unwrap();
-        assert!(!settings.random_skin);
-        assert_eq!(settings.skin.as_deref(), Some("A.wsz"));
     }
 
     #[test]
@@ -3375,10 +3285,6 @@ pub struct SessionState {
     pub queue_open: Option<bool>,
     /// Which tab the queue panel showed: `queue` or `recents`.
     pub queue_tab: Option<String>,
-    /// Last outer position of the Winamp window.
-    pub winamp_pos: Option<[f32; 2]>,
-    /// Last outer position of the MilkDrop window.
-    pub milkdrop_pos: Option<[f32; 2]>,
     /// The window mode fullscreen lyrics left, when the app closed while
     /// showing them. eframe restores the window full screen, so the next
     /// start returns it to this mode instead.
