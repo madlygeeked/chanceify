@@ -1500,6 +1500,7 @@ pub enum Action {
     ToggleVisGradient,
     ToggleVisLyrics,
     ToggleVisTextSway,
+    ToggleVisSwayBeat,
     SetVisSway(u8),
     SetVisSwayAmount(f32),
     ToggleVisTextOutline,

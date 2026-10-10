@@ -8,7 +8,7 @@ use egui::{Color32, Context, CornerRadius, Frame, Id, Margin, Rect, Stroke};
 
 use crate::app::App;
 use crate::model::{Action, ViewKind};
-use crate::theme::{self, Palette};
+use crate::theme::{self, Icon, Palette};
 
 use super::widgets;
 

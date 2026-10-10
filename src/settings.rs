@@ -878,6 +878,9 @@ pub struct Settings {
     /// The full-screen visualizer's title holds still instead of swaying.
     #[serde(default)]
     pub vis_text_still: bool,
+    /// The title only sways on the beat and holds still between hits.
+    #[serde(default)]
+    pub vis_sway_beat: bool,
     /// How the title sways, an index into `SWAY_PRESETS`.
     #[serde(default)]
     pub vis_sway: u8,
@@ -1350,6 +1353,7 @@ impl Default for Settings {
             vis_lyrics: false,
             vis_text_still: false,
             vis_sway: 0,
+            vis_sway_beat: false,
             vis_sway_amount: 0.0,
             vis_text_no_outline: false,
             vis_text_back: false,

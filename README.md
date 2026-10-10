@@ -8,6 +8,8 @@ A small, fast Spotify player for your desktop. Needs Spotify Premium.
 - Music stats: top artists and songs for 7 days, 30 days or all time
 - Last.fm scrobbling and missing cover art
 - 16 themes, or pick your own colours
+- Full screen visualizer with swirl, bass jump, lyrics and a swaying title
+- Pop-out controls, columns you can lay out your way, mini player and calm mode
 - Every key can be changed, exported and shared
 - Everything it saves stays in one folder next to the app
 

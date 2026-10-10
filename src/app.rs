@@ -11584,6 +11584,11 @@ impl App {
                 self.settings.vis_text_still = !self.settings.vis_text_still;
                 self.mark_settings_dirty();
             }
+            Action::ToggleVisSwayBeat => {
+                self.settings.vis_sway_beat = !self.settings.vis_sway_beat;
+                self.settings.vis_text_still = false;
+                self.mark_settings_dirty();
+            }
             Action::ToggleVisTextOutline => {
                 self.settings.vis_text_no_outline = !self.settings.vis_text_no_outline;
                 self.mark_settings_dirty();

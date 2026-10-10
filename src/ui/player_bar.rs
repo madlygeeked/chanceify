@@ -2189,6 +2189,10 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
                 if let Some(index) = open_choices(ui, &palette, "SWAY STYLE", &names, Some(current)) {
                     app.actions.push(Action::SetVisSway(index as u8));
                 }
+                sway_preview(ui, &palette, app.settings.vis_sway_preset(), app.settings.vis_sway_strength());
+                if chip(ui, &palette, "Sway on the beat only", app.settings.vis_sway_beat, ui.available_width().min(290.0)).clicked() {
+                    app.actions.push(Action::ToggleVisSwayBeat);
+                }
                 slider_row(
                     ui,
                     &palette,
@@ -2851,6 +2855,55 @@ fn shape_button(
 
 /// A title and every choice as chips right under it, two to a row, with
 /// nothing to open first. Returns the one clicked this frame.
+/// The chosen sway style, moving: a small word that sways the way the title
+/// will, so a style can be judged without leaving the panel.
+fn sway_preview(ui: &mut egui::Ui, palette: &crate::theme::Palette, preset: crate::settings::SwayPreset, strength: f32) {
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width().min(290.0), 34.0), Sense::hover());
+    if !ui.is_rect_visible(rect) {
+        return;
+    }
+    let time = ui.input(|input| input.time) as f32;
+    let painter = ui.painter().with_clip_rect(rect);
+    let font = theme::bold(18.0);
+    let word = "sway";
+    let glyphs: Vec<_> = word
+        .chars()
+        .map(|c| painter.layout_no_wrap(c.to_string(), font.clone(), palette.text))
+        .collect();
+    let total: f32 = glyphs.iter().map(|g| g.size().x).sum();
+    let mut x = rect.left() + 6.0;
+    let base = rect.bottom() - 6.0;
+    let t = time * preset.speed;
+    // A steady beat for the preview, so bass-driven styles show their pump.
+    let pulse = ((time * 2.0).sin().max(0.0)).powi(3);
+    let lean = |phase: f32| -> f32 {
+        ((0.05 * (t * 0.9 - phase * 0.6).sin() + 0.03 * (t * 1.7 - phase * 0.9 + 1.0).sin())
+            * (1.0 + 2.0 * pulse * preset.bass * 0.5)
+            * preset.lean
+            * strength)
+            .clamp(-0.6, 0.6)
+    };
+    for (i, galley) in glyphs.iter().enumerate() {
+        let w = galley.size().x;
+        let h = galley.size().y;
+        let bob = (time * 3.0 * preset.speed - i as f32 * 0.55).sin() * preset.bob * h * strength;
+        let origin = pos2(x, base - h + bob);
+        let (pivot, angle) = if preset.stalk > 0.0 {
+            (pos2(x + w / 2.0, base + bob), lean(i as f32 * 0.22))
+        } else {
+            (pos2(rect.left() + 6.0 + total / 2.0, base), lean(0.0))
+        };
+        let (sin, cos) = angle.sin_cos();
+        let d = origin - pivot;
+        let mut shape = egui::epaint::TextShape::new(origin, galley.clone(), palette.text);
+        shape.pos = pivot + vec2(d.x * cos - d.y * sin, d.x * sin + d.y * cos);
+        shape.angle = angle;
+        painter.add(egui::Shape::Text(shape));
+        x += w;
+    }
+    ui.ctx().request_repaint();
+}
+
 fn open_choices(
     ui: &mut egui::Ui,
     palette: &crate::theme::Palette,
@@ -3509,7 +3562,13 @@ fn swirl_scene(app: &mut App, ui: &egui::Ui, rect: Rect, now: Option<&NowPlaying
         .animate_value_with_time(egui::Id::new("title-bass"), bass, 0.07);
     let still = app.settings.vis_text_still;
     let sway = app.settings.vis_sway_preset();
-    let strength = app.settings.vis_sway_strength();
+    // On the beat only: the title moves with each hit and holds still between.
+    let gate = if app.settings.vis_sway_beat {
+        ((bass - 0.12) / 0.4).clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+    let strength = app.settings.vis_sway_strength() * gate;
     let contrast = if ink == Color32::WHITE { Color32::BLACK } else { Color32::WHITE };
     let outline = !app.settings.vis_text_no_outline;
     let show_artist = !app.settings.vis_text_no_artist && !now.subtitle.is_empty();
@@ -4469,7 +4528,12 @@ pub fn now_playing_overlay(app: &mut App, ui: &mut egui::Ui, art: Rect, now: &No
         .on_hover_cursor(egui::CursorIcon::PointingHand);
     {
         let sway = app.settings.vis_sway_preset();
-        let strength = app.settings.vis_sway_strength();
+        let beat_gate = if app.settings.vis_sway_beat {
+            ((app.music_bass_level() - 0.12) / 0.4).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        let strength = app.settings.vis_sway_strength() * beat_gate;
         let still = app.settings.vis_text_still;
         let angle = if still {
             0.0
