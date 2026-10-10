@@ -203,6 +203,10 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
         return;
     };
     if app.settings.float_detached && !app.calm_mode && !app.mini_active {
+        // Where the app's own window is, for the controls to snap to.
+        if let Some(main) = ctx.input(|input| input.viewport().outer_rect) {
+            ctx.data_mut(|data| data.insert_temp(Id::new("main-outer"), main));
+        }
         detached_controls(app, ctx);
         return;
     }
@@ -507,6 +511,25 @@ fn detached_controls(app: &mut App, ctx: &Context) {
             });
         if let Some(outer) = ctx.input(|input| input.viewport().outer_rect) {
             place = Some([outer.min.x, outer.min.y]);
+            // Let go near an edge of the app's window and it sticks there,
+            // flush along it (inside, or just outside, the edge).
+            let main: Option<Rect> = ctx.data(|data| data.get_temp(Id::new("main-outer")));
+            if let Some(main) = main
+                && !ctx.input(|input| input.pointer.any_down())
+            {
+                const NEAR: f32 = 18.0;
+                let pick = |value: f32, targets: [f32; 4]| {
+                    targets.into_iter().find(|t| (value - t).abs() <= NEAR && (value - t).abs() >= 1.0)
+                };
+                let (w, h) = (outer.width(), outer.height());
+                let x = pick(outer.min.x, [main.left(), main.right() - w, main.right(), main.left() - w]);
+                let y = pick(outer.min.y, [main.top(), main.bottom() - h, main.bottom(), main.top() - h]);
+                if x.is_some() || y.is_some() {
+                    let to = egui::pos2(x.unwrap_or(outer.min.x), y.unwrap_or(outer.min.y));
+                    ctx.send_viewport_cmd(ViewportCommand::OuterPosition(to));
+                    place = Some([to.x, to.y]);
+                }
+            }
         }
         ctx.request_repaint_after(std::time::Duration::from_millis(33));
     });
@@ -527,9 +550,23 @@ pub fn show(app: &mut App, ctx: &Context) {
         corner_disc(app, ctx);
     }
     floating_controls(app, ctx);
+    // Closed, the panel forgets where it was: it opens in its usual place
+    // each time (a new id makes the window start afresh).
+    let open_id = Id::new("views-panel-was-open");
+    let gen_id = Id::new("views-panel-generation");
     if !app.views_panel {
+        if ctx.data(|data| data.get_temp::<bool>(open_id)).unwrap_or(false) {
+            ctx.data_mut(|data| {
+                data.insert_temp(open_id, false);
+                let gen: u32 = data.get_temp(gen_id).unwrap_or(0);
+                data.insert_temp(gen_id, gen.wrapping_add(1));
+                data.remove::<Rect>(Id::new("views-panel-rect"));
+            });
+        }
         return;
     }
+    ctx.data_mut(|data| data.insert_temp(open_id, true));
+    let panel_id = Id::new(("views-panel-v3", ctx.data(|data| data.get_temp::<u32>(gen_id)).unwrap_or(0)));
     let palette = dark_palette(app);
     let frame = Frame::new()
         .fill(Color32::from_rgb(0x14, 0x16, 0x1a))
@@ -553,7 +590,7 @@ pub fn show(app: &mut App, ctx: &Context) {
     let scale = if app.settings.views_scale.is_finite() { app.settings.views_scale.clamp(0.7, 1.6) } else { 1.0 };
     let pivot = last_rect.map_or(egui::pos2(60.0, 60.0), |rect| rect.min);
     let to_global = |p: egui::Pos2| pivot + (p - pivot) * scale;
-    let panel_layer = egui::LayerId::new(egui::Order::Foreground, Id::new("views-panel-v3"));
+    let panel_layer = egui::LayerId::new(egui::Order::Foreground, panel_id);
     ctx.set_transform_layer(
         panel_layer,
         egui::emath::TSTransform::new(pivot.to_vec2() * (1.0 - scale), scale),
@@ -566,7 +603,7 @@ pub fn show(app: &mut App, ctx: &Context) {
     let frame = frame.multiply_with_opacity(dim);
     let width = app.settings.views_width.clamp(260.0, 520.0);
     let shown = egui::Window::new("Views")
-        .id(Id::new("views-panel-v3"))
+        .id(panel_id)
         .title_bar(false)
         .order(egui::Order::Foreground)
         .frame(frame)
