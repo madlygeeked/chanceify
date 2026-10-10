@@ -1778,6 +1778,37 @@ pub(crate) fn table_layout(
 /// column is dropped instead.
 const TITLE_MIN: f32 = 150.0;
 
+/// Where the title and each shown column sit, left to right, in the order the
+/// reader arranged them: `(column, x, width)`. The title takes whatever the
+/// others leave, so it can sit anywhere, even in the middle.
+pub(crate) fn column_slots(
+    start: f32,
+    end: f32,
+    order: [u8; 6],
+    laid: &Columns,
+) -> Vec<(crate::model::SortColumn, f32, f32)> {
+    use crate::model::SortColumn as Sc;
+    let others = laid.playlists + laid.album + laid.added + laid.release + laid.bpm;
+    let title = (end - start - others).max(0.0);
+    let mut x = start;
+    let mut out = Vec::new();
+    for code in order {
+        let (column, width) = match code {
+            0 => (Sc::Title, title),
+            1 => (Sc::Playlists, laid.playlists),
+            2 => (Sc::Album, laid.album),
+            3 => (Sc::Added, laid.added),
+            4 => (Sc::Release, laid.release),
+            _ => (Sc::Bpm, laid.bpm),
+        };
+        if width > 0.0 || column == Sc::Title {
+            out.push((column, x, width));
+            x += width;
+        }
+    }
+    out
+}
+
 fn columns(
     width: f32,
     row: &TrackRow<'_>,
@@ -2102,8 +2133,20 @@ fn track_row_contents(
         .filter(|_| cols.added == 0.0)
         .map(|added| util::format_relative_date(app.locale, added, jiff::Timestamp::now()));
     let ago_w = if ago_label.is_some() { 78.0 } else { 0.0 };
-    let text_right =
-        rect.right() - right_fixed - cols.added - cols.added_by - cols.album - cols.bpm - cols.release - cols.genre - cols.playlists - ago_w;
+    // The reader's arrangement: every column, the title too, has a slot.
+    let region_right = rect.right() - right_fixed;
+    let slots = column_slots(x, region_right, app.settings.track_columns.order(), &cols);
+    let slot_at = |column: crate::model::SortColumn| {
+        slots.iter().find(|(c, _, _)| *c == column).map(|(_, at, _)| *at)
+    };
+    if let Some((_, at, _)) = slots.iter().find(|(c, _, _)| *c == crate::model::SortColumn::Title) {
+        x = *at;
+    }
+    let title_end = slots
+        .iter()
+        .find(|(c, _, _)| *c == crate::model::SortColumn::Title)
+        .map_or(region_right, |(_, at, w)| at + w);
+    let text_right = title_end - ago_w;
     if let Some(label) = &ago_label {
         painter.with_clip_rect(Rect::from_min_size(pos2(text_right, rect.top()), vec2(ago_w, row_height)).intersect(painter.clip_rect())).text(
             pos2(text_right + 6.0, rect.center().y),
@@ -2371,7 +2414,6 @@ fn track_row_contents(
             }
         });
     }
-    x = text_right;
 
     // Album.
     // Never drawn over the song name: with no room they are not drawn.
@@ -2381,6 +2423,7 @@ fn track_row_contents(
     // The playlists column: the same icons, in a cell of their own, laid out
     // left to right so the first playlist is always at the cell's left.
     if cols.playlists > 0.0 {
+        x = slot_at(crate::model::SortColumn::Playlists).unwrap_or(x);
         rule(x);
         let cell = Rect::from_min_size(pos2(x, rect.top()), vec2(cols.playlists, row_height));
         let (height, gap) = membership_metrics(app.settings.membership_icon_scale);
@@ -2395,6 +2438,7 @@ fn track_row_contents(
         x += cols.playlists;
     }
     if cols.album > 0.0 {
+        x = slot_at(crate::model::SortColumn::Album).unwrap_or(x);
         rule(x);
         if let PlayableItem::Track(track) = row.item
             && let Some(album) = &track.album
@@ -2444,6 +2488,7 @@ fn track_row_contents(
     }
     // Date added.
     if cols.added > 0.0 {
+        x = slot_at(crate::model::SortColumn::Added).unwrap_or(x);
         rule(x);
         // Spotify stamps the epoch on dates it never recorded; an empty
         // cell is truer than January 1970.
@@ -2466,6 +2511,7 @@ fn track_row_contents(
 
     // The album's release date.
     if cols.release > 0.0 {
+        x = slot_at(crate::model::SortColumn::Release).unwrap_or(x);
         rule(x);
         if let PlayableItem::Track(track) = row.item
             && let Some(date) = track.album.as_ref().and_then(|album| album.release_date.as_deref())
@@ -2499,6 +2545,7 @@ fn track_row_contents(
     // as it scrolls, and a row of dashes would read as a column of answers
     // that are all "unknown".
     if cols.bpm > 0.0 {
+        x = slot_at(crate::model::SortColumn::Bpm).unwrap_or(x);
         rule(x);
         let cell = Rect::from_min_size(pos2(x, rect.top()), vec2(cols.bpm, row_height));
         let measured_key = app.live_key_for(row.item);
@@ -2545,6 +2592,7 @@ fn track_row_contents(
     }
 
     // Heart.
+    x = region_right;
     if cols.heart > 0.0 {
         let tc = app.settings.track_columns;
         let saved = app.is_saved(row.item.uri());
@@ -3109,6 +3157,8 @@ fn column_divider(
     rect: Rect,
     x: f32,
     column: crate::model::SortColumn,
+    // Dragging right makes this column wider (it sits before the title).
+    grows_right: bool,
     columns: &mut crate::settings::TrackColumns,
     // Where the handles already drawn this frame sit. Two handles close
     // enough to overlap would leave one permanently ungrabbable, because
@@ -3150,7 +3200,7 @@ fn column_divider(
         // the names to its left, so a wider column is a smaller delta.
         let delta = ui.input(|input| input.pointer.delta()).x;
         if delta != 0.0 {
-            let width = columns.width(column) - delta;
+            let width = columns.width(column) + if grows_right { delta } else { -delta };
             // A drag stops at the minimum rather than hiding the column.
             // Hiding is a menu choice: a column that vanishes mid-drag
             // takes its handle with it, and there is then no way to drag it
@@ -3266,6 +3316,8 @@ pub fn table_header(
     // swallowed by the heading itself: it was interactive, so the row never
     // saw the click and the menu only opened on empty space.
     let mut anchors: Vec<egui::Response> = Vec::new();
+    // A heading dragged sideways and let go: which one, and where the pointer was.
+    let mut dropped: Option<(SortColumn, f32)> = None;
     let mut heading =
         |ui: &mut Ui, x: f32, text: &str, column: SortColumn, room: f32, anchors: &mut Vec<egui::Response>| {
             let active = sort.and_then(|sort| sort.direction(column));
@@ -3278,7 +3330,19 @@ pub fn table_header(
             let top_left = pos2(x, rect.center().y - size.y / 2.0);
             let head =
                 Rect::from_min_size(top_left, size + vec2(arrow_room, 0.0)).expand2(vec2(4.0, 8.0));
-            let response = ui.interact(head, ui.id().with(("table-header", text)), Sense::click());
+            let response = ui.interact(head, ui.id().with(("table-header", text)), Sense::click_and_drag());
+            if response.dragged() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+                if let Some(at) = ui.input(|input| input.pointer.interact_pos()) {
+                    ui.painter().vline(at.x, rect.y_range().shrink(3.0), Stroke::new(2.0, palette.accent));
+                }
+            }
+            if response.drag_stopped()
+                && let Some(at) = response.interact_pointer_pos()
+                && (at.x - response.rect.center().x).abs() > 12.0
+            {
+                dropped = Some((column, at.x));
+            }
             response.widget_info(|| {
                 egui::WidgetInfo::labeled(
                     egui::WidgetType::Button,
@@ -3379,17 +3443,9 @@ pub fn table_header(
     if show_cover {
         x += 52.0;
     }
-    heading(
-        ui,
-        x,
-        &pgettext(locale, "column heading", "TITLE"),
-        SortColumn::Title,
-        f32::INFINITY,
-        &mut anchors,
-    );
-    // The columns are laid out from the right inwards, so the song names
-    // take whatever is left and a column the reader widened takes its room
-    // from them.
+    // The columns sit where the reader put them. The song names take
+    // whatever the others leave, wherever they are, so a column added or
+    // widened takes its room from them.
     let laid = table_layout(
         width,
         ColumnsShown {
@@ -3407,90 +3463,38 @@ pub fn table_header(
     );
     let right_fixed = columns.buttons_width() + if columns.hide_duration { 0.0 } else { 56.0 } + 8.0;
     // The headings must be drawn in exactly the order `track_row` draws the
-    // cells, or every heading sits one column left of its own data. The
-    // order is: album, added by, date added, tempo.
-    let mut cx = rect.right()
-        - right_fixed
-        - laid.added
-        - laid.added_by
-        - laid.album
-        - laid.bpm
-        - laid.release
-        - laid.genre
-        - laid.playlists;
-    let mut edges: Vec<(f32, SortColumn)> = Vec::new();
-    if laid.playlists > 0.0 {
-        heading(
-            ui,
-            cx,
-            &pgettext(locale, "column heading", "PLAYLISTS"),
-            SortColumn::Playlists,
-            laid.playlists,
-            &mut anchors,
-        );
-        edges.push((cx, SortColumn::Playlists));
-        cx += laid.playlists;
+    // cells (both use `column_slots`), or every heading sits over the wrong data.
+    let slots = column_slots(x, rect.right() - right_fixed, columns.order(), &laid);
+    let title_at = slots.iter().position(|(c, _, _)| *c == SortColumn::Title);
+    // (edge, column, whether dragging right makes the column wider)
+    let mut edges: Vec<(f32, SortColumn, bool)> = Vec::new();
+    for (index, (column, at, room)) in slots.iter().enumerate() {
+        let label = match column {
+            SortColumn::Title => pgettext(locale, "column heading", "TITLE"),
+            SortColumn::Playlists => pgettext(locale, "column heading", "PLAYLISTS"),
+            SortColumn::Album => pgettext(locale, "column heading", "ALBUM"),
+            SortColumn::Added => pgettext(locale, "column heading", "DATE ADDED"),
+            SortColumn::Release => pgettext(locale, "column heading", "RELEASE DATE"),
+            _ => pgettext(locale, "column heading", "BPM"),
+        };
+        let room = if *column == SortColumn::Title { f32::INFINITY } else { *room };
+        heading(ui, *at, &label, *column, room, &mut anchors);
+        if *column != SortColumn::Title {
+            // The title gives way to its neighbours: a column after it is
+            // resized from its left edge, one before it from its right edge.
+            match title_at {
+                Some(title) if index < title => edges.push((at + *room, *column, true)),
+                _ => edges.push((*at, *column, false)),
+            }
+        }
     }
-    if laid.album > 0.0 {
-        heading(
-            ui,
-            cx,
-            &pgettext(locale, "column heading", "ALBUM"),
-            SortColumn::Album,
-            laid.album,
-            &mut anchors,
-        );
-        edges.push((cx, SortColumn::Album));
-        cx += laid.album;
-    }
-    if laid.added > 0.0 {
-        heading(
-            ui,
-            cx,
-            &pgettext(locale, "column heading", "DATE ADDED"),
-            SortColumn::Added,
-            laid.added,
-            &mut anchors,
-        );
-        edges.push((cx, SortColumn::Added));
-        // The cursor steps over the column just drawn, so the next heading
-        // starts where its own cell starts.
-        cx += laid.added;
-    }
-    if laid.release > 0.0 {
-        heading(
-            ui,
-            cx,
-            &pgettext(locale, "column heading", "RELEASE DATE"),
-            SortColumn::Release,
-            laid.release,
-            &mut anchors,
-        );
-        edges.push((cx, SortColumn::Release));
-        cx += laid.release;
-    }
-    if laid.genre > 0.0 {
-        heading(
-            ui,
-            cx,
-            &pgettext(locale, "column heading", "GENRE"),
-            SortColumn::Genre,
-            laid.genre,
-            &mut anchors,
-        );
-        edges.push((cx, SortColumn::Genre));
-        cx += laid.genre;
-    }
-    if laid.bpm > 0.0 {
-        heading(
-            ui,
-            cx,
-            &pgettext(locale, "column heading", "BPM"),
-            SortColumn::Bpm,
-            laid.bpm,
-            &mut anchors,
-        );
-        edges.push((cx, SortColumn::Bpm));
+    if let Some((column, at)) = dropped {
+        let shown: Vec<SortColumn> = slots.iter().map(|(c, _, _)| *c).collect();
+        let target = slots
+            .iter()
+            .filter(|(c, x, w)| *c != column && x + w / 2.0 < at)
+            .count();
+        widths.move_column(column, &shown, target);
     }
     if number_clicked {
         clicked = Some(SortColumn::Index);
@@ -3577,7 +3581,7 @@ pub fn table_header(
                     ("RELEASE DATE", "When the album came out."),
                     ("LENGTH", "Shows or hides the song length."),
                     ("RESET COLUMN WIDTHS", "Puts every column back to its starting width."),
-                    ("Dragging", "Drag a column edge to resize it, double-click it to reset, drag to the far left to hide it."),
+                    ("Dragging", "Drag a column edge to resize it (Shift makes them all equal), double-click it to reset, drag to the far left to hide it. Drag a heading sideways to move the column; the song names can go anywhere, even in the middle."),
                     ("Sorting", "Click a heading to sort. Click again to reverse, once more for the list's own order."),
                 ] {
                     ui.horizontal_wrapped(|ui| {
@@ -3600,7 +3604,7 @@ pub fn table_header(
     // menu as a right-click anywhere else on the header.
     let mut menu_anchor = None;
     let mut placed: Vec<f32> = Vec::new();
-    for (edge, column) in edges {
+    for (edge, column, grows_right) in edges {
         if let Some(handle) = column_divider(
             ui,
             palette,
@@ -3608,6 +3612,7 @@ pub fn table_header(
             rect,
             edge,
             column,
+            grows_right,
             &mut widths,
             &mut placed,
         ) {

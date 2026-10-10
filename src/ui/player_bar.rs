@@ -675,22 +675,22 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             // While the controls are popped out (by choice, or because the
             // album art is big) the bar keeps their room but draws nothing.
             let popped = app.float_slot(super::views_panel::default_float(ui.ctx())).is_some();
-            let seek_rect = ui
-                .scope(|ui| {
-                    if popped {
-                        ui.set_invisible();
-                    }
-                    transport(
-                        app,
-                        ui,
-                        now.as_ref(),
-                        seek_row,
-                        band,
-                        blocks[0].left(),
-                        (left_cursor, right_cursor),
-                    )
-                })
-                .inner;
+            // The pop-out controls and the bar's own song-length bar are
+            // exclusive: while the controls are out nothing of the bar's own
+            // is drawn or answers the pointer.
+            let seek_rect = if popped {
+                seek_row
+            } else {
+                transport(
+                    app,
+                    ui,
+                    now.as_ref(),
+                    seek_row,
+                    band,
+                    blocks[0].left(),
+                    (left_cursor, right_cursor),
+                )
+            };
             blocks[1] = seek_rect;
             // Right-click the buttons: the controls pop out into a panel you
             // can move, like the disc. Right-click them there to put away.
@@ -717,10 +717,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     .max_rect(blocks[2])
                     .layout(Layout::left_to_right(Align::Center)),
             );
-            if popped {
-                right_ui.set_invisible();
+            if !popped {
+                extras(app, &mut right_ui, now.as_ref(), &presets);
             }
-            extras(app, &mut right_ui, now.as_ref(), &presets);
             blocks[0] = Rect::from_min_max(
                 pos2(blocks[0].left(), band.top()),
                 pos2(blocks[0].left() + block_w[0], band.bottom()),

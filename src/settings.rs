@@ -99,6 +99,10 @@ pub struct TrackColumns {
     pub hide_plus: bool,
     /// Songs as a grid of covers, whatever columns are on.
     pub grid: bool,
+    /// Where each column sits, left to right: 0 title, 1 playlists, 2 album,
+    /// 3 date added, 4 release date, 5 tempo. The title takes whatever room
+    /// the others leave, wherever it is.
+    pub order: [u8; 6],
 }
 
 impl Default for TrackColumns {
@@ -116,11 +120,66 @@ impl Default for TrackColumns {
             hide_heart: false,
             hide_plus: false,
             grid: false,
+            order: Self::DEFAULT_ORDER,
         }
     }
 }
 
 impl TrackColumns {
+    /// Title first, then the others in the order they have always had.
+    pub const DEFAULT_ORDER: [u8; 6] = [0, 1, 2, 3, 4, 5];
+
+    /// The column order, always a full set of the six: a hand-edited file
+    /// that repeats or drops one gets the standard order back.
+    pub fn order(&self) -> [u8; 6] {
+        let mut seen = [false; 6];
+        for code in self.order {
+            match seen.get_mut(usize::from(code)) {
+                Some(slot) if !*slot => *slot = true,
+                _ => return Self::DEFAULT_ORDER,
+            }
+        }
+        self.order
+    }
+
+    /// The code a column has in `order`, if it can be moved.
+    pub fn code(column: crate::model::SortColumn) -> Option<u8> {
+        use crate::model::SortColumn as Sc;
+        Some(match column {
+            Sc::Title => 0,
+            Sc::Playlists => 1,
+            Sc::Album => 2,
+            Sc::Added => 3,
+            Sc::Release => 4,
+            Sc::Bpm => 5,
+            _ => return None,
+        })
+    }
+
+    /// Moves `column` so that it sits `slot` places from the left among the
+    /// columns that are showing; the hidden ones keep their relative order
+    /// after them.
+    pub fn move_column(&mut self, column: crate::model::SortColumn, shown: &[crate::model::SortColumn], slot: usize) {
+        let Some(code) = Self::code(column) else {
+            return;
+        };
+        let mut visible: Vec<u8> = shown
+            .iter()
+            .filter(|c| **c != column)
+            .filter_map(|c| Self::code(*c))
+            .collect();
+        visible.insert(slot.min(visible.len()), code);
+        let mut next: Vec<u8> = visible.clone();
+        for each in self.order() {
+            if !next.contains(&each) {
+                next.push(each);
+            }
+        }
+        if let Ok(order) = <[u8; 6]>::try_from(next) {
+            self.order = order;
+        }
+    }
+
     /// How wide the heart and "+" buttons are together.
     pub fn buttons_width(&self) -> f32 {
         // The "+" goes with the heart: no liked column, no buttons.
@@ -3377,5 +3436,32 @@ mod session_tests {
         assert_eq!(columns.buttons_width(), 72.0);
         let one = TrackColumns { hide_heart: true, ..columns };
         assert_eq!(one.buttons_width(), 0.0);
+    }
+}
+
+#[cfg(test)]
+mod column_order_tests {
+    use super::TrackColumns;
+    use crate::model::SortColumn as Sc;
+
+    #[test]
+    fn a_broken_order_falls_back_to_the_standard_one() {
+        let mut columns = TrackColumns::default();
+        columns.order = [0, 0, 2, 3, 4, 5];
+        assert_eq!(columns.order(), TrackColumns::DEFAULT_ORDER);
+        columns.order = [0, 1, 2, 3, 4, 9];
+        assert_eq!(columns.order(), TrackColumns::DEFAULT_ORDER);
+    }
+
+    #[test]
+    fn moving_the_title_into_the_middle_keeps_every_column() {
+        let mut columns = TrackColumns::default();
+        let shown = [Sc::Title, Sc::Album, Sc::Added, Sc::Bpm];
+        columns.move_column(Sc::Title, &shown, 1);
+        let order = columns.order();
+        assert_eq!(&order[..4], &[2, 0, 3, 5]);
+        let mut sorted = order;
+        sorted.sort_unstable();
+        assert_eq!(sorted, [0, 1, 2, 3, 4, 5]);
     }
 }
