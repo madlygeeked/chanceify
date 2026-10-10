@@ -9930,6 +9930,13 @@ impl App {
                 // F and C never run together: F again closes both.
                 self.leave_lyrics_fullscreen(ctx);
                 self.fullscreen_vis = !self.fullscreen_vis;
+                // The full screen is the visualizer: with every shape off
+                // there would be nothing behind the controls, so one comes on.
+                if self.fullscreen_vis && self.settings.vis_shapes_value() == 0 {
+                    self.settings.vis_shapes = crate::settings::Settings::SHAPE_BARS;
+                    self.settings.vis_shapes_set = true;
+                    self.mark_settings_dirty();
+                }
             }
             Action::RevealSong { uri } => {
                 // The membership index already knows which of the reader's
@@ -11454,6 +11461,12 @@ impl App {
                     self.settings.jump_shake = value.clamp(0.2, 3.0);
                     self.mark_settings_dirty();
                 }
+            }
+            Action::ToggleJumpAuto => {
+                self.settings.vis_jump_on = !self.settings.vis_jump_on;
+                let text = if self.settings.vis_jump_on { "Bass jump on" } else { "Bass jump off" };
+                self.toast(text);
+                self.mark_settings_dirty();
             }
             Action::SetJumpReact(mode) => {
                 self.settings.vis_jump_react = mode.min(3);

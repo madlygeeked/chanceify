@@ -99,6 +99,9 @@ pub struct TrackColumns {
     pub hide_plus: bool,
     /// The artist's name under the song name is switched off.
     pub hide_artist: bool,
+    /// The table keeps to the left edge, as in Spotify. Off (the default),
+    /// it sits in the middle and grows out from there.
+    pub lock_left: bool,
     /// Songs as a grid of covers, whatever columns are on.
     pub grid: bool,
     /// Where each column sits, left to right: 0 title, 1 playlists, 2 album,
@@ -125,6 +128,7 @@ impl Default for TrackColumns {
             hide_heart: false,
             hide_plus: false,
             hide_artist: false,
+            lock_left: false,
             grid: false,
             order: Self::DEFAULT_ORDER,
             spread: false,
@@ -989,6 +993,8 @@ pub struct Settings {
     /// What makes the screen jump by itself: 0 loudness, 1 bass, 2 beat,
     /// 3 nothing (only the bass-jump key).
     pub vis_jump_react: u8,
+    /// The screen jumps by itself, following `vis_jump_react`.
+    pub vis_jump_on: bool,
     #[serde(default)]
     pub vis_flow_opacity: f32,
     /// The volume shortcut buttons; never set means 50 and 100.
@@ -1390,7 +1396,8 @@ impl Default for Settings {
             lyrics_vis_dark: 0.0,
             vis_bars_opacity: 0.0,
             swirl_react_mode: 0,
-            vis_jump_react: 3,
+            vis_jump_react: 1,
+            vis_jump_on: false,
             vis_flow_opacity: 0.0,
             volume_presets: None,
             hint_seen: false,
@@ -1808,7 +1815,7 @@ impl Settings {
         "swirl_scale", "swirl_tune", "swirl_warp", "swirl_waves", "theme", "theme_from_cover", "custom_bg", "custom_accent",
         "track_columns", "tracklist_compact", "vis", "vis_bar_sides", "vis_shapes",
         "vis_shapes_last", "vis_shapes_set", "volume_presets", "zoom",
-        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_sway", "vis_sway_amount", "vis_text_no_outline", "vis_text_back", "vis_back_alpha", "vis_back_round", "vis_back_pad", "vis_back_block", "vis_live_preview", "vis_font_random", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "lyrics_vis_mode", "window_opacity", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "bar_layout", "bar_free", "bar_free_pos", "bar_free_seek", "lyrics_ctl_off", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode", "vis_jump_react",
+        "volume_custom_width", "vis_no_gradient", "vis_lyrics", "vis_text_still", "vis_sway", "vis_sway_amount", "vis_text_no_outline", "vis_text_back", "vis_back_alpha", "vis_back_round", "vis_back_pad", "vis_back_block", "vis_live_preview", "vis_font_random", "vis_text_font", "vis_text_no_artist", "vis_lyrics_no_back", "vis_bars_stay", "lyrics_vis", "lyrics_vis_dark", "lyrics_vis_mode", "window_opacity", "anchor_controls", "anchor_volume", "nudge_controls", "nudge_volume", "nudge_seek", "bar_stacked", "bar_layout", "bar_free", "bar_free_pos", "bar_free_seek", "lyrics_ctl_off", "vis_bars_opacity", "vis_flow_opacity", "swirl_react_mode", "vis_jump_react", "vis_jump_on",
     ];
 
     /// The shareable part of the settings, as the text of a file.

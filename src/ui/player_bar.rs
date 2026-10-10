@@ -1349,7 +1349,9 @@ pub(super) fn vis_panel_window(app: &mut App, ctx: &egui::Context) {
     // Above the spot that was right-clicked; with no click on record (the V
     // key), the old place at the right.
     let clicked_x = ctx.data(|data| data.get_temp::<f32>(egui::Id::new("vis-click-x")));
+    // Normal view and full screen each remember their own place and width.
     let mut panel = egui::Window::new("visualizer-panel")
+        .id(egui::Id::new(if floating { "visualizer-panel-full" } else { "visualizer-panel" }))
         .title_bar(false)
         .collapsible(false);
     // Wherever the panel is shown it can be dragged about and made wider;
@@ -2058,15 +2060,23 @@ fn vis_menu_body(app: &mut App, ui: &mut egui::Ui) {
             ui.vertical(|ui| {
             ui.set_width(col_w);
             theme::subtle(ui, &palette, &gettext(app.locale, "BASS JUMP"));
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                if chip(ui, &palette, &gettext(app.locale, "On"), app.settings.vis_jump_on, 60.0).clicked() {
+                    app.actions.push(Action::ToggleJumpAuto);
+                }
+                if chip(ui, &palette, &gettext(app.locale, "Preview"), false, 80.0).clicked() {
+                    app.actions.push(Action::TapTempo);
+                }
+            });
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 for (value, glyph, tip) in [
                     (0u8, Glyph::Icon(Icon::Volume2), "Jumps with the loudness"),
                     (1, Glyph::Icon(Icon::Speaker), "Jumps with the bass"),
                     (2, Glyph::Icon(Icon::Zap), "Jumps on the beat"),
-                    (3, Glyph::Nothing, "Only the bass jump key"),
                 ] {
-                    if glyph_button(ui, &palette, glyph, tip, app.settings.vis_jump_react.min(3) == value).clicked() {
+                    if glyph_button(ui, &palette, glyph, tip, app.settings.vis_jump_react.min(2) == value).clicked() {
                         app.actions.push(Action::SetJumpReact(value));
                     }
                 }

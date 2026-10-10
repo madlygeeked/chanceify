@@ -34,8 +34,8 @@ impl App {
     /// The screen jumps by itself when the music does what the visualizer
     /// settings ask: a rise in loudness, in the bass, or a beat.
     pub fn auto_jump(&mut self) {
-        let mode = self.settings.vis_jump_react;
-        if mode > 2 || !self.now_playing().is_some_and(|now| now.playing && now.local) {
+        let mode = self.settings.vis_jump_react.min(2);
+        if !self.settings.vis_jump_on || !self.now_playing().is_some_and(|now| now.playing && now.local) {
             return;
         }
         let energy = if mode == 1 {
@@ -51,12 +51,12 @@ impl App {
             return;
         }
         let ratio = match mode {
-            0 => 1.5,
-            1 => 1.35,
-            _ => 1.25,
+            0 => 1.3,
+            1 => 1.2,
+            _ => 1.15,
         };
         let rested = self.jump_at.is_none_or(|at| at.elapsed().as_secs_f32() > 0.32);
-        if rested && energy > 0.08 && energy > self.jump_avg * ratio + 0.02 {
+        if rested && energy > 0.03 && energy > self.jump_avg * ratio + 0.01 {
             self.jump_at = Some(Instant::now());
         }
         self.jump_avg += (energy - self.jump_avg) * 0.05;

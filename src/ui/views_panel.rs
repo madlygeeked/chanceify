@@ -245,40 +245,64 @@ pub fn floating_controls(app: &mut App, ctx: &Context) {
                 );
                 change = Some(Some([top_left.x, top_left.y, width]));
             }
-            // Resizable from any edge or corner: the right side and the
-            // bottom-right corner widen it, the left side widens it and
-            // moves it so the far edge stays put. Everything inside scales.
+            // Resizable from any edge or corner. The sides widen it (the left
+            // one moves it so the far edge stays put); the bottom makes it
+            // taller. Taller or wider, everything inside scales together.
+            let edge = 10.0;
+            let corner = 16.0;
             let right_edge = Rect::from_min_max(
-                egui::pos2(outer.right() - 10.0, outer.top() + 10.0),
-                egui::pos2(outer.right() + 6.0, outer.bottom() + 6.0),
+                egui::pos2(outer.right() - edge, outer.top() + 14.0),
+                egui::pos2(outer.right() + 6.0, outer.bottom() - corner),
             );
             let left_edge = Rect::from_min_max(
-                egui::pos2(outer.left() - 6.0, outer.top() + 10.0),
-                egui::pos2(outer.left() + 10.0, outer.bottom() + 6.0),
+                egui::pos2(outer.left() - 6.0, outer.top() + 14.0),
+                egui::pos2(outer.left() + edge, outer.bottom() - corner),
             );
             let bottom_edge = Rect::from_min_max(
-                egui::pos2(outer.left() + 10.0, outer.bottom() - 8.0),
-                egui::pos2(outer.right() - 10.0, outer.bottom() + 6.0),
+                egui::pos2(outer.left() + corner, outer.bottom() - edge),
+                egui::pos2(outer.right() - corner, outer.bottom() + 6.0),
+            );
+            let corner_right = Rect::from_min_max(
+                egui::pos2(outer.right() - corner, outer.bottom() - corner),
+                egui::pos2(outer.right() + 6.0, outer.bottom() + 6.0),
+            );
+            let corner_left = Rect::from_min_max(
+                egui::pos2(outer.left() - 6.0, outer.bottom() - corner),
+                egui::pos2(outer.left() + corner, outer.bottom() + 6.0),
             );
             let right_response = ui.interact(right_edge, Id::new("pop-out-edge"), egui::Sense::drag());
             let left_response = ui.interact(left_edge, Id::new("pop-out-edge-left"), egui::Sense::drag());
             let bottom_response = ui.interact(bottom_edge, Id::new("pop-out-edge-bottom"), egui::Sense::drag());
-            for response in [&right_response, &left_response, &bottom_response] {
+            let corner_right_response = ui.interact(corner_right, Id::new("pop-out-corner-right"), egui::Sense::drag());
+            let corner_left_response = ui.interact(corner_left, Id::new("pop-out-corner-left"), egui::Sense::drag());
+            for (response, cursor) in [
+                (&right_response, egui::CursorIcon::ResizeHorizontal),
+                (&left_response, egui::CursorIcon::ResizeHorizontal),
+                (&bottom_response, egui::CursorIcon::ResizeVertical),
+                (&corner_right_response, egui::CursorIcon::ResizeNwSe),
+                (&corner_left_response, egui::CursorIcon::ResizeNeSw),
+            ] {
                 if response.hovered() || response.dragged() {
-                    ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+                    ui.ctx().set_cursor_icon(cursor);
                 }
             }
-            let max_w = (screen.width() - 16.0).clamp(300.0, 1400.0);
-            if right_response.dragged() || bottom_response.dragged() {
-                let dx = right_response.drag_delta().x + bottom_response.drag_delta().x;
-                let wider = (width + dx).clamp(300.0, max_w);
-                let x = top_left.x.min((screen.right() - wider).max(screen.left()));
+            // Never so wide that the song bar runs the whole screen.
+            let max_w = (screen.width() - 16.0).clamp(300.0, 640.0);
+            let grow_right = right_response.drag_delta().x + corner_right_response.drag_delta().x;
+            let grow_left = -(left_response.drag_delta().x + corner_left_response.drag_delta().x);
+            let grow_down = bottom_response.drag_delta().y
+                + corner_right_response.drag_delta().y
+                + corner_left_response.drag_delta().y;
+            if grow_right != 0.0 || grow_left != 0.0 {
+                let wider = (width + grow_right + grow_left).clamp(300.0, max_w);
+                let x = (top_left.x + width - wider).max(screen.left());
+                let x = if grow_left != 0.0 { x } else { top_left.x.min((screen.right() - wider).max(screen.left())) };
                 change = Some(Some([x, top_left.y, wider]));
             }
-            if left_response.dragged() {
-                let wider = (width - left_response.drag_delta().x).clamp(300.0, max_w);
-                let x = (top_left.x + width - wider).max(screen.left());
-                change = Some(Some([x, top_left.y, wider]));
+            if grow_down != 0.0 {
+                // Height is the controls' size: dragging down makes them bigger.
+                let scale = (app.settings.controls_scale_value() + grow_down / 56.0).clamp(0.7, 1.8);
+                app.actions.push(Action::SetControlsScale(scale));
             }
             grip_response.context_menu(|ui| {
                 if ui.button("Snap to the library sidebar").clicked() {

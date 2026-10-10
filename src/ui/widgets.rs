@@ -1802,6 +1802,19 @@ pub(crate) fn spread_columns(laid: &mut Columns, region: f32) {
     }
 }
 
+/// How far the whole table moves right to sit in the middle of the list: the
+/// song name keeps a fixed 460 and everything grows out from the centre.
+/// Nothing moves when the table is locked to the left, spread evenly, or
+/// too narrow to have room to spare.
+fn centred_shift(room: f32, others: f32, columns: &crate::settings::TrackColumns) -> f32 {
+    let title = room - others;
+    if columns.lock_left || columns.spread || title <= 520.0 {
+        0.0
+    } else {
+        (title - 460.0) / 2.0
+    }
+}
+
 /// Where the title and each shown column sit, left to right, in the order the
 /// reader arranged them: `(column, x, width)`. The title takes whatever the
 /// others leave, so it can sit anywhere, even in the middle.
@@ -1810,18 +1823,11 @@ pub(crate) fn column_slots(
     end: f32,
     order: [u8; 6],
     laid: &Columns,
-    centre_lone_title: bool,
 ) -> Vec<(crate::model::SortColumn, f32, f32)> {
     use crate::model::SortColumn as Sc;
     let others = laid.playlists + laid.album + laid.added + laid.release + laid.bpm;
-    let mut title = (end - start - others).max(0.0);
+    let title = (end - start - others).max(0.0);
     let mut x = start;
-    // The song name alone in a wide list sits in the middle, not hard left.
-    if centre_lone_title && others == 0.0 && title > 560.0 {
-        let narrow = 460.0;
-        x += (title - narrow) / 2.0;
-        title = narrow;
-    }
     let mut out = Vec::new();
     for code in order {
         let (column, width) = match code {
@@ -2074,7 +2080,7 @@ fn track_row_contents(
         let others = cols.playlists + cols.album + cols.added + cols.release + cols.bpm;
         let right_fixed = cols.heart + if row.show_time { cols.duration } else { 0.0 } + cols.more + 8.0;
         let region = rect.right() - right_fixed - (rect.left() + 8.0 + cols.number + cols.cover);
-        if others == 0.0 && !bare && region > 560.0 { (region - 460.0) / 2.0 } else { 0.0 }
+        if bare { 0.0 } else { centred_shift(region, others, &app.settings.track_columns) }
     };
     let mut x = rect.left() + 8.0 + lone_shift;
 
@@ -2183,7 +2189,7 @@ fn track_row_contents(
     if app.settings.track_columns.spread && !bare {
         spread_columns(&mut cols, region_right - x);
     }
-    let slots = column_slots(x, region_right, app.settings.track_columns.order(), &cols, false);
+    let slots = column_slots(x, region_right - lone_shift, app.settings.track_columns.order(), &cols);
     let slot_at = |column: crate::model::SortColumn| {
         slots.iter().find(|(c, _, _)| *c == column).map(|(_, at, _)| *at)
     };
@@ -2963,6 +2969,67 @@ pub fn drag_ghost(ctx: &egui::Context, palette: &Palette, locale: Locale) {
         });
 }
 
+/// The list of columns, shared by the right-click menu and the button at
+/// the end of the heading row (which opens it with a plain left click).
+fn columns_menu(ui: &mut Ui, palette: &Palette, locale: crate::i18n::Locale, widths: &mut crate::settings::TrackColumns) {
+    ui.set_width(220.0);
+                    ui.spacing_mut().item_spacing.y = 1.0;
+                    if checkbox_row(ui, palette, &gettext(locale, "GRID VIEW"), widths.grid) {
+                        widths.grid = !widths.grid;
+                    }
+                    if checkbox_row(ui, palette, &gettext(locale, "SPREAD EVENLY"), widths.spread) {
+                        widths.spread = !widths.spread;
+                    }
+                    if checkbox_row(ui, palette, &gettext(locale, "LOCK TO THE LEFT"), widths.lock_left) {
+                        widths.lock_left = !widths.lock_left;
+                    }
+                    menu_separator(ui, palette);
+                    if checkbox_row(
+                        ui,
+                        palette,
+                        &gettext(locale, "NUMBER"),
+                        !widths.hide_number,
+                    ) {
+                        widths.hide_number = !widths.hide_number;
+                    }
+                    for (column, entry) in RESIZABLE {
+                        if checkbox_row(
+                            ui,
+                            palette,
+                            &column_label(locale, entry),
+                            widths.shown(column),
+                        ) {
+                            widths.toggle(column);
+                        }
+                    }
+                    if checkbox_row(
+                        ui,
+                        palette,
+                        &pgettext(locale, "column heading", "RELEASE DATE"),
+                        widths.shown(SortColumn::Release),
+                    ) {
+                        widths.toggle(SortColumn::Release);
+                    }
+                    if checkbox_row(
+                        ui,
+                        palette,
+                        &gettext(locale, "LENGTH"),
+                        !widths.hide_duration,
+                    ) {
+                        widths.hide_duration = !widths.hide_duration;
+                    }
+                    if checkbox_row(ui, palette, &gettext(locale, "ARTIST"), !widths.hide_artist) {
+                        widths.hide_artist = !widths.hide_artist;
+                    }
+                    if checkbox_row(ui, palette, &gettext(locale, "LIKED"), !widths.hide_heart) {
+                        widths.hide_heart = !widths.hide_heart;
+                    }
+                    menu_separator(ui, palette);
+                    if menu_item(ui, palette, None, &gettext(locale, "RESET COLUMN WIDTHS")) {
+                        widths.reset();
+                    }
+}
+
 pub fn explicit_badge(ui: &mut Ui, palette: &Palette) {
     // The explicit mark is not shown anywhere.
     let _ = (ui, palette);
@@ -3439,8 +3506,36 @@ pub fn table_header(
             }
             anchors.push(response);
         };
+    // The columns sit where the reader put them. The song names take
+    // whatever the others leave, wherever they are, so a column added or
+    // widened takes its room from them.
+    let mut laid = table_layout(
+        width,
+        ColumnsShown {
+            album: show_album,
+            added: show_added,
+            added_by: show_added_by,
+            bpm: show_bpm,
+            release: widths.shown(SortColumn::Release),
+            genre: widths.shown(SortColumn::Genre),
+            playlists: widths.shown(SortColumn::Playlists),
+            cover: show_cover,
+        },
+        &widths,
+        false,
+    );
+    let right_fixed = columns.buttons_width() + if columns.hide_duration { 0.0 } else { 56.0 } + 8.0;
+    // Unless it is locked to the left, the whole table sits in the middle:
+    // the number, cover, song name and columns move together and grow out
+    // from the centre as columns are added.
+    let prefix = if !columns.hide_number && !grid { 44.0 } else { 0.0 } + if show_cover { 52.0 } else { 0.0 };
+    let shift = centred_shift(
+        rect.right() - right_fixed - (rect.left() + 8.0 + prefix),
+        laid.playlists + laid.album + laid.added + laid.release + laid.bpm,
+        columns,
+    );
     let mut number_clicked = false;
-    let mut x = rect.left() + 8.0;
+    let mut x = rect.left() + 8.0 + shift;
     // In the grid the songs carry their numbers on their covers, so there
     // is no # heading.
     let show_number = !columns.hide_number && !grid;
@@ -3498,31 +3593,12 @@ pub fn table_header(
     if show_cover {
         x += 52.0;
     }
-    // The columns sit where the reader put them. The song names take
-    // whatever the others leave, wherever they are, so a column added or
-    // widened takes its room from them.
-    let mut laid = table_layout(
-        width,
-        ColumnsShown {
-            album: show_album,
-            added: show_added,
-            added_by: show_added_by,
-            bpm: show_bpm,
-            release: widths.shown(SortColumn::Release),
-            genre: widths.shown(SortColumn::Genre),
-            playlists: widths.shown(SortColumn::Playlists),
-            cover: show_cover,
-        },
-        &widths,
-        false,
-    );
-    let right_fixed = columns.buttons_width() + if columns.hide_duration { 0.0 } else { 56.0 } + 8.0;
     if columns.spread {
         spread_columns(&mut laid, rect.right() - right_fixed - x);
     }
     // The headings must be drawn in exactly the order `track_row` draws the
     // cells (both use `column_slots`), or every heading sits over the wrong data.
-    let slots = column_slots(x, rect.right() - right_fixed, columns.order(), &laid, true);
+    let slots = column_slots(x, rect.right() - right_fixed - shift, columns.order(), &laid);
     let title_at = slots.iter().position(|(c, _, _)| *c == SortColumn::Title);
     // (edge, column, whether dragging right makes the column wider)
     let mut edges: Vec<(f32, SortColumn, bool)> = Vec::new();
@@ -3638,6 +3714,25 @@ pub fn table_header(
             anchors.push(handle);
         }
         anchors.push(row);
+        // The same list opens with a plain left click on this button.
+        {
+            let spot = Rect::from_center_size(
+                pos2(rect.right() - right_fixed + 16.0, rect.center().y),
+                Vec2::splat(22.0),
+            );
+            let button = ui.interact(spot, ui.id().with("columns-button"), Sense::click());
+            theme::paint_icon(
+                ui,
+                Icon::Settings,
+                spot,
+                14.0,
+                if button.hovered() { palette.text } else { palette.dim },
+            );
+            let button = button.on_hover_text(gettext(locale, "Columns"));
+            egui::Popup::menu(&button)
+                .frame(menu_frame(palette))
+                .show(|ui| columns_menu(ui, palette, locale, &mut widths));
+        }
         for anchor in anchors {
             egui::Popup::context_menu(&anchor)
                 .frame(menu_frame(palette))
@@ -3645,59 +3740,7 @@ pub fn table_header(
                     // Spotify-style Columns list, in the order the columns sit
                     // in the table. Sorting is only ever done by clicking a
                     // heading, so there is no sort section here.
-                    ui.set_width(220.0);
-                    ui.spacing_mut().item_spacing.y = 1.0;
-                    if checkbox_row(ui, palette, &gettext(locale, "GRID VIEW"), widths.grid) {
-                        widths.grid = !widths.grid;
-                    }
-                    if checkbox_row(ui, palette, &gettext(locale, "SPREAD EVENLY"), widths.spread) {
-                        widths.spread = !widths.spread;
-                    }
-                    menu_separator(ui, palette);
-                    if checkbox_row(
-                        ui,
-                        palette,
-                        &gettext(locale, "NUMBER"),
-                        !widths.hide_number,
-                    ) {
-                        widths.hide_number = !widths.hide_number;
-                    }
-                    for (column, entry) in RESIZABLE {
-                        if checkbox_row(
-                            ui,
-                            palette,
-                            &column_label(locale, entry),
-                            widths.shown(column),
-                        ) {
-                            widths.toggle(column);
-                        }
-                    }
-                    if checkbox_row(
-                        ui,
-                        palette,
-                        &pgettext(locale, "column heading", "RELEASE DATE"),
-                        widths.shown(SortColumn::Release),
-                    ) {
-                        widths.toggle(SortColumn::Release);
-                    }
-                    if checkbox_row(
-                        ui,
-                        palette,
-                        &gettext(locale, "LENGTH"),
-                        !widths.hide_duration,
-                    ) {
-                        widths.hide_duration = !widths.hide_duration;
-                    }
-                    if checkbox_row(ui, palette, &gettext(locale, "ARTIST"), !widths.hide_artist) {
-                        widths.hide_artist = !widths.hide_artist;
-                    }
-                    if checkbox_row(ui, palette, &gettext(locale, "LIKED"), !widths.hide_heart) {
-                        widths.hide_heart = !widths.hide_heart;
-                    }
-                    menu_separator(ui, palette);
-                    if menu_item(ui, palette, None, &gettext(locale, "RESET COLUMN WIDTHS")) {
-                        widths.reset();
-                    }
+                    columns_menu(ui, palette, locale, &mut widths);
                 });
         }
     }

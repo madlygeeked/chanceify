@@ -368,6 +368,18 @@ pub fn song_link(uri: &str, title: &str, artist: &str) -> Option<String> {
     Some(format!("{}/t/{id}?t={}&a={}", EMBED_URL.trim_end_matches('/'), enc(title), enc(artist)))
 }
 
+/// What Discord last said when it refused the song, or why the pipe failed,
+/// for the Settings page (empty when all is well).
+static LAST_ERROR: Mutex<String> = Mutex::new(String::new());
+
+fn note_error(text: String) {
+    *LAST_ERROR.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = text;
+}
+
+pub fn last_error() -> String {
+    LAST_ERROR.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone()
+}
+
 pub fn link_state() -> u8 {
     LINK.load(std::sync::atomic::Ordering::Relaxed)
 }
@@ -427,7 +439,7 @@ fn run(rx: mpsc::Receiver<Message>) {
     let mut pending: Option<(String, Option<Activity>)> = None;
     loop {
         let listening = LISTEN.load(std::sync::atomic::Ordering::Relaxed);
-        let wait = if listening && connection.is_some() { 4 } else { 12 };
+        let wait = if listening && connection.is_some() { 4 } else if connection.is_none() { 5 } else { 12 };
         match rx.recv_timeout(Duration::from_secs(wait)) {
             Ok(Message::Set(id, activity)) => pending = Some((id, activity)),
             Err(mpsc::RecvTimeoutError::Timeout) => {}
@@ -475,12 +487,16 @@ fn run(rx: mpsc::Receiver<Message>) {
             other => other,
         };
         match sent {
-            Ok(_) => {
+            Ok(taken) => {
                 pending = None;
                 LINK.store(2, std::sync::atomic::Ordering::Relaxed);
+                if taken {
+                    note_error(String::new());
+                }
             }
             Err(error) => {
                 log::debug!("discord presence: {error}");
+                note_error(format!("the link to Discord broke ({error}); trying again"));
                 connection = None;
                 LINK.store(0, std::sync::atomic::Ordering::Relaxed);
             }
@@ -503,6 +519,7 @@ fn connect(client_id: &str) -> Option<Box<dyn Pipe>> {
             }
             Ok((_, answer)) => {
                 log::debug!("discord presence: not accepted: {answer}");
+                note_error(format!("Discord did not accept the application ID: {answer}"));
                 return None;
             }
             Err(_) => continue,
@@ -670,6 +687,7 @@ fn set_activity(
     let refused = answer.get("evt").and_then(Value::as_str) == Some("ERROR");
     if refused {
         log::debug!("discord presence: refused: {answer}");
+        note_error(format!("Discord refused the song: {}", answer.get("data").and_then(|d| d.get("message")).and_then(Value::as_str).unwrap_or("no reason given")));
     }
     Ok(!refused)
 }

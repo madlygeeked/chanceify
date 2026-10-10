@@ -2096,6 +2096,10 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                             ),
                         };
                         theme::text(ui, text, theme::regular(12.5), colour);
+                        let problem = crate::discord::last_error();
+                        if !problem.is_empty() {
+                            theme::text(ui, &problem, theme::regular(12.0), palette.warning);
+                        }
                         ui.ctx().request_repaint_after(std::time::Duration::from_secs(2));
                     }
                     ui.add_space(6.0);
