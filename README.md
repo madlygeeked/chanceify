@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://madlygeeked.github.io/assets/chanceify.png" alt="" width="120">
+  <img src="https://madlygeeked.github.io/assets/madgeeked.png" alt="" width="120">
 </p>
 
 <h1 align="center">chanceify™</h1>
